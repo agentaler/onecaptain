@@ -11,8 +11,6 @@ Thanks for your interest in contributing to Alook. This guide covers everything 
 ## Setup
 
 ```bash
-git clone https://github.com/alookai/alook.git
-cd alook
 pnpm install
 pnpm db:migrate
 pnpm dev
@@ -114,18 +112,3 @@ Tests run on both Ubuntu and Windows in CI.
 | `pnpm db:migrate` | Run D1 migrations locally |
 | `pnpm db:reset` | Wipe local D1 and re-migrate |
 | `pnpm clean` | Remove node_modules, build artifacts, local D1 |
-
-## Reporting Issues
-
-Use [GitHub Issues](https://github.com/alookai/alook/issues). We have templates for:
-
-- **Bug reports** — reproduction steps, expected vs actual behavior
-- **Feature requests** — problem statement, proposed solution
-
-## Community
-
-- [Discord](https://discord.alook.ai) — questions, discussion, help
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the [Apache-2.0 License](LICENSE).
