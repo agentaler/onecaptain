@@ -54,8 +54,10 @@ OAuth + integrations (web):
 
 1. **Railway project** with the GitHub repo connected (deploy on push to `main`), the
    services above created from the monorepo root, and the `data` volume attached to `web`.
-2. **Domains + DNS**: point `app.onecaptain.ai` (web) and `ws.onecaptain.ai` (ws) at the
-   Railway services; Railway issues TLS.
+2. **Domains + DNS**: `onecaptain.ai` (landing/marketing) and `app.onecaptain.ai` (app)
+   both point at the `web` service (the Next app serves both surfaces; canonical auth URL
+   is `https://app.onecaptain.ai`), and `ws.onecaptain.ai` points at the `ws` service.
+   Railway issues TLS.
 3. **Secrets** above generated and set (`openssl rand -base64 32` for the two keys).
 4. **OAuth apps** (GitHub + Google) with callback URLs on the new web domain.
 5. **Inbound email provider** (Phase 3): a Postmark (or Mailgun/SES) account with an
