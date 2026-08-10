@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { sqlRun, sqlQuery } from "@alook/test-utils"
+import { sqlRun, sqlQuery } from "@onecaptain/test-utils"
 
 /**
  * Real-DB existence oracle for the user discriminator unique index

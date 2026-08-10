@@ -11,8 +11,8 @@ const mockCountMembers = vi.fn()
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -46,7 +46,7 @@ vi.mock("@/lib/middleware/helpers", () => {
 })
 
 import { GET } from "./route"
-import { MAX_MEMBERS_PAGE_SIZE, DEFAULT_MEMBERS_PAGE_SIZE } from "@alook/shared"
+import { MAX_MEMBERS_PAGE_SIZE, DEFAULT_MEMBERS_PAGE_SIZE } from "@onecaptain/shared"
 
 function buildRow(i: number) {
   return {

@@ -22,6 +22,10 @@ export type BotSummary = {
   // Sparse — only days with activity; oldest→newest; [] for a brand-new bot.
   // The heatmap builds the full 30-day calendar and fills from this by day-key.
   dailyActivity: BotActivityDay[]
+  // Cloud LLM provider attachment. The API key itself is write-only and never
+  // present in any response — only whether one is saved.
+  providerKind: string | null
+  hasProviderKey: boolean
 }
 export type BotsResponse = { bots: BotSummary[] }
 
@@ -83,6 +87,9 @@ export type UpdateBotInput = {
   // Explicit `null` clears a set model; `undefined` leaves it untouched.
   model?: string | null
   runtime?: string
+  // Explicit `null` clears the provider attachment; `undefined` leaves it
+  // untouched. `apiKey` is write-only.
+  provider?: { kind: string; apiKey: string; apiUrl?: string } | null
 }
 export type UpdateBotResponse = {
   bot: Pick<BotSummary, "id" | "name" | "description" | "image" | "runtime" | "modelName">
@@ -105,6 +112,7 @@ export function useUpdateBot() {
           // explicit key the server would read as "clear to default".
           ...("model" in input ? { model: input.model } : {}),
           ...("runtime" in input ? { runtime: input.runtime } : {}),
+          ...("provider" in input ? { provider: input.provider } : {}),
         }),
       }),
     onSuccess: (data) => invalidateBotSurfaces(qc, data.bot.id),

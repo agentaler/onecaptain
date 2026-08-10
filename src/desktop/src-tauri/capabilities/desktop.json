@@ -5,7 +5,7 @@
   "windows": ["main"],
   "platforms": ["linux", "macOS", "windows"],
   "remote": {
-    "urls": ["https://alook.ai", "http://localhost:3000"]
+    "urls": ["https://onecaptain.ai", "http://localhost:3000"]
   },
   "permissions": [
     "shell:allow-open",

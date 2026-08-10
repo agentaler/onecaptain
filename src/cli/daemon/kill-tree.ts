@@ -19,7 +19,7 @@ const log = createLogger({ module: "kill-tree" });
 
 /** Session-runner grace before it escalates the inner-agent group to SIGKILL. */
 export function killGraceMs(): number {
-  return Number(process.env.ALOOK_KILL_GRACE_MS) || 2000;
+  return Number(process.env.ONECAPTAIN_KILL_GRACE_MS) || 2000;
 }
 const POLL_MS = 100;
 const isPosix = process.platform !== "win32";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { MESSAGE_PREVIEW_LENGTH } from "@alook/shared"
+import { MESSAGE_PREVIEW_LENGTH } from "@onecaptain/shared"
 import { toOptimisticReplyPreview } from "./reply-preview"
 
 describe("toOptimisticReplyPreview", () => {

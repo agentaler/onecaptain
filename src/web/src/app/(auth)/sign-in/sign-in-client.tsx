@@ -28,7 +28,7 @@ import {
   type LandingScene,
 } from "@/components/home/landing-shell-motion-timeline"
 import galleryStyles from "@/components/home/landing-shell-motion.module.css"
-import { DEV_PASSWORD } from "@alook/shared"
+import { DEV_PASSWORD } from "@onecaptain/shared"
 
 // Default post-login landing when no explicit `?redirect=` is present. Points
 // at the community home (/c/me); the old `/workspaces` target was the legacy

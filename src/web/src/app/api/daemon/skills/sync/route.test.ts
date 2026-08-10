@@ -11,8 +11,8 @@ vi.mock("@/lib/db", () => ({
 
 const mockSyncGlobal = vi.fn();
 const mockSyncAgent = vi.fn();
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     queries: {

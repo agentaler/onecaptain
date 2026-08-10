@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import type { UploadedAttachment } from "@/hooks/community/mutations/uploads"
-import type { MentionType } from "@alook/shared"
+import type { MentionType } from "@onecaptain/shared"
 import {
   removeForumSidebarThreadExact,
   removeForumSidebarUnreadChild,

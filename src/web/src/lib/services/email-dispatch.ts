@@ -1,6 +1,6 @@
-import { queries, TASK_TYPES, extractThreadId, buildEmailMapKey } from "@alook/shared"
+import { queries, TASK_TYPES, extractThreadId, buildEmailMapKey } from "@onecaptain/shared"
 import { nanoid } from "nanoid"
-import type { Database } from "@alook/shared"
+import type { Database } from "@onecaptain/shared"
 import { TaskService } from "@/lib/services/task"
 import { broadcastToUser } from "@/lib/broadcast"
 import { taskToResponse } from "@/lib/api/responses"

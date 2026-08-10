@@ -8,7 +8,7 @@
  * Messages are bucketed by their resolved `target` (channel / DM / thread),
  * each bucket summarized (count, first, latest, sender, flags), and the
  * buckets sorted by most-recent activity. The summary is metadata only — it
- * never carries message bodies; the agent pulls those with `alook inbox pull`.
+ * never carries message bodies; the agent pulls those with `onecaptain inbox pull`.
  *
  * Generic daemon-side abstraction (host-neutral).
  */

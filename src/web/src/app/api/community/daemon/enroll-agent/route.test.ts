@@ -13,8 +13,8 @@ const mockFindCred = vi.fn()
 const mockGetUserInternal = vi.fn()
 const mockGetBotBinding = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<any>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<any>("@onecaptain/shared")
   return {
     ...actual,
     queries: {

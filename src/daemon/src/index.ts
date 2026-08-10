@@ -2,7 +2,7 @@
  * Public entry point for the daemon's driver layer.
  *
  * Typical use:
- *   import { getDriver, createChildProcessRuntimeSession } from "@alook/daemon";
+ *   import { getDriver, createChildProcessRuntimeSession } from "@onecaptain/daemon";
  *   const driver = getDriver("claude");
  *   const session = createChildProcessRuntimeSession(driver, ctx);
  *   session.on("runtime_event", (e) => handle(e));
@@ -29,8 +29,8 @@ export * from "./daemon/index.js";
 export * from "./drivers/codexHome.js";
 export { resolveSpawnSpec, type SpawnSpec } from "./drivers/probe.js";
 export {
-  resolveAlookCliPath,
-  resolveAlookCliPathWithFallback,
+  resolveOneCaptainCliPath,
+  resolveOneCaptainCliPathWithFallback,
   deriveCliFallbackCandidates,
   detectRuntimes,
   getAvailableRuntimes,

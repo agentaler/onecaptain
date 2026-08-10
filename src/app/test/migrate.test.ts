@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockExecSync = vi.fn();
 vi.mock("child_process", () => ({ execSync: (...a: unknown[]) => mockExecSync(...a) }));
-vi.mock("../src/lib/constants.js", () => ({ SELF_HOSTED_DIR: "/tmp/alook-test" }));
+vi.mock("../src/lib/constants.js", () => ({ SELF_HOSTED_DIR: "/tmp/onecaptain-test" }));
 
 import { runMigrations } from "../src/lib/migrate.js";
 

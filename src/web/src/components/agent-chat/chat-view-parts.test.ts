@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import type { Agent } from "@alook/shared"
+import type { Agent } from "@onecaptain/shared"
 
 const agents: Agent[] = []
 

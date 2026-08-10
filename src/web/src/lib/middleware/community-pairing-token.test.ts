@@ -22,7 +22,7 @@ const pairingQuerySpies = {
   findActiveCredentialByBearer: vi.fn(),
   findCredentialByHash: vi.fn(),
 }
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   queries: {
     communityMachine: pairingQuerySpies,
   },

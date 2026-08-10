@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import { toast } from "sonner"
-import { isForum } from "@alook/shared"
+import { isForum } from "@onecaptain/shared"
 import { AddMembersDialog } from "@/components/community/add-members-dialog"
 import type { CommunityPanelSheet } from "@/components/community/community-panel-sheet"
 import type { Member, Role } from "@/components/community/_types"

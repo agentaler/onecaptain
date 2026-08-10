@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Slider, SliderControl, SliderTrack, SliderRange, SliderThumb } from "@/components/ui/slider"
-import { ICON_CROP_MIN_ZOOM, ICON_CROP_MAX_ZOOM, ICON_CROP_OUTPUT_SIZE } from "@alook/shared"
+import { ICON_CROP_MIN_ZOOM, ICON_CROP_MAX_ZOOM, ICON_CROP_OUTPUT_SIZE } from "@onecaptain/shared"
 import { getCroppedIconBlob, buildCroppedIconFile } from "@/lib/community/image-crop"
 
 /**

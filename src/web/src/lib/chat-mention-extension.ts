@@ -1,5 +1,5 @@
 import Mention from "@tiptap/extension-mention";
-import { MENTION_TOKEN_RE } from "@alook/shared";
+import { MENTION_TOKEN_RE } from "@onecaptain/shared";
 
 function escapeAttr(value: string): string {
   return value

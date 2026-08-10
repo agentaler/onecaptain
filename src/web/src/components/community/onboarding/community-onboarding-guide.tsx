@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { GeneratedAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { driver, type Driver } from "driver.js";
-import { isPresenceOnline, type CommunityMachineSummary } from "@alook/shared";
+import { isPresenceOnline, type CommunityMachineSummary } from "@onecaptain/shared";
 import { useMachines } from "@/hooks/community/use-machines";
 import { useBots, type BotSummary } from "@/hooks/community/use-bots";
 import {
@@ -636,7 +636,7 @@ export function CommunityOnboardingGuide() {
       {targetAvatarContainer
         ? createPortal(
             <GeneratedAvatar
-              seed={state.guideAvatarSeed ?? "alook-guide"}
+              seed={state.guideAvatarSeed ?? "onecaptain-guide"}
               size={28}
               className="rounded-full ring-2 ring-background shadow-md"
             />,

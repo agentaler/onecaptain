@@ -9,7 +9,7 @@
  *
  * Synchronous + non-blocking by design: `acquireLock` returns immediately with
  * true/false and the caller decides whether to retry/back off. That keeps the
- * timeline module's append path simple and matches alook's `execenv/filelock.ts`.
+ * timeline module's append path simple and matches onecaptain's `execenv/filelock.ts`.
  */
 import * as fs from "fs";
 

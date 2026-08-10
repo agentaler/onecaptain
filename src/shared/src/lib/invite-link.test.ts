@@ -3,7 +3,7 @@ import { parseInviteToken } from "./invite-link";
 
 describe("parseInviteToken", () => {
   it("extracts the token from a full URL with an origin", () => {
-    expect(parseInviteToken("https://alook.dev/c/invite/AbC123XyZ0")).toBe("AbC123XyZ0");
+    expect(parseInviteToken("https://onecaptain.dev/c/invite/AbC123XyZ0")).toBe("AbC123XyZ0");
   });
 
   it("extracts the token from a path-only URL (no origin)", () => {

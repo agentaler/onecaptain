@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type React from "react"
 import { X } from "lucide-react"
-import { MAX_STATUS_TEXT_LENGTH } from "@alook/shared"
+import { MAX_STATUS_TEXT_LENGTH } from "@onecaptain/shared"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"

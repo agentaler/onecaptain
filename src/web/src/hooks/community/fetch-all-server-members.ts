@@ -1,4 +1,4 @@
-import { MAX_MEMBERS_PAGE_SIZE } from "@alook/shared"
+import { MAX_MEMBERS_PAGE_SIZE } from "@onecaptain/shared"
 import type { Member } from "@/components/community/_types"
 import { apiFetch } from "@/lib/api/client"
 

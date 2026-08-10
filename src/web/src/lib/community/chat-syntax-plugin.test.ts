@@ -24,7 +24,7 @@ describe("CLI prompt ref examples — tokenizer contract", () => {
       workspacePath: "/tmp/workspace",
     } as Parameters<typeof buildCliSystemPrompt>[0])
     const examples = prompt.split("\n").filter((line) =>
-      line.startsWith("/Alook#1234") || line.startsWith("/.dm/alice#0042"),
+      line.startsWith("/OneCaptain#1234") || line.startsWith("/.dm/alice#0042"),
     )
 
     expect(examples).toHaveLength(6)
@@ -32,7 +32,7 @@ describe("CLI prompt ref examples — tokenizer contract", () => {
       const children = paragraphChildren(parse(example))
       expect(children).toHaveLength(1)
       expect(children[0]).toMatchObject({
-        type: example === "/Alook#1234" ? "serverRef" : "channelRef",
+        type: example === "/OneCaptain#1234" ? "serverRef" : "channelRef",
         value: example,
       })
     }
@@ -191,7 +191,7 @@ describe("chatSyntaxPlugin — channelRef", () => {
     expect(bare).toHaveLength(1)
     expect(bare[0]).toMatchObject({ type: "text", value: "join /community/invite/abc123XYZ" })
 
-    const full = paragraphChildren(parse("join https://alook.ai/community/invite/xY9k2vW7aQ"))
+    const full = paragraphChildren(parse("join https://onecaptain.ai/community/invite/xY9k2vW7aQ"))
     expect(full.some((c) => c.type === "channelRef")).toBe(false)
   })
 

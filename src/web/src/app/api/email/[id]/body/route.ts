@@ -1,5 +1,5 @@
 import PostalMime from "postal-mime";
-import { queries } from "@alook/shared";
+import { queries } from "@onecaptain/shared";
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";

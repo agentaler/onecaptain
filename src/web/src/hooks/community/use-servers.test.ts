@@ -15,14 +15,14 @@ describe("useServers / serversQueryFn", () => {
   it("materialises raw server rows into render-ready Server shape", async () => {
     apiFetchMock.mockResolvedValueOnce({
       servers: [
-        { id: "srv_1", name: "Alook", discriminator: "0042", icon: null, role: "owner", mentions: 3 },
+        { id: "srv_1", name: "OneCaptain", discriminator: "0042", icon: null, role: "owner", mentions: 3 },
         { id: "srv_2", name: "Beta", discriminator: "12345", icon: null, role: "member" },
       ],
     })
     const { serversQueryFn } = await import("./use-servers")
     const data = await serversQueryFn()
     expect(apiFetchMock).toHaveBeenCalledWith("/api/community/servers")
-    expect(data.servers[0].initial).toBe("A")
+    expect(data.servers[0].initial).toBe("O")
     expect(data.servers[0].isOwner).toBe(true)
     expect(data.servers[0].mentions).toBe(3)
     expect(data.servers[0].active).toBe(false)
@@ -60,7 +60,7 @@ describe("useServers / serversQueryFn", () => {
 
 describe("useServer / serverQueryFn", () => {
   it("composes a single server detail from canonical resources", async () => {
-    const detail = { id: "srv_1", name: "Alook", description: "", icon: null, ownerId: "u_1" }
+    const detail = { id: "srv_1", name: "OneCaptain", description: "", icon: null, ownerId: "u_1" }
     apiFetchMock.mockImplementation(async (url: string) => {
       if (url === "/api/community/servers") return { servers: [{ ...detail, discriminator: "0001" }] }
       if (url.endsWith("/categories")) return { categories: [{ id: "cat_1", name: "Main", private: 0 }] }
@@ -86,7 +86,7 @@ describe("useServer / serverQueryFn", () => {
   it("cold-boots a forum fallback from a canonical unread child outside the sidebar projection", async () => {
     apiFetchMock.mockImplementation(async (url: string) => {
       if (url === "/api/community/servers") return { servers: [{
-        id: "srv_1", name: "Alook", discriminator: "0001", icon: null, ownerId: "u_1",
+        id: "srv_1", name: "OneCaptain", discriminator: "0001", icon: null, ownerId: "u_1",
       }] }
       if (url.endsWith("/categories")) return { categories: [{ id: "cat_1", name: "Main", private: 0 }] }
       if (url.endsWith("/channels")) return { channels: [{
@@ -109,7 +109,7 @@ describe("useServer / serverQueryFn", () => {
   })
 
   it("nests the server(id) key under servers() so prefix invalidation cascades", async () => {
-    const detail = { id: "srv_1", name: "Alook", description: "", icon: null, ownerId: "u_1", categories: [] }
+    const detail = { id: "srv_1", name: "OneCaptain", description: "", icon: null, ownerId: "u_1", categories: [] }
     apiFetchMock.mockImplementation(async (url: string) => {
       if (url === "/api/community/servers") return { servers: [{ ...detail, discriminator: "0001" }] }
       if (url.endsWith("/categories")) return { categories: [] }
@@ -129,7 +129,7 @@ describe("useServer / serverQueryFn", () => {
 
   it("rejects a stale raw unread read instead of caching false read badges", async () => {
     apiFetchMock.mockImplementation(async (url: string) => {
-      if (url === "/api/community/servers") return { servers: [{ id: "srv_1", name: "Alook", discriminator: "0001", icon: null, ownerId: "u_1" }] }
+      if (url === "/api/community/servers") return { servers: [{ id: "srv_1", name: "OneCaptain", discriminator: "0001", icon: null, ownerId: "u_1" }] }
       if (url.endsWith("/categories")) return { categories: [] }
       if (url.endsWith("/channels")) return { channels: [{ id: "ch_1", name: "general", categoryId: null }] }
       if (url.endsWith("/unreads")) return { channelIds: [], stale: true }

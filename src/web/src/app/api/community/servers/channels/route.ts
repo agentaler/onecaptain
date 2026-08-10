@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries } from "@alook/shared"
-import type { CommunityCliChannelGroup as ChannelGroup } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
+import type { CommunityCliChannelGroup as ChannelGroup } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor } from "@/lib/middleware/community-actor"
 import { buildServerChannelGroups } from "@/lib/community/list-channels"

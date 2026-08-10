@@ -1,17 +1,17 @@
-# @alook/app
+# @onecaptain/app
 
-Run Alook locally — one command, no clone needed.
+Run OneCaptain locally — one command, no clone needed.
 
 ## Quick Start
 
 ```bash
-npx @alook/app onboard
+npx @onecaptain/app onboard
 ```
 
 This will:
 
 1. Check your environment (Node.js >= 20, AI runtime)
-2. Install Alook to `~/.alook/self-hosted/`
+2. Install OneCaptain to `~/.onecaptain/self-hosted/`
 3. Generate secrets (`BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`)
 4. Run database migrations (SQLite via Cloudflare D1 local)
 5. Start all services (web, email worker, WebSocket)
@@ -23,21 +23,21 @@ This will:
 
 | Command | Description |
 | --- | --- |
-| `npx @alook/app onboard` | Full setup: install, migrate, start, and register |
-| `npx @alook/app start` | Start services from an existing installation |
-| `npx @alook/app stop` | Stop all services |
-| `npx @alook/app update` | Update to latest version, re-run migrations, then stop |
+| `npx @onecaptain/app onboard` | Full setup: install, migrate, start, and register |
+| `npx @onecaptain/app start` | Start services from an existing installation |
+| `npx @onecaptain/app stop` | Stop all services |
+| `npx @onecaptain/app update` | Update to latest version, re-run migrations, then stop |
 
 ### Embedded CLI
 
-`@alook/app` bundles a copy of `@alook/cli` for managing the local daemon and runtime registration:
+`@onecaptain/app` bundles a copy of `@onecaptain/cli` for managing the local daemon and runtime registration:
 
 ```bash
-npx @alook/app register          # Register CLI with local server
-npx @alook/app daemon start      # Start the daemon
-npx @alook/app daemon stop       # Stop the daemon
-npx @alook/app daemon status     # Check daemon status
-npx @alook/app cli <any command> # Pass-through to @alook/cli
+npx @onecaptain/app register          # Register CLI with local server
+npx @onecaptain/app daemon start      # Start the daemon
+npx @onecaptain/app daemon stop       # Stop the daemon
+npx @onecaptain/app daemon status     # Check daemon status
+npx @onecaptain/app cli <any command> # Pass-through to @onecaptain/cli
 ```
 
 ## Options
@@ -53,7 +53,7 @@ npx @alook/app cli <any command> # Pass-through to @alook/cli
 
 ### Services
 
-Alook runs three local services, each in its own Wrangler dev process:
+OneCaptain runs three local services, each in its own Wrangler dev process:
 
 | Service | Default Port | Description |
 | --- | --- | --- |
@@ -61,12 +61,12 @@ Alook runs three local services, each in its own Wrangler dev process:
 | **Email Worker** | 15211 | Email processing worker |
 | **WebSocket (WS-DO)** | 15212 | Real-time communication via Durable Objects |
 
-All services share a single SQLite database (Cloudflare D1 local mode) with state persisted at `~/.alook/self-hosted/web/.wrangler/state/`.
+All services share a single SQLite database (Cloudflare D1 local mode) with state persisted at `~/.onecaptain/self-hosted/web/.wrangler/state/`.
 
 ### Directory Layout
 
 ```
-~/.alook/self-hosted/
+~/.onecaptain/self-hosted/
 ├── web/                  # Web app (wrangler.toml, migrations, .dev.vars)
 │   ├── .wrangler/state/  # D1 database & KV persistence
 │   └── migrations/       # SQL migration files
@@ -96,7 +96,7 @@ Secrets are never overwritten on subsequent runs — only missing files are crea
 
 ## Dev Mode
 
-When the `ALOOK_PROJECT_ROOT` environment variable is set, `@alook/app` runs in dev mode against the monorepo:
+When the `ONECAPTAIN_PROJECT_ROOT` environment variable is set, `@onecaptain/app` runs in dev mode against the monorepo:
 
 - Runs `pnpm predev` to set up environment files
 - Runs `pnpm db:migrate` for migrations (instead of Wrangler CLI)
@@ -105,7 +105,7 @@ When the `ALOOK_PROJECT_ROOT` environment variable is set, `@alook/app` runs in 
 - `Ctrl+C` cleanly stops all services
 
 ```bash
-ALOOK_PROJECT_ROOT=/path/to/alook npx @alook/app onboard
+ONECAPTAIN_PROJECT_ROOT=/path/to/onecaptain npx @onecaptain/app onboard
 ```
 
 ## Requirements
@@ -120,4 +120,4 @@ ALOOK_PROJECT_ROOT=/path/to/alook npx @alook/app onboard
 
 ## License
 
-Apache-2.0 — see [LICENSE](../../LICENSE).
+Proprietary — see [LICENSE](../../LICENSE). Not open source.

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { queries, MeetingStatus } from "@alook/shared"
+import { queries, MeetingStatus } from "@onecaptain/shared"
 import { withAuth } from "@/lib/middleware/auth"
 import { withWorkspaceMember } from "@/lib/middleware/workspace"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"

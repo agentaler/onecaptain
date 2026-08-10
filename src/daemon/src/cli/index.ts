@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `alook` — the agent-facing CLI.
+ * `onecaptain` — the agent-facing CLI.
  *
  * Built on commander; each subcommand is registered once and `-h` is auto-generated.
  *
@@ -22,8 +22,8 @@ import type { ServerApi, Cursor, Message } from "../server/contract.js";
 import { parseRef } from "../server/contract.js";
 import { proxyServerApiFromEnv } from "./proxyServerApi.js";
 import { daemonStart, daemonStop, daemonList, daemonStatus, type DaemonInfo } from "./daemonStart.js";
-import { parseInviteToken } from "@alook/shared/lib/invite-link";
-import { MAX_EMOJI_BYTES } from "@alook/shared/constants/community";
+import { parseInviteToken } from "@onecaptain/shared/lib/invite-link";
+import { MAX_EMOJI_BYTES } from "@onecaptain/shared/constants/community";
 import { nowLocalISO, toLocalISO } from "../util/localTime.js";
 
 /**
@@ -108,12 +108,12 @@ function getApi(): ServerApi {
   if (injectedApi) return injectedApi;
   const fromEnv = proxyServerApiFromEnv();
   if (fromEnv) return fromEnv;
-  throw new CliError("no ServerApi available — ALOOK_PROXY_URL + ALOOK_PROXY_TOKEN_FILE must be set");
+  throw new CliError("no ServerApi available — ONECAPTAIN_PROXY_URL + ONECAPTAIN_PROXY_TOKEN_FILE must be set");
 }
 
 function agentId(opts: Record<string, unknown>): string {
-  const id = (opts.agent as string) || process.env.ALOOK_AGENT_ID || process.env.ALOOK_ID;
-  if (!id) throw new CliError("agent identity required — pass --agent <id> or set ALOOK_AGENT_ID");
+  const id = (opts.agent as string) || process.env.ONECAPTAIN_AGENT_ID || process.env.ONECAPTAIN_ID;
+  if (!id) throw new CliError("agent identity required — pass --agent <id> or set ONECAPTAIN_AGENT_ID");
   return id;
 }
 
@@ -286,7 +286,7 @@ async function cmdMessageSend(opts: Record<string, unknown>): Promise<unknown> {
   if (res.state === "blocked") {
     throw new CliError(
       `channel not aligned: ${res.unreadCount} unread message(s) in ${channel} (latest #${res.latestSeq}). ` +
-        `Run \`alook inbox pull\` to align, then resend.`,
+        `Run \`onecaptain inbox pull\` to align, then resend.`,
     );
   }
   // `deduped` (a same-nonce retry matched the already-committed message) is a
@@ -445,7 +445,7 @@ async function cmdAttachmentDownload(opts: Record<string, unknown>): Promise<unk
   const outFlag = opts.out as string | undefined;
   const os = await import("os");
   const pathMod = await import("path");
-  const destPath = outFlag ?? pathMod.join(os.tmpdir(), "alook-attachments", agent, id, "file");
+  const destPath = outFlag ?? pathMod.join(os.tmpdir(), "onecaptain-attachments", agent, id, "file");
 
   const result = await api.attachmentDownload({ agentId: agent, id, destPath });
   if (!outFlag) {
@@ -621,14 +621,14 @@ async function cmdNap(opts: Record<string, unknown>): Promise<unknown> {
 /* ------------------------------------------------------------------ */
 
 function buildProgram(): Command {
-  const program = new Command("alook")
+  const program = new Command("onecaptain")
     .description("agent CLI")
     .exitOverride()
     .configureOutput({
       writeOut: () => {},
       writeErr: () => {},
     })
-    .option("--agent <id>", "agent identity (or ALOOK_AGENT_ID env)");
+    .option("--agent <id>", "agent identity (or ONECAPTAIN_AGENT_ID env)");
 
   const message = program.command("message").description("message operations").exitOverride();
   message.configureOutput({ writeOut: () => {}, writeErr: () => {} });
@@ -712,7 +712,7 @@ function buildProgram(): Command {
     .command("download")
     .description("download an attachment by id to disk")
     .option("--id <id>", "attachment id (from inbox pull / send response)")
-    .option("--out <path>", "explicit output path (default: /tmp/alook-attachments/<agent>/<id>/<filename>)")
+    .option("--out <path>", "explicit output path (default: /tmp/onecaptain-attachments/<agent>/<id>/<filename>)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(async function (this: Command) {
@@ -817,7 +817,7 @@ function buildProgram(): Command {
 
   channel
     .command("member")
-    .description("fetch the followed members of a channel or thread; public channels return a hint pointing at `alook server member`")
+    .description("fetch the followed members of a channel or thread; public channels return a hint pointing at `onecaptain server member`")
     .option("--channel <ref>", "channel/thread ref (path-style)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
@@ -877,9 +877,9 @@ function buildProgram(): Command {
     .command("start")
     .description("start the daemon (connects to server, manages agent lifecycles)")
     .requiredOption("--machine-key <key>", "machine key for server authentication")
-    .option("--server-url <url>", "server HTTP URL (or ALOOK_SERVER_URL env)")
-    .option("--ws-url <url>", "server WebSocket URL (or ALOOK_SERVER_WS_URL env)")
-    .option("--base-dir <path>", "data directory for agent workspaces and pidfile (or ALOOK_DATA_DIR env)")
+    .option("--server-url <url>", "server HTTP URL (or ONECAPTAIN_SERVER_URL env)")
+    .option("--ws-url <url>", "server WebSocket URL (or ONECAPTAIN_SERVER_WS_URL env)")
+    .option("--base-dir <path>", "data directory for agent workspaces and pidfile (or ONECAPTAIN_DATA_DIR env)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(async function (this: Command) {
@@ -894,9 +894,9 @@ function buildProgram(): Command {
 
   daemon
     .command("stop")
-    .argument("<id>", "daemon id from `alook daemon list` (the ID column)")
-    .description("stop a daemon by its id (from `alook daemon list`)")
-    .option("--base-dir <path>", "data directory (or ALOOK_DATA_DIR env)")
+    .argument("<id>", "daemon id from `onecaptain daemon list` (the ID column)")
+    .description("stop a daemon by its id (from `onecaptain daemon list`)")
+    .option("--base-dir <path>", "data directory (or ONECAPTAIN_DATA_DIR env)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(async function (this: Command, id: string) {
@@ -910,7 +910,7 @@ function buildProgram(): Command {
   daemon
     .command("list")
     .description("list running daemons on this machine")
-    .option("--base-dir <path>", "data directory (or ALOOK_DATA_DIR env)")
+    .option("--base-dir <path>", "data directory (or ONECAPTAIN_DATA_DIR env)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(function (this: Command) {
@@ -924,9 +924,9 @@ function buildProgram(): Command {
 
   daemon
     .command("status")
-    .argument("[id]", "daemon id from `alook daemon list` (omit if only one daemon)")
+    .argument("[id]", "daemon id from `onecaptain daemon list` (omit if only one daemon)")
     .description("dump each agent's current FSM state from a daemon's status snapshot")
-    .option("--base-dir <path>", "data directory (or ALOOK_DATA_DIR env)")
+    .option("--base-dir <path>", "data directory (or ONECAPTAIN_DATA_DIR env)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(function (this: Command, id: string | undefined) {
@@ -936,8 +936,8 @@ function buildProgram(): Command {
       // (status is per-daemon since C0, so it can't guess which one).
       if (status.ambiguous) {
         printEnvelope({
-          error: "multiple daemons on this machine — pass an id: `alook daemon status <id>`",
-          hint: `available ids: ${(status.availableIds ?? []).join(", ")} (see \`alook daemon list\`)`,
+          error: "multiple daemons on this machine — pass an id: `onecaptain daemon status <id>`",
+          hint: `available ids: ${(status.availableIds ?? []).join(", ")} (see \`onecaptain daemon list\`)`,
         });
         return;
       }
@@ -968,7 +968,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         // consume. (Gus 架构#473: -h wrongly returned `{"success":{"usage":…}}`.)
         process.stdout.write(getHelpText(program, argv) + "\n");
       } else if (err.code === "commander.unknownCommand") {
-        printEnvelope({ error: `unknown command: ${argv.join(" ") || "(none)"}. Run \`alook help\`.` });
+        printEnvelope({ error: `unknown command: ${argv.join(" ") || "(none)"}. Run \`onecaptain help\`.` });
       } else {
         printEnvelope({ error: err.message });
       }

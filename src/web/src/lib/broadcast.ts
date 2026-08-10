@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import type { WsMessage, DaemonPushMessage } from "@alook/shared"
-import { DEV_WS_DO_URL, createLogger } from "@alook/shared"
+import type { WsMessage, DaemonPushMessage } from "@onecaptain/shared"
+import { DEV_WS_DO_URL, createLogger } from "@onecaptain/shared"
 import { fetchViaBindingOrDevFallback } from "./dev-binding-fetch"
 
 const log = createLogger({ service: "broadcast" })
@@ -11,7 +11,7 @@ const log = createLogger({ service: "broadcast" })
  * Prefers the `WS_DO_WORKER` service binding (production). If the binding
  * isn't available (local dev, unit tests) OR the binding responds with a
  * non-OK status (5xx), falls through to an HTTP fetch against
- * `env.DEV_WS_DO_URL` (or the shared default in `@alook/shared`).
+ * `env.DEV_WS_DO_URL` (or the shared default in `@onecaptain/shared`).
  *
  * Thin wrapper around `fetchViaBindingOrDevFallback` — see that module for
  * the actual "try binding → non-OK/throw → HTTP fallback" decision tree so

@@ -5,7 +5,7 @@ export function versionCommand(): Command {
   const cmd = new Command("version")
     .description("Show CLI version")
     .action(() => {
-      console.log(`alook version ${getCurrentVersion()}`);
+      console.log(`onecaptain version ${getCurrentVersion()}`);
     });
 
   return cmd;

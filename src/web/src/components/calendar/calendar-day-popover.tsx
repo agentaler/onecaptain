@@ -2,7 +2,7 @@
 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { CalendarEvent, Agent } from "@alook/shared";
+import type { CalendarEvent, Agent } from "@onecaptain/shared";
 import { Repeat } from "lucide-react";
 import { agentDot, agentInk } from "./calendar-month-grid";
 

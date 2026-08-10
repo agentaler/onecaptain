@@ -3,15 +3,15 @@
  *
  * One consistent line shape so logs are scannable and greppable:
  *
- *   2026-06-25T12:33:00.123Z @alook/daemon INFO  control plane OPEN
+ *   2026-06-25T12:33:00.123Z @onecaptain/daemon INFO  control plane OPEN
  *   <ISO-8601 timestamp>      <header>   <LEVEL> <message>
  *
- * - `header` defaults to `@alook/daemon` (the package), overridable per component
- *   (e.g. a sub-tag like `@alook/daemon:daemon`) so a line still says where it came
+ * - `header` defaults to `@onecaptain/daemon` (the package), overridable per component
+ *   (e.g. a sub-tag like `@onecaptain/daemon:daemon`) so a line still says where it came
  *   from without each call site hand-prefixing `[daemon]`.
  * - Default level is `info`; `debug` lines are suppressed unless the level is
  *   lowered. `warn`/`error` go to stderr, `info`/`debug` to stdout. When
- *   `options.level` isn't passed, the `ALOOK_LOG_LEVEL` env var is used as a
+ *   `options.level` isn't passed, the `ONECAPTAIN_LOG_LEVEL` env var is used as a
  *   fallback (same 4 values), so one env var controls verbosity for a whole
  *   daemon process without every call site threading it through explicitly.
  * - Variadic data args are auto-formatted as key=value pairs when objects are
@@ -30,12 +30,12 @@ export interface Logger {
   info(message: string, ...data: unknown[]): void;
   warn(message: string, ...data: unknown[]): void;
   error(message: string, ...data: unknown[]): void;
-  /** Derive a logger with a sub-tagged header (e.g. `@alook/daemon:daemon`). */
+  /** Derive a logger with a sub-tagged header (e.g. `@onecaptain/daemon:daemon`). */
   child(tag: string): Logger;
 }
 
 export interface LoggerOptions {
-  /** Line header. Defaults to `@alook/daemon`. */
+  /** Line header. Defaults to `@onecaptain/daemon`. */
   header?: string;
   /** Minimum level emitted. Defaults to `info`. */
   level?: LogLevel;
@@ -46,11 +46,11 @@ export interface LoggerOptions {
   err?: (line: string) => void;
 }
 
-const DEFAULT_HEADER = "@alook/daemon";
+const DEFAULT_HEADER = "@onecaptain/daemon";
 const VALID_LEVELS: readonly LogLevel[] = ["debug", "info", "warn", "error"];
 
 function envLevel(): LogLevel | undefined {
-  const raw = process.env.ALOOK_LOG_LEVEL?.toLowerCase();
+  const raw = process.env.ONECAPTAIN_LOG_LEVEL?.toLowerCase();
   return VALID_LEVELS.includes(raw as LogLevel) ? (raw as LogLevel) : undefined;
 }
 

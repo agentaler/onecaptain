@@ -81,7 +81,17 @@ export class OwnerHasBotsError extends Error {
 export async function listBotsForOwner(
   db: Database,
   ownerId: string
-): Promise<Array<BotRow & { machineId: string; runtime: string; modelName: string | null }>> {
+): Promise<
+  Array<
+    BotRow & {
+      machineId: string;
+      runtime: string;
+      modelName: string | null;
+      providerKind: string | null;
+      hasProviderKey: boolean;
+    }
+  >
+> {
   const rows = await db
     .select({
       id: user.id,
@@ -96,6 +106,8 @@ export async function listBotsForOwner(
       machineId: communityBotBinding.machineId,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
+      providerKind: communityBotBinding.providerKind,
+      providerApiKeyEnc: communityBotBinding.providerApiKeyEnc,
     })
     .from(user)
     .innerJoin(communityBotBinding, eq(communityBotBinding.userId, user.id))
@@ -123,6 +135,8 @@ export async function listBotsForOwner(
     machineId: r.machineId,
     runtime: r.runtime,
     modelName: r.modelName ?? null,
+    providerKind: r.providerKind ?? null,
+    hasProviderKey: Boolean(r.providerApiKeyEnc),
   }));
 }
 
@@ -134,7 +148,17 @@ export async function getBotOwnedBy(
   db: Database,
   botId: string,
   ownerId: string
-): Promise<(BotRow & { machineId: string | null; runtime: string | null; modelName: string | null }) | null> {
+): Promise<
+  | (BotRow & {
+      machineId: string | null;
+      runtime: string | null;
+      modelName: string | null;
+      providerKind: string | null;
+      providerApiUrl: string | null;
+      providerApiKeyEnc: string | null;
+    })
+  | null
+> {
   const rows = await db
     .select({
       id: user.id,
@@ -149,6 +173,9 @@ export async function getBotOwnedBy(
       machineId: communityBotBinding.machineId,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
+      providerKind: communityBotBinding.providerKind,
+      providerApiUrl: communityBotBinding.providerApiUrl,
+      providerApiKeyEnc: communityBotBinding.providerApiKeyEnc,
     })
     .from(user)
     .leftJoin(communityBotBinding, eq(communityBotBinding.userId, user.id))
@@ -180,6 +207,9 @@ export async function getBotOwnedBy(
     machineId: r.machineId ?? null,
     runtime: r.runtime ?? null,
     modelName: r.modelName ?? null,
+    providerKind: r.providerKind ?? null,
+    providerApiUrl: r.providerApiUrl ?? null,
+    providerApiKeyEnc: r.providerApiKeyEnc ?? null,
   };
 }
 
@@ -329,6 +359,9 @@ export type BotWakeContext =
       machineId: string;
       runtime: string;
       modelName: string | null;
+      providerKind: string | null;
+      providerApiUrl: string | null;
+      providerApiKeyEnc: string | null;
       ownerUserId: string | null;
     };
 
@@ -344,6 +377,9 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
       machineId: communityBotBinding.machineId,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
+      providerKind: communityBotBinding.providerKind,
+      providerApiUrl: communityBotBinding.providerApiUrl,
+      providerApiKeyEnc: communityBotBinding.providerApiKeyEnc,
     })
     .from(user)
     .leftJoin(communityBotBinding, eq(communityBotBinding.userId, user.id))
@@ -361,6 +397,9 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
     machineId: r.machineId,
     runtime: r.runtime,
     modelName: r.modelName ?? null,
+    providerKind: r.providerKind ?? null,
+    providerApiUrl: r.providerApiUrl ?? null,
+    providerApiKeyEnc: r.providerApiKeyEnc ?? null,
     ownerUserId: r.ownerUserId,
   };
 }
@@ -385,6 +424,9 @@ export async function listBotsForMachine(
     ownerDiscriminator: string;
     runtime: string;
     modelName: string | null;
+    providerKind: string | null;
+    providerApiUrl: string | null;
+    providerApiKeyEnc: string | null;
   }>
 > {
   // Guard against orphaned bots: if a future flow soft-deletes an owner user
@@ -400,6 +442,9 @@ export async function listBotsForMachine(
       ownerDiscriminator: owner.discriminator,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
+      providerKind: communityBotBinding.providerKind,
+      providerApiUrl: communityBotBinding.providerApiUrl,
+      providerApiKeyEnc: communityBotBinding.providerApiKeyEnc,
     })
     .from(user)
     .innerJoin(communityBotBinding, eq(communityBotBinding.userId, user.id))
@@ -425,6 +470,9 @@ export async function listBotsForMachine(
     ownerDiscriminator: r.ownerDiscriminator,
     runtime: r.runtime,
     modelName: r.modelName ?? null,
+    providerKind: r.providerKind ?? null,
+    providerApiUrl: r.providerApiUrl ?? null,
+    providerApiKeyEnc: r.providerApiKeyEnc ?? null,
   }));
 }
 
@@ -664,6 +712,42 @@ export async function updateBotModel(
   const rows = await db
     .update(communityBotBinding)
     .set({ modelName })
+    .where(inArray(communityBotBinding.userId, ownerScopedIds))
+    .returning({ userId: communityBotBinding.userId });
+  return rows.length > 0;
+}
+
+/**
+ * Update a bot's stored cloud-provider attachment. Same owner-scoped
+ * RETURNING pattern as `updateBotModel`: a cross-owner or unbound bot writes
+ * zero rows and the caller must not report the provider as saved.
+ * `providerApiKeyEnc` is the ALREADY-ENCRYPTED key (or null to clear) — this
+ * layer never sees plaintext.
+ */
+export async function updateBotProvider(
+  db: Database,
+  botId: string,
+  ownerId: string,
+  provider: {
+    providerKind: string | null;
+    providerApiUrl: string | null;
+    providerApiKeyEnc: string | null;
+  }
+): Promise<boolean> {
+  const ownerScopedIds = db
+    .select({ id: user.id })
+    .from(user)
+    .where(
+      and(
+        eq(user.id, botId),
+        eq(user.ownerUserId, ownerId),
+        eq(user.isBot, true),
+        isNull(user.deletedAt)
+      )
+    );
+  const rows = await db
+    .update(communityBotBinding)
+    .set(provider)
     .where(inArray(communityBotBinding.userId, ownerScopedIds))
     .returning({ userId: communityBotBinding.userId });
   return rows.length > 0;

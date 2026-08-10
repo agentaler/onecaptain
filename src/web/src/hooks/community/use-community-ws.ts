@@ -52,8 +52,8 @@ import type {
   Subscription,
   UseCommunityWsOptions,
 } from "@/hooks/community/community-ws/handler-context"
-import type { CommunityWsEvent } from "@alook/shared"
-import { isCommunityEvent, TYPING_INDICATOR_THROTTLE_MS } from "@alook/shared"
+import type { CommunityWsEvent } from "@onecaptain/shared"
+import { isCommunityEvent, TYPING_INDICATOR_THROTTLE_MS } from "@onecaptain/shared"
 
 export type {
   Subscription,

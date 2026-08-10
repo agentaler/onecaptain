@@ -12,7 +12,7 @@ import { EmailToolbar } from "@/components/email-toolbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import type { EmailAttachment } from "@alook/shared";
+import type { EmailAttachment } from "@onecaptain/shared";
 import { toast } from "sonner";
 import { Send, X, Loader2, Paperclip, File as FileIcon } from "lucide-react";
 

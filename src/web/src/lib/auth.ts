@@ -9,7 +9,7 @@ import {
   COMMUNITY_BOT_EMAIL_DOMAIN,
   RATE_LIMITS,
   sanitizeCommunityName,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getOtpSubject, renderOtpEmail } from "./email-templates"

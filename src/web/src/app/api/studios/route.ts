@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, CreateStudioRequestSchema, isValidHandle, isOnline, TASK_TYPES, toAlookAddress, sanitizeSlug, slugSuffix } from "@alook/shared";
+import { queries, CreateStudioRequestSchema, isValidHandle, isOnline, TASK_TYPES, toOneCaptainAddress, sanitizeSlug, slugSuffix } from "@onecaptain/shared";
 import { nanoid } from "nanoid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { getDb } from "@/lib/db";
@@ -197,11 +197,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     try {
       const teammatesList = createdAgents
         .filter((a) => a.id !== leaderAgent.id)
-        .map((a) => `- ${a.name} (${a.emailHandle ? toAlookAddress(a.emailHandle) : a.name}), role: ${a.role}`)
+        .map((a) => `- ${a.name} (${a.emailHandle ? toOneCaptainAddress(a.emailHandle) : a.name}), role: ${a.role}`)
         .join("\n");
 
       const welcomePrompt = createdAgents.length === 1
-        ? `You have just been created by your owner (${ctx.email}). Please send them a welcome email introducing yourself as "${leaderAgent.name}". In the email: 1) Introduce yourself warmly — your name, your email address, and what you can help with. 2) Briefly introduce the Alook platform. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise.`
+        ? `You have just been created by your owner (${ctx.email}). Please send them a welcome email introducing yourself as "${leaderAgent.name}". In the email: 1) Introduce yourself warmly — your name, your email address, and what you can help with. 2) Briefly introduce the OneCaptain platform. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise.`
         : `You have just been created as the lead of a new AI studio by your owner (${ctx.email}). Your teammates are:\n${teammatesList}\n\nPlease send a welcome email to your owner introducing yourself and all your teammates. Include: 1) Your name and email address. 2) Each teammate's name, email, and what they handle. 3) How the team works together — you coordinate and delegate to specialists. 4) Let them know they can email you directly to assign work. Be warm, professional, and concise.`;
 
       const conv = await queries.conversation.createConversation(db, {
@@ -229,11 +229,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     try {
       const teammatesList = createdAgents
         .filter((a) => a.id !== leaderAgent.id)
-        .map((a) => `- ${a.name} (${a.emailHandle ? toAlookAddress(a.emailHandle) : a.name}), role: ${a.role}`)
+        .map((a) => `- ${a.name} (${a.emailHandle ? toOneCaptainAddress(a.emailHandle) : a.name}), role: ${a.role}`)
         .join("\n");
 
       const welcomeChatPrompt = createdAgents.length === 1
-        ? `You have just been created by your owner (${ctx.email}). Please introduce yourself as "${leaderAgent.name}" in this chat. 1) Introduce yourself warmly — your name and what you can help with. 2) Briefly introduce the Alook platform. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise. Reply in the same language as your owner's name or email suggests.`
+        ? `You have just been created by your owner (${ctx.email}). Please introduce yourself as "${leaderAgent.name}" in this chat. 1) Introduce yourself warmly — your name and what you can help with. 2) Briefly introduce the OneCaptain platform. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise. Reply in the same language as your owner's name or email suggests.`
         : `You have just been created as the lead of a new AI studio by your owner (${ctx.email}). Your teammates are:\n${teammatesList}\n\nPlease introduce yourself and all your teammates in this chat. Include: 1) Your name. 2) Each teammate's name and what they handle. 3) How the team works together — you coordinate and delegate to specialists. 4) Let them know they can chat with you directly to assign work. Be warm, professional, and concise. Reply in the same language as your owner's name or email suggests.`;
 
       const dmConv = await queries.conversation.createConversation(db, {

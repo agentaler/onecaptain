@@ -11,7 +11,7 @@ vi.mock("@/lib/db", () => ({
   withD1Retry: vi.fn((fn: () => Promise<any>) => fn()),
 }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   createDb: vi.fn(() => ({})),
   queries: {
     task: {

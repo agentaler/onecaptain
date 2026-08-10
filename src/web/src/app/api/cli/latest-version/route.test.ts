@@ -19,7 +19,7 @@ describe("GET /api/cli/latest-version", () => {
 
     expect(res.status).toBe(200);
     expect(body.version).toBe("2.0.0");
-    expect(body.package).toBe("@alook/cli");
+    expect(body.package).toBe("@onecaptain/cli");
   });
 
   it("returns 502 when npm registry returns non-ok", async () => {
@@ -45,7 +45,7 @@ describe("GET /api/cli/latest-version", () => {
   it("returns 502 when response has no version field", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ name: "@alook/cli" }),
+      json: async () => ({ name: "@onecaptain/cli" }),
     });
 
     const res = await GET();

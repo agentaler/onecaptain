@@ -45,7 +45,7 @@ importers:
         specifier: ^4.118.0
         version: 4.118.0(@cloudflare/workers-types@4.20260702.1)
     devDependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
       '@types/bun':
@@ -85,7 +85,7 @@ importers:
         specifier: ^0.35.3
         version: 0.35.3(@types/node@26.0.0)
     devDependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
       '@types/bun':
@@ -116,7 +116,7 @@ importers:
         specifier: ^8.21.2
         version: 8.21.2
     devDependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
       '@types/node':
@@ -171,7 +171,7 @@ importers:
 
   src/email-worker:
     dependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
       nanoid:
@@ -242,7 +242,7 @@ importers:
 
   src/wake-worker:
     dependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -267,9 +267,6 @@ importers:
 
   src/web:
     dependencies:
-      '@alook/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@date-fns/tz@1.4.1)(@types/react@19.2.18)(date-fns@4.1.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -315,6 +312,9 @@ importers:
       '@number-flow/react':
         specifier: ^0.6.2
         version: 0.6.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@onecaptain/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@opennextjs/cloudflare':
         specifier: ^1.20.2
         version: 1.20.2(next@16.3.0(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.62.1)(@types/node@25.9.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(wrangler@4.118.0(@cloudflare/workers-types@4.20260702.1))
@@ -508,12 +508,12 @@ importers:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(react@19.2.8)
     devDependencies:
-      '@alook/test-utils':
-        specifier: workspace:*
-        version: link:../../tests/utils
       '@lhci/cli':
         specifier: ^0.15.1
         version: 0.15.1
+      '@onecaptain/test-utils':
+        specifier: workspace:*
+        version: link:../../tests/utils
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -586,7 +586,7 @@ importers:
 
   src/ws-do:
     dependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -611,7 +611,7 @@ importers:
 
   tests/utils:
     dependencies:
-      '@alook/shared':
+      '@onecaptain/shared':
         specifier: workspace:*
         version: link:../../src/shared
       better-sqlite3:
@@ -5052,8 +5052,8 @@ packages:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
 
-  deslop-js@0.9.6:
-    resolution: {integrity: sha512-ADY8/3JsK0epUcdXez54MhY4CGWeppT032Ko1fJkwFfmHog5hBJtMeihUeHs5PF7eG6Y17YbKcNQXSp3B67GRA==}
+  deslop-js@0.9.11:
+    resolution: {integrity: sha512-0hXU8GImv3uJZY25jeXQ1JOcajpuKyzdNTK7FTyxyGR/GtjpGPmiVM+8d+5Tacb702UzVtAHhB5xMBl/pOGxKQ==}
 
   destroy@1.2.0:
     resolution: {integrity: sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==}
@@ -7306,8 +7306,8 @@ packages:
   oxc-resolver@11.24.2:
     resolution: {integrity: sha512-FY91FiDBj7ls5MsFS9jN3tjz2o0/zsdSsymlakySaBwVJZorHhkWyICLZMKxlu1R9vYo+sd3z1jwb4J8x7bNDw==}
 
-  oxlint-plugin-react-doctor@0.9.6:
-    resolution: {integrity: sha512-kk39ffbDFaL0UfAx7ndltBsxal1hRkr+qYYsSv57PsD+9DnjcV0Y0jZ6NYMhBmHuvPC7so2CN6dNml+fOGrpxw==}
+  oxlint-plugin-react-doctor@0.9.11:
+    resolution: {integrity: sha512-ZhW15wfFjQlUwAO6zG3jVZKse4/PBTCArhbibiidHmTlvOpPHPM1AjdYG13023pfsbbtVdy7Tb7KHfqbKt8rHg==}
     engines: {node: ^20.19.0 || >=22.13.0}
 
   oxlint@1.76.0:
@@ -7641,8 +7641,8 @@ packages:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
 
-  react-doctor@0.9.6:
-    resolution: {integrity: sha512-X3ZLL6UQfzqIyY1HDKEgUOnoxKreEfy9KphiV2aYhiotgCsR81LBl92XgyZUbZeRgpQuwbIDOiyxQnRRkcX42A==}
+  react-doctor@0.9.11:
+    resolution: {integrity: sha512-y5DQ+ILL6mawXpKtAvJYrrqznl6nasXd4Xs9JGJsY4GWlplzs5UCozKaZgFS5AWzZ7KNrX88GZTuV4Vj47k+IQ==}
     engines: {node: ^20.19.0 || >=22.13.0}
     hasBin: true
 
@@ -13613,7 +13613,7 @@ snapshots:
 
   dequal@2.0.3: {}
 
-  deslop-js@0.9.6:
+  deslop-js@0.9.11:
     dependencies:
       '@oxc-project/types': 0.142.0
       fast-glob: 3.3.3
@@ -13934,7 +13934,7 @@ snapshots:
       eslint: 9.39.5(jiti@2.7.0)
       eslint-import-resolver-node: 0.3.10
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-react: 7.37.5(eslint@9.39.5(jiti@2.7.0))
       eslint-plugin-react-hooks: 7.1.1(eslint@9.39.5(jiti@2.7.0))
@@ -13967,7 +13967,7 @@ snapshots:
       tinyglobby: 0.2.17
       unrs-resolver: 1.12.2
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -13981,7 +13981,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0)):
+  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)))(eslint@9.39.5(jiti@2.7.0)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -16532,7 +16532,7 @@ snapshots:
       '@oxc-resolver/binding-win32-arm64-msvc': 11.24.2
       '@oxc-resolver/binding-win32-x64-msvc': 11.24.2
 
-  oxlint-plugin-react-doctor@0.9.6:
+  oxlint-plugin-react-doctor@0.9.11:
     dependencies:
       '@shaderfrog/glsl-parser': 7.0.1
       '@typescript-eslint/types': 8.66.0
@@ -16936,7 +16936,7 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
-  react-doctor@0.9.6(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(eslint@9.39.5(jiti@2.7.0)):
+  react-doctor@0.9.11(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(eslint@9.39.5(jiti@2.7.0)):
     dependencies:
       '@astrojs/compiler': 4.0.0
       '@babel/code-frame': 7.29.7
@@ -16944,14 +16944,14 @@ snapshots:
       agent-install: 0.0.5
       conf: 15.1.0
       confbox: 0.2.4
-      deslop-js: 0.9.6
+      deslop-js: 0.9.11
       eslint-plugin-react-hooks: 7.1.1(eslint@9.39.5(jiti@2.7.0))
       figures: 6.1.0
       jiti: 2.7.0
       magicast: 0.5.4
       oxc-resolver: 11.24.2
       oxlint: 1.76.0
-      oxlint-plugin-react-doctor: 0.9.6
+      oxlint-plugin-react-doctor: 0.9.11
       prompts: 2.4.2
       typescript: 5.9.3
       vscode-languageserver: 9.0.1
@@ -17006,7 +17006,7 @@ snapshots:
       preact: 10.29.7
       prompts: 2.4.2
       react: 19.2.8
-      react-doctor: 0.9.6(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(eslint@9.39.5(jiti@2.7.0))
+      react-doctor: 0.9.11(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(eslint@9.39.5(jiti@2.7.0))
       react-dom: 19.2.8(react@19.2.8)
       react-grab: 0.1.50(react@19.2.8)
     optionalDependencies:

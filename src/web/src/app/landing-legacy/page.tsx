@@ -8,8 +8,8 @@ const HomePage = dynamic(
 );
 
 export const metadata: Metadata = {
-  title: { absolute: "Alook — Legacy landing" },
-  description: "The previous Alook landing page, preserved for reference.",
+  title: { absolute: "OneCaptain — Legacy landing" },
+  description: "The previous OneCaptain landing page, preserved for reference.",
   robots: {
     index: false,
     follow: false,

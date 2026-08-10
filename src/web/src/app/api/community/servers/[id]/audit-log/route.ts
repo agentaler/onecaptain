@@ -3,7 +3,7 @@ import {
   queries,
   DEFAULT_AUDIT_LOG_PAGE_SIZE,
   MAX_AUDIT_LOG_PAGE_SIZE,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"

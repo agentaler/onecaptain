@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import { Bell, BellOff, Pin, Users, MessagesSquare, ChevronLeft, Check, Pencil, MoreHorizontal } from "lucide-react"
-import { NOTIF_LEVELS, USE_SERVER_DEFAULT, type NotifLevel } from "@alook/shared"
+import { NOTIF_LEVELS, USE_SERVER_DEFAULT, type NotifLevel } from "@onecaptain/shared"
 import { Button } from "@/components/ui/button"
 import { avatarInitial } from "@/lib/community/avatar"
 import { Input } from "@/components/ui/input"

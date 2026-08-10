@@ -40,7 +40,7 @@ import type {
   Agent,
   CalendarEvent,
   UpdateCalendarEventRequest,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { AutoResizeTextarea } from "@/components/ui/auto-resize-textarea";
 import { Kbd } from "@/components/ui/kbd";
 import { useSheetResize, SheetResizeHandle } from "@/components/ui/sheet-resize-handle";

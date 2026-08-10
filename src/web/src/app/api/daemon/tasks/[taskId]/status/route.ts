@@ -1,4 +1,4 @@
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb, withD1Retry } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON, writeError } from "@/lib/middleware/helpers";

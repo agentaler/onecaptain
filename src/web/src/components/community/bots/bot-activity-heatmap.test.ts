@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import React from "react"
 import TestRenderer, { act } from "react-test-renderer"
-import { utcDayKeyDaysAgo } from "@alook/shared"
+import { utcDayKeyDaysAgo } from "@onecaptain/shared"
 
 // The real Tooltip pulls in floating-ui, which needs `window` — unavailable in
 // this node renderer. Mock it: the trigger renders its `render` element (the

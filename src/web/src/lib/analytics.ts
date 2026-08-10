@@ -56,7 +56,7 @@ export function trackEmailComposed(params: {
 
 export function trackEmailReceived(params: {
   agent_id: string;
-  mailbox_type: "alook" | "imap";
+  mailbox_type: "onecaptain" | "imap";
 }) {
   sendGTMEvent({ event: "email_received", ...params });
 }

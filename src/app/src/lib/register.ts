@@ -1,5 +1,5 @@
 import { createInterface } from "readline";
-import { DEV_PASSWORD } from "@alook/shared";
+import { DEV_PASSWORD } from "@onecaptain/shared";
 import { SELF_HOSTED_DIR } from "./constants.js";
 import { join } from "path";
 
@@ -35,7 +35,7 @@ function extractSession(res: Response): { sessionCookie: string; userId: string 
 
 export async function collectEmail(): Promise<string> {
   const { userInfo } = await import("os");
-  const defaultEmail = `${userInfo().username || "user"}@local.alook`;
+  const defaultEmail = `${userInfo().username || "user"}@local.onecaptain`;
   console.log("\n📝 Create your account:\n");
   const input = await prompt(`  Email (${defaultEmail}): `);
   return input.trim() || defaultEmail;

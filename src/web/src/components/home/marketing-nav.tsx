@@ -47,7 +47,7 @@ export function MarketingNav({
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-2">
         <Link href={homeHref} className="flex items-center gap-1">
-          <Image src="/alook.svg" alt="Alook" width={22} height={22} />
+          <Image src="/onecaptain.svg" alt="OneCaptain" width={22} height={22} />
           <span
             className="text-lg tracking-tight"
             style={{
@@ -56,7 +56,7 @@ export function MarketingNav({
               fontWeight: 700,
             }}
           >
-            Alook
+            OneCaptain
           </span>
         </Link>
 
@@ -84,7 +84,7 @@ export function MarketingNav({
             Blog
           </Link>
           <a
-            href="https://github.com/alookai/alook"
+            href="https://github.com/agentaler/onecaptain"
             target="_blank"
             rel="noopener noreferrer"
             className={`${collapseLinksOnMobile ? "hidden sm:flex" : "flex"} items-center justify-center p-2 transition-opacity duration-150 hover:opacity-70`}
@@ -95,7 +95,7 @@ export function MarketingNav({
             </svg>
           </a>
           <a
-            href="https://discord.alook.ai"
+            href="https://discord.onecaptain.ai"
             target="_blank"
             rel="noopener noreferrer"
             className={`${collapseLinksOnMobile ? "hidden sm:flex" : "flex"} items-center justify-center p-2 transition-opacity duration-150 hover:opacity-70`}
@@ -106,7 +106,7 @@ export function MarketingNav({
             </svg>
           </a>
           <a
-            href="https://x.com/alook_ai"
+            href="https://x.com/onecaptain_ai"
             target="_blank"
             rel="noopener noreferrer"
             className={`${collapseLinksOnMobile ? "hidden sm:flex" : "flex"} items-center justify-center p-2 transition-opacity duration-150 hover:opacity-70`}
@@ -141,9 +141,9 @@ export function MarketingNav({
               >
                 {showTemplates && <Link href="/templates" className="block px-3 py-2 text-xs uppercase tracking-widest">Templates</Link>}
                 <Link href="/blog" className="block px-3 py-2 text-xs uppercase tracking-widest">Blog</Link>
-                <a href="https://github.com/alookai/alook" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">GitHub</a>
-                <a href="https://discord.alook.ai" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">Discord</a>
-                <a href="https://x.com/alook_ai" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">X</a>
+                <a href="https://github.com/agentaler/onecaptain" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">GitHub</a>
+                <a href="https://discord.onecaptain.ai" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">Discord</a>
+                <a href="https://x.com/onecaptain_ai" target="_blank" rel="noopener noreferrer" className="block px-3 py-2 text-xs uppercase tracking-widest">X</a>
               </div>
             </details>
           )}

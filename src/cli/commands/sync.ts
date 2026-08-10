@@ -79,7 +79,7 @@ export function syncCommand(): Command {
     .command("send-dm")
     .description("Send a message to the user in the current conversation (the agent's voice)")
     .option("--agent_id <id>", "Agent ID")
-    .option("--conversation_id <id>", "Conversation ID (defaults to $ALOOK_CONVERSATION_ID)")
+    .option("--conversation_id <id>", "Conversation ID (defaults to $ONECAPTAIN_CONVERSATION_ID)")
     .option("--message <text>", "Message body")
     .option("--message-file <path>", "Read message body from a file")
     .action(async (opts, command) => {
@@ -104,9 +104,9 @@ export function syncCommand(): Command {
         process.exit(1);
       }
 
-      const conversationId = opts.conversation_id || process.env.ALOOK_CONVERSATION_ID;
+      const conversationId = opts.conversation_id || process.env.ONECAPTAIN_CONVERSATION_ID;
       if (!conversationId) {
-        console.error("Error: no conversation id (set --conversation_id or $ALOOK_CONVERSATION_ID)");
+        console.error("Error: no conversation id (set --conversation_id or $ONECAPTAIN_CONVERSATION_ID)");
         process.exit(1);
       }
 
@@ -117,7 +117,7 @@ export function syncCommand(): Command {
       try {
         const result = await client.postJSON<Record<string, unknown>>(
           `/api/daemon/conversations/${encodeURIComponent(conversationId)}/messages`,
-          { content, task_id: process.env.ALOOK_TASK_ID || undefined }
+          { content, task_id: process.env.ONECAPTAIN_TASK_ID || undefined }
         );
         printJSON(result);
       } catch (err) {

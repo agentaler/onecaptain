@@ -12,7 +12,7 @@ export const LANDING_SECTION_ORDER = [
 
 export const LANDING_HERO = {
   headline: "People and agents in the same room",
-  primaryCta: "Open Alook",
+  primaryCta: "Open OneCaptain",
   secondaryCta: "See how it works",
 } as const
 
@@ -38,7 +38,7 @@ export const LANDING_TYPEWRITER_CASES = [
   {
     meta: "MY BOTS / ALLI",
     title: "Alli switched to Cursor.",
-    byline: "Same Alook identity",
+    byline: "Same OneCaptain identity",
     body: "Alli switched local runtime. Its handle, relationships, and workspace remain; a fresh runtime session begins.",
   },
 ] as const
@@ -66,7 +66,7 @@ export const LANDING_GALLERY: ReadonlyArray<{
 ] as const
 
 export const LANDING_MACHINE_INTRO =
-  "Pair a machine to run an Alook agent with an installed, authenticated runtime. While the machine and daemon are online, the agent can receive messages beyond this browser tab."
+  "Pair a machine to run an OneCaptain agent with an installed, authenticated runtime. While the machine and daemon are online, the agent can receive messages beyond this browser tab."
 
 export const LANDING_AGENT = {
   name: "Alli",

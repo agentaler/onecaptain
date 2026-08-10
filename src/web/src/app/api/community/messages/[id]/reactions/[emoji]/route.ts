@@ -7,8 +7,8 @@ import {
   isUniqueConstraintError,
   MAX_EMOJI_BYTES,
   WS_EVENTS,
-} from "@alook/shared"
-import type { Database } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 import type { CommunityActor } from "@/lib/middleware/community-actor"
 import { fanOutToChannel, fanOutToDM } from "@/lib/community/fanout"
 import {

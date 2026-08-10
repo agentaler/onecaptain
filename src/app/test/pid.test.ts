@@ -4,7 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 vi.mock("../src/lib/constants.js", () => {
-  const dir = join(tmpdir(), `alook-test-pid-${process.pid}`);
+  const dir = join(tmpdir(), `onecaptain-test-pid-${process.pid}`);
   return {
     SELF_HOSTED_DIR: dir,
     PID_FILE: join(dir, ".pids.json"),

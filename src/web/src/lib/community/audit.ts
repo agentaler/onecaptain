@@ -1,5 +1,5 @@
-import { queries, createLogger } from "@alook/shared"
-import type { Database } from "@alook/shared"
+import { queries, createLogger } from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 
 const log = createLogger({ service: "community-audit" })
 
@@ -20,7 +20,7 @@ export const COMMUNITY_AUDIT_ACTIONS = {
   BOT_JOIN_REQUESTED: "community.bot.join_requested",
   BOT_JOIN_APPROVED: "community.bot.join_approved",
   BOT_JOIN_DENIED: "community.bot.join_denied",
-  /** A bot joined a server via `alook server join --invite <link>` (owner-initiated CLI join). */
+  /** A bot joined a server via `onecaptain server join --invite <link>` (owner-initiated CLI join). */
   BOT_JOINED_VIA_INVITE: "community.bot.joined_via_invite",
   BOT_FRIEND_REQUESTED: "community.bot.friend_requested",
   /** Requester withdrew their own pending bot friend-request. */

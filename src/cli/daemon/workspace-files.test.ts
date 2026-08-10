@@ -7,7 +7,7 @@ import { readDirectoryTree, readFileContent, validatePath } from "./workspace-fi
 let workDir: string;
 
 beforeEach(() => {
-  workDir = join(tmpdir(), `alook-test-files-${Date.now()}`);
+  workDir = join(tmpdir(), `onecaptain-test-files-${Date.now()}`);
   mkdirSync(workDir, { recursive: true });
 });
 

@@ -19,8 +19,8 @@ describe("GET /blog/feed.xml", () => {
   it("returns RSS with blog posts and correct content type", async () => {
     vi.mocked(getAllPosts).mockResolvedValue([
       {
-        slug: "why-we-built-alook",
-        title: "Why We Built Alook",
+        slug: "why-we-built-onecaptain",
+        title: "Why We Built OneCaptain",
         date: "2026-05-15",
         author: "Gus",
         excerpt: "Origin story excerpt.",
@@ -32,8 +32,8 @@ describe("GET /blog/feed.xml", () => {
     const body = await res.text();
 
     expect(res.headers.get("Content-Type")).toBe("application/rss+xml");
-    expect(body).toContain("<title>Alook Blog</title>");
-    expect(body).toContain("https://alook.ai/blog/why-we-built-alook");
-    expect(body).toContain("Why We Built Alook");
+    expect(body).toContain("<title>OneCaptain Blog</title>");
+    expect(body).toContain("https://onecaptain.ai/blog/why-we-built-onecaptain");
+    expect(body).toContain("Why We Built OneCaptain");
   });
 });

@@ -8,9 +8,9 @@ const root = resolve(dir, "../../../")
 export default mergeConfig(shared, defineConfig({
   resolve: {
     alias: {
-      "@alook/shared/community-cli-contract": resolve(root, "src/shared/src/community-cli-contract.ts"),
-      "@alook/test-utils": resolve(root, "tests/utils/src/index.ts"),
-      "@alook/shared": resolve(root, "src/shared/src/index.ts"),
+      "@onecaptain/shared/community-cli-contract": resolve(root, "src/shared/src/community-cli-contract.ts"),
+      "@onecaptain/test-utils": resolve(root, "tests/utils/src/index.ts"),
+      "@onecaptain/shared": resolve(root, "src/shared/src/index.ts"),
     },
   },
   test: {

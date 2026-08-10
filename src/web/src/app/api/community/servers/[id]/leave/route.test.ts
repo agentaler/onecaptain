@@ -14,8 +14,8 @@ const mockBroadcastToUserSafe = vi.fn()
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {

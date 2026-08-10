@@ -1,6 +1,6 @@
 import type { BlogPost } from "./types";
 
-export const LLMS_TXT_SITE_URL = "https://alook.ai";
+export const LLMS_TXT_SITE_URL = "https://onecaptain.ai";
 
 function formatPostDate(date: string): string {
   return new Date(date).toLocaleDateString("en-US", {
@@ -29,11 +29,11 @@ export function buildLlmsTxt(
         });
 
   return [
-    "# Alook",
+    "# OneCaptain",
     "",
     "> Connect your own agents and run them as one coordinated team.",
     "",
-    "Alook is an open-source, self-hosted platform that turns local AI agents into a collaborating team. Give agents roles, email addresses, tasks, and shared coordination so you stop routing context by hand. Sign up at alook.ai and connect your local runtime, or self-host.",
+    "OneCaptain is an open-source, self-hosted platform that turns local AI agents into a collaborating team. Give agents roles, email addresses, tasks, and shared coordination so you stop routing context by hand. Sign up at onecaptain.ai and connect your local runtime, or self-host.",
     "",
     "Supported agent runtimes today: Claude Code, Codex, and OpenCode.",
     "",
@@ -42,8 +42,8 @@ export function buildLlmsTxt(
     `- [Home](${siteUrl}/): Product overview and onboarding`,
     `- [Blog](${siteUrl}/blog): Essays and guides on agent teams and coordination`,
     `- [Blog RSS](${siteUrl}/blog/feed.xml): Machine-readable post feed`,
-    `- [GitHub](https://github.com/alookai/alook): Source code and self-host path`,
-    `- [Discord](https://discord.alook.ai): Community`,
+    `- [GitHub](https://github.com/agentaler/onecaptain): Source code and self-host path`,
+    `- [Discord](https://discord.onecaptain.ai): Community`,
     "",
     "## Blog posts",
     "",
@@ -54,7 +54,7 @@ export function buildLlmsTxt(
     `- This index: ${siteUrl}/llms.txt`,
     `- Blog RSS: ${siteUrl}/blog/feed.xml`,
     "",
-    "## How Alook fits",
+    "## How OneCaptain fits",
     "",
     "1. Bring agents you already run (Claude Code, Codex, OpenCode, …)",
     "2. Connect your local runtime (online signup or self-host)",
@@ -63,10 +63,10 @@ export function buildLlmsTxt(
     "## Contact",
     "",
     `- Website: ${siteUrl}`,
-    "- GitHub: https://github.com/alookai/alook",
-    "- Discord: https://discord.alook.ai",
-    "- X: https://x.com/alook_ai",
-    "- Support: support@alook.ai",
+    "- GitHub: https://github.com/agentaler/onecaptain",
+    "- Discord: https://discord.onecaptain.ai",
+    "- X: https://x.com/onecaptain_ai",
+    "- Support: support@onecaptain.ai",
     "",
   ].join("\n");
 }

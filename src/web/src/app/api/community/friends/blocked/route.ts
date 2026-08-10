@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries, readOrStale } from "@alook/shared"
+import { queries, readOrStale } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor, rejectBot } from "@/lib/middleware/community-actor"
 import { avatarInitial } from "@/lib/community/avatar"

@@ -1,6 +1,6 @@
 import { SENSITIVE_RECIPIENT_DOMAINS, SENSITIVE_DOMAIN_LABELS } from "../constants"
 
-const DOMAIN = `@${process.env.ALOOK_DOMAIN || "alook.ai"}`
+const DOMAIN = `@${process.env.ONECAPTAIN_DOMAIN || "onecaptain.ai"}`
 const HANDLE_RE = /^[a-zA-Z0-9-]{3,}$/
 
 const RESERVED_HANDLES = new Set([
@@ -18,11 +18,11 @@ const RESERVED_HANDLES = new Set([
   "webmaster",
   "hostmaster",
   "system",
-  "alook",
+  "onecaptain",
 ])
 
 export function parseEmailHandle(a: string) { return a.endsWith(DOMAIN) ? a.slice(0, -DOMAIN.length) : "" }
-export function toAlookAddress(h: string) { return `${h}${DOMAIN}` }
+export function toOneCaptainAddress(h: string) { return `${h}${DOMAIN}` }
 export function isValidHandle(h: string) { return HANDLE_RE.test(h) && !RESERVED_HANDLES.has(h.toLowerCase()) }
 
 export function extractDomain(email: string): string | null {

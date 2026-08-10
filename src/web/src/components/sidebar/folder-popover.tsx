@@ -1,6 +1,6 @@
 "use client";
 
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import type { AgentFolder } from "@/hooks/use-agent-folders";
 import { AgentSidebarButton } from "./agent-sidebar-button";
 import { ContextMenuItem } from "@/components/ui/context-menu";

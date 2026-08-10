@@ -63,36 +63,36 @@ describe("describeProvenance", () => {
 
 describe("platformEnv", () => {
   it("builds all <PREFIX>_* keys and honours the prefix", () => {
-    const v = platformEnv("ALOOK", {
-      stateHome: "/home/.alook",
+    const v = platformEnv("ONECAPTAIN", {
+      stateHome: "/home/.onecaptain",
       agentId: "agent_1",
-      cliName: "alook",
+      cliName: "onecaptain",
       serverUrl: "ws://x",
       capabilities: ["send", "read"],
       launchId: "launch_1",
       traceDir: "/trace",
     });
-    expect(v.ALOOK_HOME).toBe("/home/.alook");
-    expect(v.ALOOK_ID).toBe("agent_1");
+    expect(v.ONECAPTAIN_HOME).toBe("/home/.onecaptain");
+    expect(v.ONECAPTAIN_ID).toBe("agent_1");
     // No cliPath → <PREFIX>_CLI falls back to the bare name.
-    expect(v.ALOOK_CLI).toBe("alook");
-    expect(v.ALOOK_SERVER_URL).toBe("ws://x");
-    expect(v.ALOOK_ACTIVE_CAPABILITIES).toBe("send,read");
-    expect(v.ALOOK_LAUNCH_ID).toBe("launch_1");
-    expect(v.ALOOK_CLI_TRANSPORT_TRACE_DIR).toBe("/trace");
+    expect(v.ONECAPTAIN_CLI).toBe("onecaptain");
+    expect(v.ONECAPTAIN_SERVER_URL).toBe("ws://x");
+    expect(v.ONECAPTAIN_ACTIVE_CAPABILITIES).toBe("send,read");
+    expect(v.ONECAPTAIN_LAUNCH_ID).toBe("launch_1");
+    expect(v.ONECAPTAIN_CLI_TRANSPORT_TRACE_DIR).toBe("/trace");
   });
 
   it("sets <PREFIX>_CLI to the ABSOLUTE cliPath when given (agent invokes by path, not bare name)", () => {
-    const v = platformEnv("ALOOK", {
-      stateHome: "/home/.alook",
+    const v = platformEnv("ONECAPTAIN", {
+      stateHome: "/home/.onecaptain",
       agentId: "agent_1",
-      cliName: "alook",
-      cliPath: "/work/.alook/bin/alook",
+      cliName: "onecaptain",
+      cliPath: "/work/.onecaptain/bin/onecaptain",
       capabilities: [],
     });
-    // The whole point: ALOOK_CLI is the absolute shim path, so `$ALOOK_CLI …`
-    // dodges PATH and always hits the injected CLI (never a host `alook`).
-    expect(v.ALOOK_CLI).toBe("/work/.alook/bin/alook");
+    // The whole point: ONECAPTAIN_CLI is the absolute shim path, so `$ONECAPTAIN_CLI …`
+    // dodges PATH and always hits the injected CLI (never a host `onecaptain`).
+    expect(v.ONECAPTAIN_CLI).toBe("/work/.onecaptain/bin/onecaptain");
   });
 
   it("swaps the prefix", () => {
@@ -109,11 +109,11 @@ describe("platformEnv", () => {
 
 describe("runtimeContextEnv", () => {
   it("returns empty when no context", () => {
-    expect(runtimeContextEnv("ALOOK", undefined)).toEqual({});
+    expect(runtimeContextEnv("ONECAPTAIN", undefined)).toEqual({});
   });
 
   it("maps the full runtime context", () => {
-    const v = runtimeContextEnv("ALOOK", {
+    const v = runtimeContextEnv("ONECAPTAIN", {
       agentId: "a",
       serverId: "s",
       computerId: "c",
@@ -123,8 +123,8 @@ describe("runtimeContextEnv", () => {
       daemonVersion: "1.2.3",
       workspacePath: "/ws",
     });
-    expect(v.ALOOK_CURRENT_AGENT_ID).toBe("a");
-    expect(v.ALOOK_CURRENT_COMPUTER_HOSTNAME).toBe("host");
-    expect(v.ALOOK_CURRENT_WORKSPACE_PATH).toBe("/ws");
+    expect(v.ONECAPTAIN_CURRENT_AGENT_ID).toBe("a");
+    expect(v.ONECAPTAIN_CURRENT_COMPUTER_HOSTNAME).toBe("host");
+    expect(v.ONECAPTAIN_CURRENT_WORKSPACE_PATH).toBe("/ws");
   });
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { queries, parseRef, DM_SERVER, parseNameAndTag, channelCreation, withD1Retry } from "@alook/shared"
-import type { Database } from "@alook/shared"
+import { queries, parseRef, DM_SERVER, parseNameAndTag, channelCreation, withD1Retry } from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 import { guardDmOpen } from "./dm-guard"
 import { createWithCollisionPolicy } from "./create-collision"
 

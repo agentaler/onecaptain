@@ -210,7 +210,7 @@ export function UseCasesSection() {
             className={`overflow-hidden ${slideDir === "left" ? "usecase-demo-slide-left" : "usecase-demo-slide-right"}`}
           >
             <DemoWindow
-              title={`alook — ${scenarios[activeIndex].title}`}
+              title={`onecaptain — ${scenarios[activeIndex].title}`}
               className="shadow-[0_4px_24px_oklch(0.15_0.01_55/10%)]"
             >
               <div className="h-120 overflow-hidden">

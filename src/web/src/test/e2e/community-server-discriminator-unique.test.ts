@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { sqlRun, sqlQuery } from "@alook/test-utils"
-import { computeDiscriminator, createDb, queries } from "@alook/shared"
+import { sqlRun, sqlQuery } from "@onecaptain/test-utils"
+import { computeDiscriminator, createDb, queries } from "@onecaptain/shared"
 import { resolveTargetForMember } from "../../lib/community/resolve-ref"
 
 /**
@@ -96,7 +96,7 @@ describe("idx_community_server_name_discriminator — server handle uniqueness (
     expect(rows.map((r) => r.discriminator)).toEqual(["0001", "0002"]) // 2 distinct, not merged
   })
 
-  it("folds name case-insensitively (COLLATE NOCASE) — Alook#0001 and alook#0001 collide", () => {
+  it("folds name case-insensitively (COLLATE NOCASE) — OneCaptain#0001 and onecaptain#0001 collide", () => {
     // The index MUST fold case identically to resolveServerByNameForMember's
     // lookup (the index/resolver alignment migration 0075 established), else a
     // ref differing only in case would resolve to a different-cased twin.

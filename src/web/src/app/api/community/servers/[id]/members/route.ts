@@ -7,7 +7,7 @@ import {
   parseNameAndTag,
   DEFAULT_MEMBERS_PAGE_SIZE,
   MAX_MEMBERS_PAGE_SIZE,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { withCommunityActor } from "@/lib/middleware/community-actor"
 import { requireServerMember } from "@/lib/community/permissions"
 import { parseBoundedInt, parseMemberCursor, buildMemberPaginatedResponse } from "@/lib/community/messages"

@@ -6,7 +6,7 @@
  * which provider/endpoint, mode, reasoning effort — as structured data (not bare
  * strings), mirroring how a production daemon models it.
  *
- * Lifted from `src/daemon/src/runtimeConfig.ts` into `@alook/shared` because
+ * Lifted from `src/daemon/src/runtimeConfig.ts` into `@onecaptain/shared` because
  * `HostCommand`'s `agent:wake.config` field needs this type, and the wake
  * producer/consumer (`src/web` + `src/wake-worker`, both Workers) has no path
  * to import from the CLI/daemon package. `src/daemon` re-exports
@@ -38,7 +38,16 @@ export type ModelConfig =
 export type ProviderConfig =
   | { kind: "default" }
   | { kind: "custom"; apiUrl: string; apiKey: string } // e.g. Claude-compatible endpoint
-  | { kind: "pi-builtin"; providerId: string; apiKey: string }; // Pi multi-provider
+  | { kind: "pi-builtin"; providerId: string; apiKey: string } // Pi multi-provider
+  | { kind: "cloud"; providerId: CloudProviderId; apiKey: string; apiUrl?: string }; // hosted LLM API
+
+/**
+ * First-party cloud LLM providers an agent can run against with a stored API
+ * key. The daemon maps each id to the provider's env keys at launch
+ * (`resolveLaunchFields`); runtimes pick the key up from their environment.
+ */
+export const CLOUD_PROVIDER_IDS = ["anthropic", "openai", "openrouter"] as const;
+export type CloudProviderId = (typeof CLOUD_PROVIDER_IDS)[number];
 
 /** Execution mode (e.g. fast lane). */
 export type ModeConfig = { kind: "default" | "fast" };
@@ -65,7 +74,7 @@ export interface RuntimeConfig {
   agentName?: string;
   /**
    * The agent's global @mention handle, `@name#0042` (e.g. "@Gus#4821").
-   * Every account in Alook — human or agent — has a name plus a 4-digit
+   * Every account in OneCaptain — human or agent — has a name plus a 4-digit
    * discriminator; this is the `@`-prefixed pair, unique even when names
    * collide.
    */

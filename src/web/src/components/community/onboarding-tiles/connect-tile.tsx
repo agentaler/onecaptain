@@ -6,9 +6,9 @@ import { useGSAP } from "@gsap/react"
 import { TileDefs, tileIds } from "./tile-defs"
 import { OT_EASE } from "./tile-motion"
 
-// "Connect your machine" — Alook is the HUB (top); your computer (bottom-left)
-// and phone (bottom-right) each link only THROUGH Alook (no device↔device edge).
-// A green dot circulates computer → Alook → phone → Alook → computer, always
+// "Connect your machine" — OneCaptain is the HUB (top); your computer (bottom-left)
+// and phone (bottom-right) each link only THROUGH OneCaptain (no device↔device edge).
+// A green dot circulates computer → OneCaptain → phone → OneCaptain → computer, always
 // routing through the hub, pulsing a flare at each node on arrival. This reads
 // as "your local bot, reachable from your phone or anywhere". Nodes stay still;
 // edges are trimmed sub-segments of the dot's path so nothing overlaps the icons.
@@ -41,10 +41,10 @@ export function ConnectTile({ idPrefix = "ot-connect" }: { idPrefix?: string }) 
         tl.to({}, { duration: 0.25 })
       }
       const tl = gsap.timeline({ repeat: -1, defaults: { ease: OT_EASE } })
-      leg(tl, PC, AL, ".ot-alook") // computer → Alook
-      leg(tl, AL, PH, ".ot-phone") // Alook → phone
-      leg(tl, PH, AL, ".ot-alook") // phone → Alook (back through hub)
-      leg(tl, AL, PC, ".ot-machine") // Alook → computer
+      leg(tl, PC, AL, ".ot-onecaptain") // computer → OneCaptain
+      leg(tl, AL, PH, ".ot-phone") // OneCaptain → phone
+      leg(tl, PH, AL, ".ot-onecaptain") // phone → OneCaptain (back through hub)
+      leg(tl, AL, PC, ".ot-machine") // OneCaptain → computer
       tl.to({}, { duration: 0.3 })
     },
     { scope: ref }
@@ -53,14 +53,14 @@ export function ConnectTile({ idPrefix = "ot-connect" }: { idPrefix?: string }) 
   return (
     <svg ref={ref} viewBox="0 0 200 130" className="ot-svg h-full w-full">
       <TileDefs idPrefix={idPrefix} />
-      {/* connectors: exact sub-segments (38%–70%) of each Alook↔device center line,
+      {/* connectors: exact sub-segments (38%–70%) of each OneCaptain↔device center line,
           so the dot rides right on the line; equal length, gap at both ends. */}
       <line className="ot-art" x1="83.7" y1="56.3" x2="70.1" y2="76.8" opacity="0.28" />
       <line className="ot-art" x1="116.3" y1="56.3" x2="129.9" y2="76.8" opacity="0.28" />
-      {/* Alook hub (top) — neutral foreground color, like the logo everywhere else */}
-      <g className="ot-alook ot-center text-foreground">
+      {/* OneCaptain hub (top) — neutral foreground color, like the logo everywhere else */}
+      <g className="ot-onecaptain ot-center text-foreground">
         <svg x="83" y="15" width="34" height="34" viewBox="3 5 22 22">
-          <use href={`#${id.alook}`} />
+          <use href={`#${id.onecaptain}`} />
         </svg>
       </g>
       {/* your computer (bottom-left) */}

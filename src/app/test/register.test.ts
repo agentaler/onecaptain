@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("@alook/shared", () => ({ DEV_PASSWORD: "dev-pw" }));
-vi.mock("../src/lib/constants.js", () => ({ SELF_HOSTED_DIR: "/tmp/alook-test" }));
+vi.mock("@onecaptain/shared", () => ({ DEV_PASSWORD: "dev-pw" }));
+vi.mock("../src/lib/constants.js", () => ({ SELF_HOSTED_DIR: "/tmp/onecaptain-test" }));
 
 import {
   registerUser,

@@ -1,4 +1,4 @@
-import { isUniqueConstraintError, type CreationTrait } from "@alook/shared"
+import { isUniqueConstraintError, type CreationTrait } from "@onecaptain/shared"
 
 /**
  * The single collision-handling strategy for CREATING a channel, dispatched

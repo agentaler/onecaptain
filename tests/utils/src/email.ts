@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto"
-import { DEV_EMAIL_WORKER_URL } from "@alook/shared"
+import { DEV_EMAIL_WORKER_URL } from "@onecaptain/shared"
 import { fetchWithRetry } from "./fetch"
 
 const EMAIL_WORKER_URL = process.env.EMAIL_WORKER_URL ?? DEV_EMAIL_WORKER_URL

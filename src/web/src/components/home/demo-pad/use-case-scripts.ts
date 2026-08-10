@@ -2,13 +2,13 @@ import type { DashboardStep, AgentInfo } from "./demo-dashboard";
 import type { UseCaseScript } from "./use-case-demo";
 
 /* ─── Agent Configs ─── */
-const SALES: AgentInfo = { name: "Sales", email: "sales@alook.ai", seed: "demo-sales" };
-const PLANNER: AgentInfo = { name: "Planner", email: "planner@alook.ai", seed: "demo-planner" };
-const CODER: AgentInfo = { name: "Coder", email: "coder@alook.ai", seed: "demo-coder" };
-const REVIEWER: AgentInfo = { name: "Reviewer", email: "reviewer@alook.ai", seed: "demo-reviewer" };
-const MARKETER: AgentInfo = { name: "Marketer", email: "marketer@alook.ai", seed: "demo-marketer" };
-const OPS: AgentInfo = { name: "Ops", email: "ops@alook.ai", seed: "demo-ops" };
-const ASSISTANT: AgentInfo = { name: "Assistant", email: "assistant@alook.ai", seed: "demo-assistant" };
+const SALES: AgentInfo = { name: "Sales", email: "sales@onecaptain.ai", seed: "demo-sales" };
+const PLANNER: AgentInfo = { name: "Planner", email: "planner@onecaptain.ai", seed: "demo-planner" };
+const CODER: AgentInfo = { name: "Coder", email: "coder@onecaptain.ai", seed: "demo-coder" };
+const REVIEWER: AgentInfo = { name: "Reviewer", email: "reviewer@onecaptain.ai", seed: "demo-reviewer" };
+const MARKETER: AgentInfo = { name: "Marketer", email: "marketer@onecaptain.ai", seed: "demo-marketer" };
+const OPS: AgentInfo = { name: "Ops", email: "ops@onecaptain.ai", seed: "demo-ops" };
+const ASSISTANT: AgentInfo = { name: "Assistant", email: "assistant@onecaptain.ai", seed: "demo-assistant" };
 
 /* ═══════════════════════════════════════════
    1. Lead Auto Follow-up
@@ -18,16 +18,16 @@ const ASSISTANT: AgentInfo = { name: "Assistant", email: "assistant@alook.ai", s
 const LEAD_SALES_STEPS: DashboardStep[] = [
   { type: "email-in", subject: "What's your pricing for a 50-person team?", address: "sarah@acmecorp.com" },
   { type: "message", text: "I remember this person. AcmeCorp, Series A — asked about API access on Discord 2 weeks ago." },
-  { type: "email-out", subject: "Does our API support bulk user import? Sarah needs this for 50 seats.", address: "coder@alook.ai" },
-  { type: "email-in", subject: "Re: Yes, /api/users/bulk supports CSV import up to 500 users.", address: "coder@alook.ai" },
+  { type: "email-out", subject: "Does our API support bulk user import? Sarah needs this for 50 seats.", address: "coder@onecaptain.ai" },
+  { type: "email-in", subject: "Re: Yes, /api/users/bulk supports CSV import up to 500 users.", address: "coder@onecaptain.ai" },
   { type: "message", text: "Got confirmation. Sending personalized reply with accurate info." },
   { type: "email-out", subject: "Re: Pricing — Team plan $29/seat with API access", address: "sarah@acmecorp.com" },
 ];
 
 const LEAD_CODER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Does our API support bulk user import? Sarah needs this for 50 seats.", address: "sales@alook.ai" },
+  { type: "email-in", subject: "Does our API support bulk user import? Sarah needs this for 50 seats.", address: "sales@onecaptain.ai" },
   { type: "message", markdown: "Yes, <code>/api/users/bulk</code> supports CSV import up to 500 users. Shipped last week." },
-  { type: "email-out", subject: "Re: Yes, /api/users/bulk supports CSV import up to 500 users.", address: "sales@alook.ai" },
+  { type: "email-out", subject: "Re: Yes, /api/users/bulk supports CSV import up to 500 users.", address: "sales@onecaptain.ai" },
 ];
 
 export const leadFollowupScript: UseCaseScript = {
@@ -73,26 +73,26 @@ export const leadFollowupScript: UseCaseScript = {
    ═══════════════════════════════════════════ */
 
 const BRIEF_PLANNER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Weekly Briefing — Mon 8:00 AM", address: "calendar@alook.ai" },
+  { type: "email-in", subject: "Weekly Briefing — Mon 8:00 AM", address: "calendar@onecaptain.ai" },
   { type: "message", text: "Collecting updates from the team..." },
-  { type: "email-out", subject: "What shipped this week? Any blockers?", address: "coder@alook.ai" },
-  { type: "email-in", subject: "Shipped calendar v2, 3 bug fixes. Blocker: OAuth refresh in staging.", address: "coder@alook.ai" },
-  { type: "email-out", subject: "Marketing status update?", address: "marketer@alook.ai" },
-  { type: "email-in", subject: "Blog post live, 2 social campaigns running. Launch copy 80% done.", address: "marketer@alook.ai" },
+  { type: "email-out", subject: "What shipped this week? Any blockers?", address: "coder@onecaptain.ai" },
+  { type: "email-in", subject: "Shipped calendar v2, 3 bug fixes. Blocker: OAuth refresh in staging.", address: "coder@onecaptain.ai" },
+  { type: "email-out", subject: "Marketing status update?", address: "marketer@onecaptain.ai" },
+  { type: "email-in", subject: "Blog post live, 2 social campaigns running. Launch copy 80% done.", address: "marketer@onecaptain.ai" },
   { type: "message", markdown: `<strong>Weekly Briefing — May 19</strong><br/><span style="display:inline-block;margin:4px 0"><span style="font-size:18px;font-weight:600">12</span> <span style="font-size:11px;opacity:0.6">Completed</span> · <span style="font-size:18px;font-weight:600;color:#ca8a04">1</span> <span style="font-size:11px;opacity:0.6">Blocker</span> · <span style="font-size:18px;font-weight:600">5</span> <span style="font-size:11px;opacity:0.6">This Week</span></span><br/>🔴 OAuth token refresh failing in staging` },
   { type: "email-out", subject: "Your Monday Briefing — May 19", address: "owner@company.com" },
 ];
 
 const BRIEF_CODER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "What shipped this week? Any blockers?", address: "planner@alook.ai" },
+  { type: "email-in", subject: "What shipped this week? Any blockers?", address: "planner@onecaptain.ai" },
   { type: "message", text: "Shipped calendar v2, 3 bug fixes. Blocker: OAuth refresh failing in staging." },
-  { type: "email-out", subject: "Shipped calendar v2, 3 bug fixes. Blocker: OAuth refresh in staging.", address: "planner@alook.ai" },
+  { type: "email-out", subject: "Shipped calendar v2, 3 bug fixes. Blocker: OAuth refresh in staging.", address: "planner@onecaptain.ai" },
 ];
 
 const BRIEF_MARKETER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Marketing status update?", address: "planner@alook.ai" },
+  { type: "email-in", subject: "Marketing status update?", address: "planner@onecaptain.ai" },
   { type: "message", text: "Blog post live, 2 social campaigns running. Launch copy 80% done." },
-  { type: "email-out", subject: "Blog post live, 2 social campaigns running. Launch copy 80% done.", address: "planner@alook.ai" },
+  { type: "email-out", subject: "Blog post live, 2 social campaigns running. Launch copy 80% done.", address: "planner@onecaptain.ai" },
 ];
 
 export const weeklyBriefScript: UseCaseScript = {
@@ -161,18 +161,18 @@ export const weeklyBriefScript: UseCaseScript = {
    ═══════════════════════════════════════════ */
 
 const STORE_OPS_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Daily Store Check — 7:00 AM", address: "calendar@alook.ai" },
+  { type: "email-in", subject: "Daily Store Check — 7:00 AM", address: "calendar@onecaptain.ai" },
   { type: "message", markdown: "Checking inventory, traffic, sales...<br/>✓ Check Inventory Levels<br/>✓ Pull Yesterday's Traffic &amp; Sales<br/>✓ Spot Anomalies" },
   { type: "message", text: "\"Classic Tee\" almost out of stock (3 left). Emailing Marketer to pause that ad." },
-  { type: "email-out", subject: "Pause \"Classic Tee\" Instagram ad — only 3 left in stock", address: "marketer@alook.ai" },
-  { type: "email-in", subject: "Re: Paused. Switching budget to Hoodie campaign.", address: "marketer@alook.ai" },
+  { type: "email-out", subject: "Pause \"Classic Tee\" Instagram ad — only 3 left in stock", address: "marketer@onecaptain.ai" },
+  { type: "email-in", subject: "Re: Paused. Switching budget to Hoodie campaign.", address: "marketer@onecaptain.ai" },
   { type: "email-out", subject: "Daily Store Report — May 23", address: "owner@company.com" },
 ];
 
 const STORE_MARKETER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Pause \"Classic Tee\" Instagram ad — only 3 left in stock", address: "ops@alook.ai" },
+  { type: "email-in", subject: "Pause \"Classic Tee\" Instagram ad — only 3 left in stock", address: "ops@onecaptain.ai" },
   { type: "message", text: "Paused. Switching budget to the Hoodie campaign instead." },
-  { type: "email-out", subject: "Re: Paused. Switching budget to Hoodie campaign.", address: "ops@alook.ai" },
+  { type: "email-out", subject: "Re: Paused. Switching budget to Hoodie campaign.", address: "ops@onecaptain.ai" },
 ];
 
 export const storeOpsScript: UseCaseScript = {
@@ -220,23 +220,23 @@ export const storeOpsScript: UseCaseScript = {
 const BUG_PLANNER_STEPS: DashboardStep[] = [
   { type: "email-in", subject: "Login page crashes on Safari", address: "user@company.com" },
   { type: "message", text: "Reproduced it — WebKit flex gap bug in Safari 14. Writing fix plan and emailing Coder." },
-  { type: "email-out", subject: "Replace flex gap with margin-based spacing in login page.", address: "coder@alook.ai" },
-  { type: "email-in", subject: "Re: Fixed. PR #142 ready for review.", address: "coder@alook.ai" },
-  { type: "email-in", subject: "Re: All tests pass. Approved.", address: "reviewer@alook.ai" },
+  { type: "email-out", subject: "Replace flex gap with margin-based spacing in login page.", address: "coder@onecaptain.ai" },
+  { type: "email-in", subject: "Re: Fixed. PR #142 ready for review.", address: "coder@onecaptain.ai" },
+  { type: "email-in", subject: "Re: All tests pass. Approved.", address: "reviewer@onecaptain.ai" },
   { type: "email-out", subject: "Re: Login page crashes on Safari — Fixed in PR #142", address: "user@company.com" },
 ];
 
 const BUG_CODER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "Replace flex gap with margin-based spacing in login page.", address: "planner@alook.ai" },
+  { type: "email-in", subject: "Replace flex gap with margin-based spacing in login page.", address: "planner@onecaptain.ai" },
   { type: "message", text: "Fixed. PR opened. Emailing Reviewer." },
-  { type: "email-out", subject: "PR #142 ready. Safari flex gap fix.", address: "reviewer@alook.ai" },
-  { type: "email-out", subject: "Re: Fixed. PR #142 ready for review.", address: "planner@alook.ai" },
+  { type: "email-out", subject: "PR #142 ready. Safari flex gap fix.", address: "reviewer@onecaptain.ai" },
+  { type: "email-out", subject: "Re: Fixed. PR #142 ready for review.", address: "planner@onecaptain.ai" },
 ];
 
 const BUG_REVIEWER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "PR #142 ready. Safari flex gap fix.", address: "coder@alook.ai" },
+  { type: "email-in", subject: "PR #142 ready. Safari flex gap fix.", address: "coder@onecaptain.ai" },
   { type: "message", text: "All tests pass. Approved." },
-  { type: "email-out", subject: "Re: All tests pass. Approved.", address: "planner@alook.ai" },
+  { type: "email-out", subject: "Re: All tests pass. Approved.", address: "planner@onecaptain.ai" },
 ];
 
 export const bugToPrScript: UseCaseScript = {
@@ -299,15 +299,15 @@ export const bugToPrScript: UseCaseScript = {
 const POST_MARKETER_STEPS: DashboardStep[] = [
   { type: "user-message", text: "Post something about today's release" },
   { type: "message", text: "I need to know what shipped today. Emailing Coder." },
-  { type: "email-out", subject: "What did we ship today? I need to write a post.", address: "coder@alook.ai" },
-  { type: "email-in", subject: "Re: Shipped calendar recurring events, email forwarding, and 3 bug fixes.", address: "coder@alook.ai" },
+  { type: "email-out", subject: "What did we ship today? I need to write a post.", address: "coder@onecaptain.ai" },
+  { type: "email-in", subject: "Re: Shipped calendar recurring events, email forwarding, and 3 bug fixes.", address: "coder@onecaptain.ai" },
   { type: "message", markdown: "Got it. Drafting and publishing now.<br/><br/>✓ Posted to X: <em>\"Just shipped: recurring calendar events, email forwarding, and squashed 3 bugs. Your AI team never sleeps.\"</em>" },
 ];
 
 const POST_CODER_STEPS: DashboardStep[] = [
-  { type: "email-in", subject: "What did we ship today? I need to write a post.", address: "marketer@alook.ai" },
+  { type: "email-in", subject: "What did we ship today? I need to write a post.", address: "marketer@onecaptain.ai" },
   { type: "message", text: "Shipped calendar recurring events, email forwarding, and 3 bug fixes." },
-  { type: "email-out", subject: "Re: Shipped calendar recurring events, email forwarding, and 3 bug fixes.", address: "marketer@alook.ai" },
+  { type: "email-out", subject: "Re: Shipped calendar recurring events, email forwarding, and 3 bug fixes.", address: "marketer@onecaptain.ai" },
 ];
 
 export const postUpdateScript: UseCaseScript = {

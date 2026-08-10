@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, RecruitAgentRequestSchema, isValidHandle, isOnline, buildMimeMessage, extractThreadId, buildEmailMapKey, DEV_WEB_URL, toAlookAddress } from "@alook/shared";
+import { queries, RecruitAgentRequestSchema, isValidHandle, isOnline, buildMimeMessage, extractThreadId, buildEmailMapKey, DEV_WEB_URL, toOneCaptainAddress } from "@onecaptain/shared";
 import { nanoid } from "nanoid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { getDb } from "@/lib/db";
@@ -93,7 +93,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   });
 
   if (callingAgent.emailHandle) {
-    const callerEmail = toAlookAddress(callingAgent.emailHandle);
+    const callerEmail = toOneCaptainAddress(callingAgent.emailHandle);
     await queries.whitelist.addWhitelist(db, newAgent.id, ws.workspaceId, callerEmail);
   }
   if (ctx.email) {
@@ -115,11 +115,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   if (isOnline(runtime.machineLastSeenAt) && callingAgent.emailHandle) {
     try {
       const cfEnv = ctx.env;
-      const fromAddress = toAlookAddress(callingAgent.emailHandle);
-      const toAddress = toAlookAddress(handle);
+      const fromAddress = toOneCaptainAddress(callingAgent.emailHandle);
+      const toAddress = toOneCaptainAddress(handle);
       const subject = "Welcome aboard";
       const htmlBody = `<p>Hi, I just recruited you. Your instructions are already set. Please reply confirming you're ready to work — tell me your name and email address.</p>`;
-      const messageId = `<${nanoid()}@alook.ai>`;
+      const messageId = `<${nanoid()}@onecaptain.ai>`;
       const traceId = "tr_" + nanoid();
 
       const rawMime = buildMimeMessage({
@@ -195,7 +195,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   }
 
   return writeJSON({
-    agent: { ...agentToResponse(newAgent), email: toAlookAddress(handle) },
+    agent: { ...agentToResponse(newAgent), email: toOneCaptainAddress(handle) },
     link: agentLinkToResponse(link),
   }, 201);
 });

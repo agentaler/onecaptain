@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { RuntimeSelect } from "@/components/runtime-select";
 import { ProviderLogo } from "@/components/provider-logo";
-import { isValidHandle, isPublic, isPrivate } from "@alook/shared";
-import type { AgentRuntime as Runtime } from "@alook/shared";
+import { isValidHandle, isPublic, isPrivate } from "@onecaptain/shared";
+import type { AgentRuntime as Runtime } from "@onecaptain/shared";
 import { cn } from "@/lib/utils";
 import { InfoIcon, XIcon, Dices, ChevronDown } from "lucide-react";
 import { useWorkspace } from "@/contexts/workspace-context";
@@ -317,7 +317,7 @@ export function EmailHandleField({
           className="w-full border-0 bg-transparent px-0 py-1 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground/40 focus-visible:ring-0"
         />
         <span className="shrink-0 text-sm text-muted-foreground/70">
-          @alook.ai
+          @onecaptain.ai
         </span>
       </div>
       {handleError && (
@@ -421,7 +421,7 @@ export function AllowedSendersTab({ agentId }: { agentId: string }) {
         <h3 className="text-sm font-medium">Allowed Senders</h3>
         <p className="text-xs text-muted-foreground mt-1">
           Only emails from these addresses will trigger this agent. Applies to
-          all configured email addresses (alook.ai handle and custom email).
+          all configured email addresses (onecaptain.ai handle and custom email).
         </p>
         {hasSiblingAgents && (
           <p className="text-xs text-muted-foreground/70 mt-2 flex items-center gap-1">

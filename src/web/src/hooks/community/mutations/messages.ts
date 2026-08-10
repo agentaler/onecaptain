@@ -35,7 +35,7 @@ import {
   patchForumSidebarActivityExact,
   patchForumSidebarTitleExact,
 } from "@/hooks/community/use-forum-sidebar-threads"
-import { isBlocked, type MentionType } from "@alook/shared"
+import { isBlocked, type MentionType } from "@onecaptain/shared"
 
 /**
  * Message-scoped mutation hooks — the split of the God-context's

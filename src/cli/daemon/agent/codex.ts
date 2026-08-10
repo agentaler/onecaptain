@@ -700,8 +700,8 @@ export class CodexBackend implements AgentBackend {
           // 1. Initialize
           await sendRpc("initialize", {
             clientInfo: {
-              name: "alook-daemon",
-              title: "Alook Agent SDK",
+              name: "onecaptain-daemon",
+              title: "OneCaptain Agent SDK",
               version: "0.1.0",
             },
             capabilities: { experimentalApi: true },

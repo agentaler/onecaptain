@@ -1,5 +1,5 @@
-import { createLogger, createDb, dispatchOneUnreadWake } from "@alook/shared"
-import type { WakePayload, Database } from "@alook/shared"
+import { createLogger, createDb, dispatchOneUnreadWake } from "@onecaptain/shared"
+import type { WakePayload, Database } from "@onecaptain/shared"
 
 const log = createLogger({ service: "wake-worker" })
 
@@ -28,9 +28,9 @@ async function resolveAndLog(db: Database, env: Env, item: WakePayload) {
 
 export default {
   /**
-   * `alook-wake-worker` — Cloudflare Queue consumer for `alook-wake`
+   * `onecaptain-wake-worker` — Cloudflare Queue consumer for `onecaptain-wake`
    * (minimal-wake-queue-unread-notice plan §3). Owns a `DB` binding to the
-   * same `alook-app` database `src/web` writes to: for every minimal
+   * same `onecaptain-app` database `src/web` writes to: for every minimal
    * `{ messageId, botUserId }` queue item, `dispatchOneUnreadWake` re-reads
    * CURRENT D1 state and only then forwards a freshly built `agent:wake`
    * `HostCommand`. This is what keeps a stale queue item from waking an old
@@ -66,7 +66,7 @@ export default {
    * `WAKE_QUEUE.sendBatch(...)`. Body is a JSON `WakePayload[]` — same shape
    * a queue batch's message bodies would carry. Runs the SAME
    * `resolveAndLog`/`dispatchOneUnreadWake` real orchestration `queue()`
-   * does, including the real D1 read and the real forward to `alook-ws-do`
+   * does, including the real D1 read and the real forward to `onecaptain-ws-do`
    * — this is the actual worker process handling actual wake candidates,
    * not a simulation of it. Best-effort: no queue infra backs this, so one
    * candidate's failure is logged but never blocks siblings or the response.

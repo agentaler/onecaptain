@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Copy pre-built @alook/cli dist files into app/dist/cli/.
+ * Copy pre-built @onecaptain/cli dist files into app/dist/cli/.
  * Run as part of the app build step so the CLI is bundled
- * directly into @alook/app — no separate npm dependency needed.
+ * directly into @onecaptain/app — no separate npm dependency needed.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";

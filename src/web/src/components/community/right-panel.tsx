@@ -10,7 +10,7 @@ import { PanelShell } from "./panel-shell"
 import { MemberList } from "./member-list"
 import { Message } from "./message"
 import { formatRelativeTime } from "./format-time"
-import { stripInlineMarkup } from "@alook/shared"
+import { stripInlineMarkup } from "@onecaptain/shared"
 import type { RightPanel, Member, Role, Msg, RenderMsg, Thread, OpenProfile, MemberManageContext } from "./_types"
 
 // Right-panel content router — members / pinned / search / threads. Data via props.

@@ -40,8 +40,8 @@ vi.mock("@/lib/community/member-presence", async () => {
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -390,7 +390,7 @@ describe("POST /channels/[id]/members", () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.visibility).toBe("public")
-    expect(body.hint).toContain("alook server member --server demo")
+    expect(body.hint).toContain("onecaptain server member --server demo")
     expect(mockResolveScopeMembers).not.toHaveBeenCalled()
   })
 

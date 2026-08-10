@@ -6,7 +6,7 @@
     <false/>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>ai.alook.desktop</string>
+        <string>ai.onecaptain.desktop</string>
     </array>
     <key>com.apple.security.inherit</key>
     <true/>

@@ -30,7 +30,7 @@ import {
   ArrowRight,
   Check,
 } from "lucide-react";
-import type { Agent, AgentLink } from "@alook/shared";
+import type { Agent, AgentLink } from "@onecaptain/shared";
 import { cn } from "@/lib/utils";
 import { useAgentContext } from "@/contexts/agent-context";
 import { useWorkspace } from "@/contexts/workspace-context";
@@ -66,11 +66,11 @@ const nodeTypes = { agent: AgentNode };
 const edgeTypes = { link: LinkEdge };
 
 function storageKey(workspaceId: string) {
-  return `alook-canvas-positions-${workspaceId}`;
+  return `onecaptain-canvas-positions-${workspaceId}`;
 }
 
 function layoutStorageKey(workspaceId: string) {
-  return `alook-canvas-layout-${workspaceId}`;
+  return `onecaptain-canvas-layout-${workspaceId}`;
 }
 
 function loadLayoutType(workspaceId: string): LayoutType {

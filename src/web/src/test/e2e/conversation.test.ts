@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest } from "@onecaptain/test-utils"
 
 let seed: TestSeed
 

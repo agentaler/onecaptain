@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun, sqlQuery, postEmail, postEmailRaw } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun, sqlQuery, postEmail, postEmailRaw } from "@onecaptain/test-utils"
 
 let seed: TestSeed
 
@@ -31,7 +31,7 @@ async function waitForEmail(
 describe("email receive (inbound)", () => {
   it("whitelisted sender → DB record with is_whitelisted = 1", async () => {
     const from = `${seed.userId}@test.local` // whitelisted in seed
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = "E2E whitelisted test"
 
     const res = await postEmail(from, to, subject, "Hello from e2e")
@@ -45,7 +45,7 @@ describe("email receive (inbound)", () => {
 
   it("non-whitelisted sender → DB record with is_whitelisted = 0", async () => {
     const from = "stranger@external.com"
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = "E2E non-whitelisted test"
 
     await postEmail(from, to, subject, "Stranger email")
@@ -58,7 +58,7 @@ describe("email receive (inbound)", () => {
 
   it("unknown handle → no email record created", async () => {
     const from = "anyone@example.com"
-    const to = "nonexistent-handle-xyz@alook.ai"
+    const to = "nonexistent-handle-xyz@onecaptain.ai"
     const subject = "E2E unknown handle"
 
     await postEmail(from, to, subject, "Should be rejected")
@@ -78,7 +78,7 @@ describe("email receive (inbound)", () => {
 describe("email threading (inbound)", () => {
   it("stores Message-ID, In-Reply-To, References from incoming email", async () => {
     const from = `${seed.userId}@test.local`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = "E2E threading test"
     const msgId = `<threading-${randomUUID()}@e2e.test>`
     const inReplyTo = `<parent-${randomUUID()}@e2e.test>`
@@ -122,7 +122,7 @@ describe("email threading (inbound)", () => {
 
 describe("email folder filtering", () => {
   it("GET /api/email?folder=untrust returns only non-whitelisted inbound emails", async () => {
-    const agentEmail = `${seed.agentEmailHandle}@alook.ai`
+    const agentEmail = `${seed.agentEmailHandle}@onecaptain.ai`
     const now = new Date().toISOString()
     const rejId = `erej_${randomUUID().slice(0, 8)}`
     sqlRun(`INSERT INTO emails (id, agent_id, workspace_id, from_email, to_email, subject, r2_key, is_whitelisted, forwarded, message_id, in_reply_to, "references", created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, rejId, seed.agentId, seed.workspaceId, 'stranger@external.com', agentEmail, 'Untrust folder test', 'emails/fake-rej/raw', 0, 0, '', '', '', now)
@@ -163,7 +163,7 @@ describe("email folder filtering", () => {
     expect(res.status).toBe(200)
 
     const emails = await res.json() as { from_email: string; to_email: string }[]
-    const agentEmail = `${seed.agentEmailHandle}@alook.ai`
+    const agentEmail = `${seed.agentEmailHandle}@onecaptain.ai`
     for (const email of emails) {
       expect(email.from_email).not.toBe(agentEmail)
     }
@@ -206,7 +206,7 @@ describe("email send (outbound)", () => {
 
     const data = await res.json() as Record<string, unknown>
     expect(data.r2_key).toBeTruthy()
-    expect(data.from_email).toBe(`${seed.agentEmailHandle}@alook.ai`)
+    expect(data.from_email).toBe(`${seed.agentEmailHandle}@onecaptain.ai`)
     expect(data.to_email).toBe("recipient@example.com")
     expect(data.subject).toBe("E2E send test")
   })
@@ -286,7 +286,7 @@ describe("email send (outbound)", () => {
 
 describe("email thread", () => {
   it("GET /api/email/[id]/thread returns parent chain", async () => {
-    const agentEmail = `${seed.agentEmailHandle}@alook.ai`
+    const agentEmail = `${seed.agentEmailHandle}@onecaptain.ai`
     const now = new Date().toISOString()
     const parentMsgId = `<thread-parent-${randomUUID()}@e2e.test>`
     const childMsgId = `<thread-child-${randomUUID()}@e2e.test>`
@@ -312,7 +312,7 @@ describe("email thread", () => {
   })
 
   it("GET /api/email/[id]/thread walks chain and returns empty for root", async () => {
-    const agentEmail = `${seed.agentEmailHandle}@alook.ai`
+    const agentEmail = `${seed.agentEmailHandle}@onecaptain.ai`
     const now = new Date().toISOString()
 
     // Build a chain of 5 emails via individual INSERTs to verify the chain walk works

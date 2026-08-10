@@ -71,7 +71,7 @@ vi.mock("@/components/community/message-context-sheet", () => ({ MessageContextS
 vi.mock("@/components/community/thread-opener", () => ({ ThreadOpener: () => null }))
 vi.mock("@/components/community/add-members-dialog", () => ({ AddMembersDialog: () => null }))
 vi.mock("@/components/community/_types", () => ({ canManageServer: () => false }))
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   isForum: () => false,
   deriveThreadName: () => "thread",
   USE_SERVER_DEFAULT: "default",

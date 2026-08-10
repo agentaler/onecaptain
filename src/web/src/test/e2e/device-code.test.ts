@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { signUp, signIn, sessionRequest, tokenRequest, sqlRun } from "@alook/test-utils"
+import { signUp, signIn, sessionRequest, tokenRequest, sqlRun } from "@onecaptain/test-utils"
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000"
 const TEST_CLIENT_ID = "e2e-test-client"

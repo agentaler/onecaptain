@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
-import type { CommunityRole } from "@alook/shared"
+import type { CommunityRole } from "@onecaptain/shared"
 import type { CommunityUserCore } from "@/components/community/_types"
 import { fetchAllServerMembers } from "./fetch-all-server-members"
 

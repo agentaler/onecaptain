@@ -1,4 +1,4 @@
-const keyFor = (channelId: string) => `alook:forum-tag:${channelId}`
+const keyFor = (channelId: string) => `onecaptain:forum-tag:${channelId}`
 
 export function readForumTagSelection(storage: Pick<Storage, "getItem">, channelId: string): string {
   return storage.getItem(keyFor(channelId)) || "All"

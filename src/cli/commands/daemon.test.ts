@@ -12,7 +12,7 @@ vi.mock("../daemon/pidfile.js", () => ({
 }));
 
 vi.mock("../daemon/config.js", () => ({
-  daemonLogFilePath: vi.fn(() => "/tmp/alook/daemon/logs/2026-04-17.log"),
+  daemonLogFilePath: vi.fn(() => "/tmp/onecaptain/daemon/logs/2026-04-17.log"),
   pidFilePath: vi.fn(() => "/tmp/fake.pid"),
 }));
 
@@ -97,7 +97,7 @@ async function runCLI(
     }) as never);
   try {
     const program = new Command()
-      .name("alook")
+      .name("onecaptain")
       .option("--server <url>", "Server URL")
       .option("--profile <name>", "Profile name");
     program.addCommand(daemonCommand());
@@ -180,7 +180,7 @@ describe("daemon stop", () => {
     readDaemonPidMock.mockReturnValue(888);
     let alive = true;
     isProcessAliveMock.mockImplementation(() => alive);
-    process.env.ALOOK_SHUTDOWN_TIMEOUT_MS = "1000";
+    process.env.ONECAPTAIN_SHUTDOWN_TIMEOUT_MS = "1000";
 
     killSpy = vi.spyOn(process, "kill").mockImplementation((_p, sig) => {
       if (sig === "SIGKILL") alive = false;
@@ -199,7 +199,7 @@ describe("daemon stop", () => {
     expect(err.join("\n")).toContain("force killing");
     expect(out.join("\n")).toContain("Daemon stopped.");
 
-    delete process.env.ALOOK_SHUTDOWN_TIMEOUT_MS;
+    delete process.env.ONECAPTAIN_SHUTDOWN_TIMEOUT_MS;
   });
 
   it("cleans up stale pidfile and reports not running when pid is dead", async () => {
@@ -271,7 +271,7 @@ describe("daemon start (background)", () => {
     expect(closeSyncMock).toHaveBeenCalledWith(99);
 
     expect(out.join("\n")).toContain("Daemon started (pid=55555)");
-    expect(out.join("\n")).toContain("Logs: /tmp/alook/daemon/logs/2026-04-17.log");
+    expect(out.join("\n")).toContain("Logs: /tmp/onecaptain/daemon/logs/2026-04-17.log");
   });
 
   it("forwards --server to child argv", async () => {
@@ -328,7 +328,7 @@ describe("daemon start (background)", () => {
     const { err } = await promise;
 
     expect(err.join("\n")).toContain("did not write a pidfile");
-    expect(err.join("\n")).toContain("/tmp/alook/daemon/logs/2026-04-17.log");
+    expect(err.join("\n")).toContain("/tmp/onecaptain/daemon/logs/2026-04-17.log");
   });
 
   it("refuses to start when another daemon is already alive", async () => {

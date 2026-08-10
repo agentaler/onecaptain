@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, WorkspaceFileReportSchema } from "@alook/shared";
+import { queries, WorkspaceFileReportSchema } from "@onecaptain/shared";
 import { withAuth } from "@/lib/middleware/auth";
 import { parseBody, writeJSON, writeError } from "@/lib/middleware/helpers";
 import { getDb, withD1Retry } from "@/lib/db";
@@ -15,7 +15,10 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   const [body, err] = await parseBody(req, WorkspaceFileReportSchema);
   if (err) return err;
 
-  const row = await withD1Retry(() => queries.workspaceFileRequest.getRequest(db, body.request_id));
+  const workspaceId = ctx.workspaceId;
+  const row = await withD1Retry(() =>
+    queries.workspaceFileRequest.getRequest(db, workspaceId, body.request_id),
+  );
   if (!row) return writeError("request not found", 404);
 
   const result = {
@@ -26,7 +29,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     path: body.path,
   };
 
-  await withD1Retry(() => queries.workspaceFileRequest.completeRequest(db, row.id, result));
+  await withD1Retry(() => queries.workspaceFileRequest.completeRequest(db, workspaceId, row.id, result));
 
   broadcastToUser(ctx.userId, {
     type: "workspace.files",

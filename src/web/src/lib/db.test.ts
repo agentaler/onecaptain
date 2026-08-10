@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { withD1Retry } from "./db"
-import { mockD1FailingUntil, makeD1Error } from "@alook/shared/db/resilience-testing"
+import { mockD1FailingUntil, makeD1Error } from "@onecaptain/shared/db/resilience-testing"
 
 /**
  * Characterization test — pins the observable contract of `withD1Retry`

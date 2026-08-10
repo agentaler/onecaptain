@@ -6,7 +6,7 @@ const mockGetLatestTokenForUser = vi.fn();
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(() => Promise.resolve({ env: { DB: {} } })),
 }));
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   queries: {
     machineToken: {
       getLatestTokenForUser: (...args: any[]) => mockGetLatestTokenForUser(...args),

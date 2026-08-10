@@ -22,7 +22,7 @@ const features: Feature[] = [
     title: "Collaboration",
     spec: "DEFINE YOUR COMPANY STRUCTURE",
     description:
-      "You're the CEO. Assign agents to roles — dev, ops, research — and let them coordinate. Define your org chart, and Alook keeps everyone in sync.",
+      "You're the CEO. Assign agents to roles — dev, ops, research — and let them coordinate. Define your org chart, and OneCaptain keeps everyone in sync.",
     terminal: [
       "▓▓▓▓▓▓▓▓▓           ▓▓▓▓▓▓▓▓▓           ▓▓▓▓▓▓▓▓▓",
       "▓  YOU  ▓░░░░░░░░░░░▓  DEV  ▓░░░░░░░░░░░▓  OPS  ▓",
@@ -184,7 +184,7 @@ export function FeatureShowcase() {
             fontSize: "0.85rem",
           }}
         >
-          Define roles, assign agents, and let them run. Alook is the
+          Define roles, assign agents, and let them run. OneCaptain is the
           orchestration layer that turns agents into a company.
         </p>
       </div>

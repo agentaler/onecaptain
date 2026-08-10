@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fromApiTask } from "./types.js";
-import type { TaskApi } from "@alook/shared";
+import type { TaskApi } from "@onecaptain/shared";
 
 describe("fromApiTask", () => {
   const baseTask: TaskApi = {
@@ -87,13 +87,13 @@ describe("fromApiTask", () => {
         instructions: "be helpful",
         runtime_config: {},
         colleagues: [
-          { name: "Scout", email: "scout@alook.ai", description: "Researcher", instruction: "Share findings" },
+          { name: "Scout", email: "scout@onecaptain.ai", description: "Researcher", instruction: "Share findings" },
         ],
       } as any,
     };
     const result = fromApiTask(task);
     expect(result.agent?.colleagues).toEqual([
-      { name: "Scout", email: "scout@alook.ai", description: "Researcher", instruction: "Share findings" },
+      { name: "Scout", email: "scout@onecaptain.ai", description: "Researcher", instruction: "Share findings" },
     ]);
   });
 

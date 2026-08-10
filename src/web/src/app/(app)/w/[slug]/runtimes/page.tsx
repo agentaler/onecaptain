@@ -25,8 +25,8 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Monitor, Plus } from "lucide-react";
 
-import type { AgentRuntime as Runtime } from "@alook/shared";
-import { semverGte, isTauri, isDesktop, tauriInvoke } from "@alook/shared";
+import type { AgentRuntime as Runtime } from "@onecaptain/shared";
+import { semverGte, isTauri, isDesktop, tauriInvoke } from "@onecaptain/shared";
 import { cliCmd, getAppMode } from "@/lib/utils";
 import { ProviderLogo } from "@/components/provider-logo";
 import { triggerRuntimeUpdate, triggerRuntimeRescan, fetchLatestCliVersion } from "@/lib/api";

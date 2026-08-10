@@ -9,9 +9,9 @@ const origFlag = process.env.NEXT_PUBLIC_PERF_TRACE
 const origNodeEnv = process.env.NODE_ENV
 
 interface TestWindow {
-  __ALOOK_PERF_INSTALLED__?: boolean
-  __ALOOK_PERF__?: unknown[]
-  __ALOOK_PERF_DEGRADED__?: boolean
+  __ONECAPTAIN_PERF_INSTALLED__?: boolean
+  __ONECAPTAIN_PERF__?: unknown[]
+  __ONECAPTAIN_PERF_DEGRADED__?: boolean
 }
 
 function setGate(flag: string | undefined, nodeEnv: string): void {
@@ -59,11 +59,11 @@ describe("installReactScan — single-install guard", () => {
 
     expect(instrumentSpy).toHaveBeenCalledTimes(1)
     const win = (globalThis as unknown as { window: TestWindow }).window
-    expect(win.__ALOOK_PERF_INSTALLED__).toBe(true)
+    expect(win.__ONECAPTAIN_PERF_INSTALLED__).toBe(true)
 
     // stop releases the guard so a later session can re-arm.
     stopReactScan()
-    expect(win.__ALOOK_PERF_INSTALLED__).toBe(false)
+    expect(win.__ONECAPTAIN_PERF_INSTALLED__).toBe(false)
     await installReactScan()
     expect(instrumentSpy).toHaveBeenCalledTimes(2)
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import * as alook from "../index"
+import * as onecaptain from "../index"
 import {
   ICON_CROP_MIN_ZOOM,
   ICON_CROP_MAX_ZOOM,
@@ -30,12 +30,12 @@ describe("icon-crop constants", () => {
     expect(ALLOWED_ICON_SOURCE_MIME_TYPES).not.toContain("image/gif")
   })
 
-  it("all four constants round-trip through the @alook/shared index re-export", () => {
-    expect(alook.ICON_CROP_MIN_ZOOM).toBe(ICON_CROP_MIN_ZOOM)
-    expect(alook.ICON_CROP_MAX_ZOOM).toBe(ICON_CROP_MAX_ZOOM)
-    expect(alook.ICON_CROP_OUTPUT_SIZE).toBe(ICON_CROP_OUTPUT_SIZE)
-    expect(alook.MAX_ICON_SOURCE_FILE_SIZE_BYTES).toBe(MAX_ICON_SOURCE_FILE_SIZE_BYTES)
-    expect(alook.ALLOWED_ICON_SOURCE_MIME_TYPES).toEqual(ALLOWED_ICON_SOURCE_MIME_TYPES)
+  it("all four constants round-trip through the @onecaptain/shared index re-export", () => {
+    expect(onecaptain.ICON_CROP_MIN_ZOOM).toBe(ICON_CROP_MIN_ZOOM)
+    expect(onecaptain.ICON_CROP_MAX_ZOOM).toBe(ICON_CROP_MAX_ZOOM)
+    expect(onecaptain.ICON_CROP_OUTPUT_SIZE).toBe(ICON_CROP_OUTPUT_SIZE)
+    expect(onecaptain.MAX_ICON_SOURCE_FILE_SIZE_BYTES).toBe(MAX_ICON_SOURCE_FILE_SIZE_BYTES)
+    expect(onecaptain.ALLOWED_ICON_SOURCE_MIME_TYPES).toEqual(ALLOWED_ICON_SOURCE_MIME_TYPES)
   })
 })
 
@@ -60,7 +60,7 @@ describe("truncateMessagePreview", () => {
     expect(beforeEllipsis < 0xd800 || beforeEllipsis > 0xdbff).toBe(true)
   })
 
-  it("round-trips through the @alook/shared index re-export", () => {
-    expect(alook.truncateMessagePreview).toBe(truncateMessagePreview)
+  it("round-trips through the @onecaptain/shared index re-export", () => {
+    expect(onecaptain.truncateMessagePreview).toBe(truncateMessagePreview)
   })
 })

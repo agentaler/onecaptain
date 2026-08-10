@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Bundle script — run in CI before `npm publish` of @alook/app.
+ * Bundle script — run in CI before `npm publish` of @onecaptain/app.
  * Builds web (opennextjs-cloudflare), email-worker, and ws-do into
  * pre-compiled bundles that can run with `wrangler dev --local` without
  * needing source code or node_modules.
@@ -76,7 +76,7 @@ writeFileSync(
     `  slug: "_placeholder",\n` +
     `  title: "Placeholder",\n` +
     `  date: "2020-01-01",\n` +
-    `  author: "Alook",\n` +
+    `  author: "OneCaptain",\n` +
     `  excerpt: "Build-time placeholder; never listed.",\n` +
     `  readingTime: "1 min",\n` +
     `  draft: true,\n` +

@@ -6,7 +6,7 @@ import type {
   IssueComment,
   Message,
   TaskApi as Task,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { getIssue, getTask, getTrace } from "@/lib/api";
 import type { TraceTask } from "@/lib/api";
 

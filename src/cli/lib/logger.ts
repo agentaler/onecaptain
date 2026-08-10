@@ -54,7 +54,7 @@ export class Logger {
   private module: string | undefined;
 
   constructor(opts: LoggerOptions = {}) {
-    const envLevel = process.env.ALOOK_LOG_LEVEL as LogLevel | undefined;
+    const envLevel = process.env.ONECAPTAIN_LOG_LEVEL as LogLevel | undefined;
     this.level = LEVELS[opts.level ?? envLevel ?? "info"];
     this.color = useColor();
     this.module = opts.module;

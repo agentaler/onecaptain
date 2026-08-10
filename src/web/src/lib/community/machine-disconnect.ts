@@ -1,4 +1,4 @@
-import { createLogger } from "@alook/shared"
+import { createLogger } from "@onecaptain/shared"
 import { wsDoFetch } from "@/lib/broadcast"
 
 const log = createLogger({ service: "community-machine-disconnect" })

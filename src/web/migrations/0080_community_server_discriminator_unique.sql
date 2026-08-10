@@ -3,8 +3,8 @@
 -- it must be unique. `name COLLATE NOCASE` matches the case-insensitive
 -- `LIKE`-based lookups in resolveServerByNameForMember (queries/community/
 -- server.ts) — the same index/resolver fold alignment migration 0075
--- established for top-level channel names. Without NOCASE, "Alook#0042" and
--- "alook#0042" could both exist as live rows and a case-insensitive handle
+-- established for top-level channel names. Without NOCASE, "OneCaptain#0042" and
+-- "onecaptain#0042" could both exist as live rows and a case-insensitive handle
 -- lookup would match two rows nondeterministically.
 --
 -- NO partial `WHERE deletedAt IS NULL` clause (unlike the user index in 0055):

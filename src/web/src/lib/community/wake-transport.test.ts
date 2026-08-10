@@ -4,8 +4,8 @@ const mockInfo = vi.fn()
 const mockWarn = vi.fn()
 const mockError = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     createLogger: () => ({
@@ -64,7 +64,7 @@ describe("createDevHttpWakeTransport", () => {
     } as unknown as Env
   }
 
-  it("POSTs the full payload batch as JSON to the alook-wake-worker binding", async () => {
+  it("POSTs the full payload batch as JSON to the onecaptain-wake-worker binding", async () => {
     const bindingFetch = vi.fn(async (url: string, init?: RequestInit) => {
       expect(url).toBe("http://internal/")
       expect(init?.method).toBe("POST")

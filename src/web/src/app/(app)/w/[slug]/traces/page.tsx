@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useChannel } from "@/contexts/channel-context";
 import { listTraces, listAgents, type TraceListItem } from "@/lib/api";
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,

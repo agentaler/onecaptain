@@ -339,7 +339,7 @@ describe("buildPrompt", () => {
     const task = makeTask("Issue iss_1: Fix import", "issue_event");
     const parsed = JSON.parse(buildPrompt(task));
     expect(parsed.notice).toContain("assigned issue");
-    expect(parsed.notice).toContain("alook issue update");
+    expect(parsed.notice).toContain("onecaptain issue update");
     expect(parsed.notice).toContain("in_progress");
   });
 

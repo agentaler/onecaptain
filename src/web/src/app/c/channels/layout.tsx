@@ -18,7 +18,7 @@ import { ServerSettings } from "@/components/community/server-settings"
 import { ImageCropDialog } from "@/components/community/image-crop-dialog"
 import { validateIconSourceFile } from "@/lib/community/image-crop"
 import type { MobileZone, SettingsSection } from "@/components/community/_types"
-import { canManageServer, isForum, notifLevelDisplay, type ChannelType } from "@alook/shared"
+import { canManageServer, isForum, notifLevelDisplay, type ChannelType } from "@onecaptain/shared"
 import { resolveRowPresence } from "@/lib/community/presence"
 import {
   useCommunityStore,

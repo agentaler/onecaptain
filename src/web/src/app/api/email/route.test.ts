@@ -14,9 +14,9 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   createDb: vi.fn(() => ({})),
-  toAlookAddress: (h: string) => `${h}@alook.ai`,
+  toOneCaptainAddress: (h: string) => `${h}@onecaptain.ai`,
   queries: {
     agent: { getAgent: (...args: unknown[]) => mockGetAgent(...args) },
     email: {
@@ -67,7 +67,7 @@ describe("GET /api/email", () => {
 
     expect(res.status).toBe(200);
     expect(body).toHaveLength(2);
-    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", undefined, undefined);
+    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", undefined, undefined);
   });
 
   it("filters by status=unread", async () => {
@@ -80,7 +80,7 @@ describe("GET /api/email", () => {
 
     expect(res.status).toBe(200);
     expect(body).toHaveLength(1);
-    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", "unread", undefined);
+    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", "unread", undefined);
   });
 
   it("filters by status and folder=inbox (whitelisted inbound)", async () => {
@@ -91,7 +91,7 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetTrustedEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", "unread", undefined);
+    expect(mockGetTrustedEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", "unread", undefined);
   });
 
   it("filters by folder=untrust (non-whitelisted inbound)", async () => {
@@ -102,7 +102,7 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetRejectedEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", undefined, undefined);
+    expect(mockGetRejectedEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", undefined, undefined);
   });
 
   it("filters by status and folder=sent", async () => {
@@ -113,7 +113,7 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetSentEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", "read", undefined);
+    expect(mockGetSentEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", "read", undefined);
   });
 
   it("returns 400 for invalid status value", async () => {
@@ -135,7 +135,7 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", undefined, { limit: 10, offset: 5 });
+    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", undefined, { limit: 10, offset: 5 });
   });
 
   it("passes pagination to folder-specific queries", async () => {
@@ -146,7 +146,7 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetSentEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", undefined, { limit: 20, offset: 10 });
+    expect(mockGetSentEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", undefined, { limit: 20, offset: 10 });
   });
 
   it("returns 400 for non-numeric limit", async () => {
@@ -195,6 +195,6 @@ describe("GET /api/email", () => {
     const res = await GET(req, {} as any);
 
     expect(res.status).toBe(200);
-    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@alook.ai", "ws1", undefined, undefined);
+    expect(mockGetInboxEmails).toHaveBeenCalledWith({}, "a1", "test@onecaptain.ai", "ws1", undefined, undefined);
   });
 });

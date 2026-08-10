@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Agent, AgentLink } from "@alook/shared";
+import type { Agent, AgentLink } from "@onecaptain/shared";
 import {
   Sheet,
   SheetContent,

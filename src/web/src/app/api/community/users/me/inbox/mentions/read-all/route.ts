@@ -1,7 +1,7 @@
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 
 export const POST = withAuth(async (_req, ctx) => {
   const db = getDb(ctx.env.DB)

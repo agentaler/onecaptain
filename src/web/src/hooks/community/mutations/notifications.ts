@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { normalizeNotifLevel, USE_SERVER_DEFAULT } from "@alook/shared"
+import { normalizeNotifLevel, USE_SERVER_DEFAULT } from "@onecaptain/shared"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import type { NotificationSettings } from "@/hooks/community/use-notification-settings"

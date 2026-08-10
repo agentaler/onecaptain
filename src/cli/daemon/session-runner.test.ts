@@ -20,11 +20,11 @@ const mockPrepare = vi.fn(() => ({
   workDir: "/tmp/ws/ws1/agent1/workdir",
   timelineDir: "/tmp/ws/ws1/agent1/workdir/.context_timeline",
   env: {
-    ALOOK_WORKSPACE_ID: "ws1",
-    ALOOK_AGENT_ID: "agent1",
-    ALOOK_TASK_ID: "t1",
-    ALOOK_CONVERSATION_ID: "c1",
-    ALOOK_HEALTH_PORT: "19514",
+    ONECAPTAIN_WORKSPACE_ID: "ws1",
+    ONECAPTAIN_AGENT_ID: "agent1",
+    ONECAPTAIN_TASK_ID: "t1",
+    ONECAPTAIN_CONVERSATION_ID: "c1",
+    ONECAPTAIN_HEALTH_PORT: "19514",
   },
 }));
 vi.mock("./execenv/index.js", () => ({

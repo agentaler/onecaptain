@@ -25,7 +25,7 @@ describe("syncCommand", () => {
   describe("send-dm behavior", () => {
     afterEach(() => {
       vi.restoreAllMocks();
-      delete process.env.ALOOK_CONVERSATION_ID;
+      delete process.env.ONECAPTAIN_CONVERSATION_ID;
     });
 
     function runSendDm(args: string[]) {
@@ -37,7 +37,7 @@ describe("syncCommand", () => {
       let thrown: Error | null = null;
       try {
         // parseAsync runs the action; commander dispatches to the subcommand.
-        return { promise: syncCommand().parseAsync(["node", "alook", "send-dm", ...args]), exit, errSpy };
+        return { promise: syncCommand().parseAsync(["node", "onecaptain", "send-dm", ...args]), exit, errSpy };
       } catch (e) {
         thrown = e as Error;
         return { thrown, exit, errSpy };
@@ -56,7 +56,7 @@ describe("syncCommand", () => {
     });
 
     it("TC3: no conversation id (no env, no flag) → error, exit 1", async () => {
-      delete process.env.ALOOK_CONVERSATION_ID;
+      delete process.env.ONECAPTAIN_CONVERSATION_ID;
       const { promise, errSpy } = runSendDm(["--message", "hello"]);
       await expect(promise).rejects.toThrow("exit:1");
       expect(errSpy).toHaveBeenCalledWith(
@@ -65,7 +65,7 @@ describe("syncCommand", () => {
     });
 
     it("empty --message → error, exit 1", async () => {
-      process.env.ALOOK_CONVERSATION_ID = "c1";
+      process.env.ONECAPTAIN_CONVERSATION_ID = "c1";
       const { promise, errSpy } = runSendDm(["--message", "   "]);
       await expect(promise).rejects.toThrow("exit:1");
       expect(errSpy).toHaveBeenCalledWith(

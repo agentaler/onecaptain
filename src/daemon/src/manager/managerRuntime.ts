@@ -37,7 +37,7 @@ import { nowLocalISO } from "../util/localTime.js";
 /**
  * Derived activity state reported up the control plane — NOT a raw passthrough
  * of `AgentState.status` (see `deriveActivity` below). Mirrors
- * `@alook/shared`'s `AgentActivityState`, inlined here since this is
+ * `@onecaptain/shared`'s `AgentActivityState`, inlined here since this is
  * daemon-internal.
  */
 export type AgentActivityState = "idle" | "starting" | "running" | "stopping";
@@ -128,7 +128,7 @@ export interface ManagerRuntimeOpts {
    * `shell` → `bash`, codex `file_change` → `edit`, etc.), picks a
    * `target` field driver-agnostically (file path / shell command /
    * pattern / url / mcp name), and suppresses any bash-family call whose
-   * resolved command is `alook <sub>` — the credential-proxy
+   * resolved command is `onecaptain <sub>` — the credential-proxy
    * `cli_invocation` sighting is authoritative for those.
    *
    * `thinking` payloads carry truncated `text` + original `chars`; the audit
@@ -167,7 +167,7 @@ export interface ManagerRuntimeOpts {
    * Pure-observability FSM transition trace. Called once per `dispatch` reduce
    * (for events carrying an agentId) with the post-reduce key fields + the
    * effect kinds produced. Wired in `createDaemon` to append to a file when
-   * `ALOOK_FSM_TRACE` is set — lets a wedge that produces no other log be
+   * `ONECAPTAIN_FSM_TRACE` is set — lets a wedge that produces no other log be
    * reconstructed from its FSM history. No behavior change; omit ⇒ no-op.
    */
   onFsmTransition?: (rec: {
@@ -238,7 +238,7 @@ export interface ManagerRuntimeOpts {
   timeline?: TimelineRecorder;
   /**
    * Appended once to the coalesced wake prompt (after dedup). Use for a
-   * one-shot instruction like "Use `alook inbox pull` to read your messages."
+   * one-shot instruction like "Use `onecaptain inbox pull` to read your messages."
    */
   wakePromptFooter?: string;
   /**
@@ -267,7 +267,7 @@ export interface ManagerRuntimeOpts {
    * their install (or after a genuine transient failure).
    */
   onRuntimeSessionEstablished?: (runtimeId: string) => void;
-  /** Defaults to `createLogger({ header: "@alook/daemon:manager" })`. */
+  /** Defaults to `createLogger({ header: "@onecaptain/daemon:manager" })`. */
   logger?: Logger;
 }
 
@@ -471,27 +471,27 @@ function pickFallthroughTarget(input: unknown): string | undefined {
 
 /**
  * A bash-family tool_call is the daemon proxy's shadow when — and only when
- * — the resolved command is `alook` or `alook <sub …>`. In that case the
+ * — the resolved command is `onecaptain` or `onecaptain <sub …>`. In that case the
  * credential proxy emits an authoritative `cli_invocation` audit row and
  * the tool_call would duplicate it. Any other command (rm, sed, git, pnpm,
- * echo, `bash -lc "alook …"` — the outer shell is real work) is user
+ * echo, `bash -lc "onecaptain …"` — the outer shell is real work) is user
  * intent and must surface.
  */
 // The agent invokes the CLI two ways, both authoritative-`cli_invocation`
 // sources the tool_call must suppress:
-//   - the injected env var: `$ALOOK_CLI …` / `${ALOOK_CLI} …` (the form the
+//   - the injected env var: `$ONECAPTAIN_CLI …` / `${ONECAPTAIN_CLI} …` (the form the
 //     system prompt now teaches — an absolute path that dodges PATH; see
 //     spawnEnv `<PREFIX>_CLI` / systemPrompt), and
-//   - the bare name `alook …` (legacy / any agent that still types it).
-// `<PREFIX>_CLI` is `${DEFAULT_CLI_CONFIG.envPrefix}_CLI` = `ALOOK_CLI`.
-const ALOOK_CLI_ENV_VAR = `${DEFAULT_CLI_CONFIG.envPrefix}_CLI`;
-const ALOOK_SHELL_INVOCATION_RE = new RegExp(
-  `^(?:${DEFAULT_CLI_CONFIG.cliName}|\\$\\{?${ALOOK_CLI_ENV_VAR}\\}?)(\\s|$)`,
+//   - the bare name `onecaptain …` (legacy / any agent that still types it).
+// `<PREFIX>_CLI` is `${DEFAULT_CLI_CONFIG.envPrefix}_CLI` = `ONECAPTAIN_CLI`.
+const ONECAPTAIN_CLI_ENV_VAR = `${DEFAULT_CLI_CONFIG.envPrefix}_CLI`;
+const ONECAPTAIN_SHELL_INVOCATION_RE = new RegExp(
+  `^(?:${DEFAULT_CLI_CONFIG.cliName}|\\$\\{?${ONECAPTAIN_CLI_ENV_VAR}\\}?)(\\s|$)`,
 );
 
-export function isAlookShellInvocation(command: string | undefined): boolean {
+export function isOneCaptainShellInvocation(command: string | undefined): boolean {
   if (!command) return false;
-  return ALOOK_SHELL_INVOCATION_RE.test(command.trimStart());
+  return ONECAPTAIN_SHELL_INVOCATION_RE.test(command.trimStart());
 }
 
 /**
@@ -512,7 +512,7 @@ export function truncateTargetToCodeUnits(s: string): string {
  * pair, returns the canonical lowercase `name`, an optional short `target`
  * summary (file path / shell command / pattern / url / mcp name), and a
  * `suppressed` flag that's true for bash-family calls whose command is
- * `alook <sub>` (the credential proxy's `cli_invocation` is authoritative
+ * `onecaptain <sub>` (the credential proxy's `cli_invocation` is authoritative
  * for those).
  *
  * The returned object contains ONLY `{name, target?, suppressed}`. Raw
@@ -528,7 +528,7 @@ export function extractToolAudit(
   const cls = classify(name);
   if (cls === "shell") {
     const raw = pickCommandString(rawInput);
-    if (isAlookShellInvocation(raw)) {
+    if (isOneCaptainShellInvocation(raw)) {
       return { name, suppressed: true };
     }
     const firstLine = typeof raw === "string"
@@ -729,7 +729,7 @@ export class AgentProcessManager {
       ...opts,
     };
     this.now = opts.now ?? (() => Date.now());
-    this.log = opts.logger ?? createLogger({ header: "@alook/daemon:manager" });
+    this.log = opts.logger ?? createLogger({ header: "@onecaptain/daemon:manager" });
     this.state = createInitialManagerState(
       this.opts.staleThresholdMs,
       this.opts.idleTimeoutMs,

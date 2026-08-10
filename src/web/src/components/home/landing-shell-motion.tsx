@@ -21,7 +21,7 @@ import {
   Smile,
   UserPlus,
 } from "lucide-react"
-import type { CommunityMachineSummary } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
 import { AgentAvatar, type AvatarDraft } from "@/components/avatar"
 import { ProviderLogo } from "@/components/provider-logo"
 import { Button } from "@/components/ui/button"
@@ -488,7 +488,7 @@ const BOT_AVATAR_DRAFT: AvatarDraft = {
 }
 
 const PAIR_COMMAND =
-  "pnpm daemon start --machine-key cmk_demo --server-url https://alook.ai --ws-url wss://alook.ai/api/ws/community-daemon"
+  "pnpm daemon start --machine-key cmk_demo --server-url https://onecaptain.ai --ws-url wss://onecaptain.ai/api/ws/community-daemon"
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -1263,7 +1263,7 @@ function PrototypeInviteSurface({ snapshot }: { snapshot: SceneSnapshot }) {
           Or, send a server invite link to a friend
         </div>
         <div className="mt-2 flex items-center gap-2">
-          <Input readOnly value="alook.ai/c/invite/home" className="font-mono text-xs" />
+          <Input readOnly value="onecaptain.ai/c/invite/home" className="font-mono text-xs" />
           <Button size="sm">Copy</Button>
         </div>
       </footer>
@@ -1388,7 +1388,7 @@ function MachineScene({
             <div>
               <h1 className="text-xl font-medium text-foreground">Machines</h1>
               <p className="text-sm text-muted-foreground">
-                Your computers running the alook daemon.
+                Your computers running the onecaptain daemon.
               </p>
             </div>
             <Button>Connect a machine</Button>

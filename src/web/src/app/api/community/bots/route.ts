@@ -5,7 +5,7 @@ import {
   COMMUNITY_BOT_LIMIT_PER_OWNER,
   runtimeSupportsModel,
   utcDayKeyDaysAgo,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers"

@@ -1,4 +1,4 @@
-import { parseNameAndTag, parseRef } from "@alook/shared"
+import { parseNameAndTag, parseRef } from "@onecaptain/shared"
 
 /**
  * Client-side "directory" of every channel-ref-resolvable server + channel —

@@ -229,7 +229,7 @@ describe("runSeedStress — idempotency", () => {
       serverUrl: "http://localhost:3000",
       owner: "perf-seed",
     })
-    expect(manifest.owner).toEqual({ email: "perf-seed@alook.test", userId: "user-seed-1" })
+    expect(manifest.owner).toEqual({ email: "perf-seed@onecaptain.test", userId: "user-seed-1" })
   })
 
   it("retries a 429 (honoring Retry-After) instead of aborting the seed", async () => {

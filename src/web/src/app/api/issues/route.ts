@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { CreateIssueRequestSchema, IssueStatusSchema, queries, TASK_TYPES } from "@alook/shared";
+import { CreateIssueRequestSchema, IssueStatusSchema, queries, TASK_TYPES } from "@onecaptain/shared";
 import { nanoid } from "nanoid";
 import { getDb } from "@/lib/db";
 import { withAuth } from "@/lib/middleware/auth";
@@ -9,7 +9,7 @@ import { issueToResponse, messageToResponse, taskToResponse } from "@/lib/api/re
 import { TaskService } from "@/lib/services/task";
 import { broadcastToUser } from "@/lib/broadcast";
 import { invalidate, cacheKeys } from "@/lib/cache";
-import type { IssueStatusType } from "@alook/shared";
+import type { IssueStatusType } from "@onecaptain/shared";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_FILES = 10;

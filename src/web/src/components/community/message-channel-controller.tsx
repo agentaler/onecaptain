@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { deriveThreadName, type MentionType } from "@alook/shared"
+import { deriveThreadName, type MentionType } from "@onecaptain/shared"
 import { apiFetch, toastApiError } from "@/lib/api/client"
 import { avatarInitial } from "@/lib/community/avatar"
 import type { Msg } from "@/components/community/_types"

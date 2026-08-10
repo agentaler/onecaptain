@@ -14,7 +14,7 @@ import { ForumChannelSurface } from "@/components/community/forum-channel-surfac
 import { useChannelMemberViewModel } from "@/components/community/channel-member-view-model"
 import type { OpenProfile } from "@/components/community/_types"
 import { canManageServer } from "@/components/community/_types"
-import { USE_SERVER_DEFAULT } from "@alook/shared"
+import { USE_SERVER_DEFAULT } from "@onecaptain/shared"
 import { setLastChannel } from "@/lib/community/last-channel"
 import { resolveChannelDisplayName } from "@/lib/community/channel-display-name"
 import {

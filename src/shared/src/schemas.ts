@@ -2,6 +2,7 @@ import { z } from "zod";
 import { IssueStatus, TASK_TYPES } from "./constants";
 import { sanitizeSlug } from "./utils/slug";
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_MESSAGE_CONTENT_LENGTH } from "./constants/community";
+import { BOT_PROVIDER_KINDS } from "./community/bot-provider";
 
 // ---------------------------------------------------------------------------
 // Task status
@@ -547,7 +548,7 @@ export const CreateMessageRequestSchema = z.object({
 export type CreateMessageRequest = z.infer<typeof CreateMessageRequestSchema>;
 
 // Agent-authored DM: the agent's own `role:"assistant"` reply, posted via the
-// machine-token daemon route (`alook sync send-dm`). Unlike CreateMessageRequest
+// machine-token daemon route (`onecaptain sync send-dm`). Unlike CreateMessageRequest
 // (a user send) this does NOT enqueue a task — it only delivers the message.
 export const AgentDmRequestSchema = z.object({
   content: z.string().min(1, "content is required"),
@@ -1109,6 +1110,21 @@ export const CommunityBotPatchRequestSchema = z
     // `null` clears a set model; `undefined` leaves it untouched.
     model: z.string().trim().min(1).max(100).nullable().optional(),
     runtime: z.string().trim().min(1).max(COMMUNITY_RUNTIME_ID_MAX).optional(),
+    // Cloud LLM provider attachment. Explicit `null` clears the provider;
+    // `undefined` leaves it untouched. `apiKey` is write-only: it is
+    // encrypted at rest and never echoed back by any response. A cloud kind
+    // requires `apiKey`; `custom` additionally requires `apiUrl`.
+    provider: z
+      .object({
+        kind: z.enum(BOT_PROVIDER_KINDS),
+        apiKey: z.string().trim().min(1).max(512),
+        apiUrl: z.string().trim().url().max(400).optional(),
+      })
+      .refine((pv) => pv.kind !== "custom" || pv.apiUrl !== undefined, {
+        message: "a custom provider requires apiUrl",
+      })
+      .nullable()
+      .optional(),
   })
   .refine(
     (v) =>
@@ -1116,14 +1132,21 @@ export const CommunityBotPatchRequestSchema = z
       v.description !== undefined ||
       v.image !== undefined ||
       v.runtime !== undefined ||
-      // `model` alone is a valid patch. An explicit `null` must count as
-      // present — hence the `in` form, not a truthiness check.
-      "model" in v,
+      // `model`/`provider` alone are valid patches. An explicit `null` must
+      // count as present — hence the `in` form, not a truthiness check.
+      "model" in v ||
+      "provider" in v,
     {
       message: "at least one field must be provided",
     }
   );
 export type CommunityBotPatchRequest = z.infer<typeof CommunityBotPatchRequestSchema>;
+
+/** Owner-only workspace member role change — `owner` is deliberately not grantable here. */
+export const UpdateMemberRoleRequestSchema = z.object({
+  role: z.enum(["admin", "member"]),
+});
+export type UpdateMemberRoleRequest = z.infer<typeof UpdateMemberRoleRequestSchema>;
 
 export const CommunityBotAddToServerRequestSchema = z.object({
   botId: z.string().min(1),
@@ -1134,7 +1157,7 @@ export type CommunityBotAddToServerRequest = z.infer<
 
 // ---------------------------------------------------------------------------
 // Community REST agent-door request/response validators. Mirror the lifted
-// `@alook/shared/community-cli-contract`
+// `@onecaptain/shared/community-cli-contract`
 // wire types verbatim (see `community-cli-contract.ts`). `agentId` is deliberately
 // OMITTED from every request schema below — identity comes from the `crk_` bearer
 // via `withAgentRunnerAuth`, never a client-supplied field (see plan §2/§7).
@@ -1236,7 +1259,7 @@ export type CommunityAgentListChannelsRequest = z.infer<
   typeof CommunityAgentListChannelsRequestSchema
 >;
 
-// CLI adapter input for `alook message post`. The daemon maps this shape onto
+// CLI adapter input for `onecaptain message post`. The daemon maps this shape onto
 // the canonical forum send body: title → opener message, content → the ordinary
 // thread's first reply. An attachment-only reply is legitimate; pending ids are
 // uploaded against the forum before the thread exists.
@@ -1281,7 +1304,7 @@ export type CommunityAgentJoinServerRequest = z.infer<
   typeof CommunityAgentJoinServerRequestSchema
 >;
 
-// `alook nap` — the agent resets its own session with a mandatory handoff (its
+// `onecaptain nap` — the agent resets its own session with a mandatory handoff (its
 // note to its reborn self, spliced into the rewake prompt). `.trim().min(1)`
 // enforces the handoff is real, not whitespace — the mechanical half of the
 // nap gate.
@@ -1326,7 +1349,7 @@ export type CommunityAgentListFriends = z.infer<
 // (route reader). The `payload` column stores JSON matching one of these
 // discriminated branches.
 //
-// - cli_invocation → the daemon's credential proxy handled an alook subcommand
+// - cli_invocation → the daemon's credential proxy handled an onecaptain subcommand
 // - tool_call      → the runtime invoked a tool. `name` is a canonical
 //                    lowercase tag (`bash`, `read`, `edit`, `write`, `grep`,
 //                    `glob`, `find`, `ls`, `notebook_edit`, `web_search`,
@@ -1334,7 +1357,7 @@ export type CommunityAgentListFriends = z.infer<
 //                    …) — case-collapsed on the daemon write side so a mixed
 //                    stream of `Bash` and `bash` reads as one shape.
 //                    Bash-family calls whose resolved command is
-//                    `alook <sub>` are suppressed here (the credential proxy
+//                    `onecaptain <sub>` are suppressed here (the credential proxy
 //                    emits the authoritative `cli_invocation` for those);
 //                    every other tool call lands here with an optional
 //                    `target` — the file path, shell command, search
@@ -1408,7 +1431,7 @@ export const AuditLogSessionResetPayloadSchema = z.object({
 export type AuditLogSessionResetPayload = z.infer<typeof AuditLogSessionResetPayloadSchema>;
 
 /**
- * `nap` payload — the agent reset ITS OWN session via `alook nap`. Twin of
+ * `nap` payload — the agent reset ITS OWN session via `onecaptain nap`. Twin of
  * `session_reset` but self-initiated, so `trigger` is always `"nap"` and there
  * is no actor. Written at the same completion landing.
  */

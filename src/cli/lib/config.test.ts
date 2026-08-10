@@ -27,35 +27,35 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete process.env.ALOOK_SERVER_URL;
-  delete process.env.ALOOK_PROJECT_ROOT;
+  delete process.env.ONECAPTAIN_SERVER_URL;
+  delete process.env.ONECAPTAIN_PROJECT_ROOT;
 });
 
-describe("configDir — three ALOOK_PROJECT_ROOT scenarios", () => {
-  it("production: returns ~/.alook (ALOOK_PROJECT_ROOT unset)", () => {
-    delete process.env.ALOOK_PROJECT_ROOT;
-    expect(configDir()).toBe(join(homedir(), ".alook"));
+describe("configDir — three ONECAPTAIN_PROJECT_ROOT scenarios", () => {
+  it("production: returns ~/.onecaptain (ONECAPTAIN_PROJECT_ROOT unset)", () => {
+    delete process.env.ONECAPTAIN_PROJECT_ROOT;
+    expect(configDir()).toBe(join(homedir(), ".onecaptain"));
   });
 
-  it("dev mode: returns ALOOK_PROJECT_ROOT directly", () => {
-    process.env.ALOOK_PROJECT_ROOT = "/tmp/my-project/.alook";
-    expect(configDir()).toBe("/tmp/my-project/.alook");
+  it("dev mode: returns ONECAPTAIN_PROJECT_ROOT directly", () => {
+    process.env.ONECAPTAIN_PROJECT_ROOT = "/tmp/my-project/.onecaptain";
+    expect(configDir()).toBe("/tmp/my-project/.onecaptain");
   });
 
-  it("app mode: returns ALOOK_PROJECT_ROOT when set to self-hosted dir", () => {
-    process.env.ALOOK_PROJECT_ROOT = join(homedir(), ".alook", "self-hosted");
-    expect(configDir()).toBe(join(homedir(), ".alook", "self-hosted"));
+  it("app mode: returns ONECAPTAIN_PROJECT_ROOT when set to self-hosted dir", () => {
+    process.env.ONECAPTAIN_PROJECT_ROOT = join(homedir(), ".onecaptain", "self-hosted");
+    expect(configDir()).toBe(join(homedir(), ".onecaptain", "self-hosted"));
   });
 });
 
 describe("configPath", () => {
-  it("returns ~/.alook/config.json by default", () => {
-    expect(configPath()).toBe(join(homedir(), ".alook", "config.json"));
+  it("returns ~/.onecaptain/config.json by default", () => {
+    expect(configPath()).toBe(join(homedir(), ".onecaptain", "config.json"));
   });
 
-  it("returns <ALOOK_PROJECT_ROOT>/config.json when set", () => {
-    process.env.ALOOK_PROJECT_ROOT = "/tmp/my-project/.alook";
-    expect(configPath()).toBe(join("/tmp/my-project/.alook", "config.json"));
+  it("returns <ONECAPTAIN_PROJECT_ROOT>/config.json when set", () => {
+    process.env.ONECAPTAIN_PROJECT_ROOT = "/tmp/my-project/.onecaptain";
+    expect(configPath()).toBe(join("/tmp/my-project/.onecaptain", "config.json"));
   });
 });
 
@@ -158,33 +158,33 @@ describe("loadCLIConfigForProfile", () => {
 });
 
 describe("saveCLIConfig", () => {
-  it("writes valid JSON with mode 0600 to ~/.alook in production", () => {
+  it("writes valid JSON with mode 0600 to ~/.onecaptain in production", () => {
     const cfg = { server_url: "http://example.com", watched_workspaces: [] };
     saveCLIConfig(cfg);
 
     expect(mockedMkdirSync).toHaveBeenCalledWith(
-      join(homedir(), ".alook"),
+      join(homedir(), ".onecaptain"),
       { recursive: true, mode: 0o700 },
     );
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      join(homedir(), ".alook", "config.json"),
+      join(homedir(), ".onecaptain", "config.json"),
       JSON.stringify(cfg, null, 2),
       { mode: 0o600 },
     );
   });
 
-  it("writes to ALOOK_PROJECT_ROOT when set", () => {
-    process.env.ALOOK_PROJECT_ROOT = "/tmp/my-project/.alook";
+  it("writes to ONECAPTAIN_PROJECT_ROOT when set", () => {
+    process.env.ONECAPTAIN_PROJECT_ROOT = "/tmp/my-project/.onecaptain";
 
     const cfg = { server_url: "http://localhost:3000", watched_workspaces: [] };
     saveCLIConfig(cfg);
 
     expect(mockedMkdirSync).toHaveBeenCalledWith(
-      "/tmp/my-project/.alook",
+      "/tmp/my-project/.onecaptain",
       { recursive: true, mode: 0o700 },
     );
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      join("/tmp/my-project/.alook", "config.json"),
+      join("/tmp/my-project/.onecaptain", "config.json"),
       JSON.stringify(cfg, null, 2),
       { mode: 0o600 },
     );

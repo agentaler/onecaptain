@@ -34,7 +34,7 @@ function marbleLayersFromSeed(seed: string) {
 
 export function renderSeededBackdropSvg(seed: string): string {
   const layers = marbleLayersFromSeed(seed)
-  const id = `alook-marble-${avatarHash(seed)}`
+  const id = `onecaptain-marble-${avatarHash(seed)}`
   const maskId = `${id}-mask`
   const filterId = `${id}-filter`
 

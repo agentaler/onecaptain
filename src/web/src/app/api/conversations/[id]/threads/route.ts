@@ -1,4 +1,4 @@
-import { queries, TASK_TYPES, truncateTitle, CreateThreadRequestSchema, isUniqueConstraintError } from "@alook/shared";
+import { queries, TASK_TYPES, truncateTitle, CreateThreadRequestSchema, isUniqueConstraintError } from "@onecaptain/shared";
 import { getDb } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { withAuth } from "@/lib/middleware/auth";

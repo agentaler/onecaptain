@@ -8,8 +8,8 @@ import {
   MAX_INVITE_EXPIRY_DAYS,
   MAX_ACTIVE_INVITES_PER_SERVER,
   WS_EVENTS,
-} from "@alook/shared"
-import type { CommunityInviteCreate } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { CommunityInviteCreate } from "@onecaptain/shared"
 import { fanOutToServerMembers } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireServerMember } from "@/lib/community/permissions"

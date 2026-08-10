@@ -3,7 +3,7 @@ import { sessionCookie } from "./community-fixture"
 import type { UserKey } from "../_setup/users"
 
 // API-driven precondition seeding for the Playwright specs. Deliberately does
-// NOT import @alook/test-utils (that barrel pulls in better-sqlite3 +
+// NOT import @onecaptain/test-utils (that barrel pulls in better-sqlite3 +
 // import.meta, which Playwright's CJS test loader can't evaluate). These call
 // the same community routes over HTTP with a user's session cookie — the
 // operations under test are still exercised through the UI in the specs.

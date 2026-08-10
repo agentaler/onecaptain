@@ -25,10 +25,10 @@ export function parseCaptionElements(elements: { speakerHtml: string; textHtml: 
 export function buildCaptionObserverScript(): string {
   return `
     (() => {
-      if (window.__alookCaptionObserver) return;
-      window.__alookCaptionObserver = true;
-      window.__alookCaptions = [];
-      window.__alookLastCaption = '';
+      if (window.__onecaptainCaptionObserver) return;
+      window.__onecaptainCaptionObserver = true;
+      window.__onecaptainCaptions = [];
+      window.__onecaptainLastCaption = '';
 
       const observer = new MutationObserver(() => {
         // On any DOM change, scan for caption content.
@@ -74,9 +74,9 @@ export function buildCaptionObserverScript(): string {
               lower.includes('settings') || lower.includes('reframe')) continue;
 
           // Only record if text changed from last snapshot
-          if (key !== window.__alookLastCaption) {
-            window.__alookLastCaption = key;
-            window.__alookCaptions.push({
+          if (key !== window.__onecaptainLastCaption) {
+            window.__onecaptainLastCaption = key;
+            window.__onecaptainCaptions.push({
               speakerHtml: speaker,
               textHtml: text,
               ts: Date.now(),
@@ -93,8 +93,8 @@ export function buildCaptionObserverScript(): string {
 export function buildCaptionScrapeScript(): string {
   return `
     (() => {
-      const result = window.__alookCaptions || [];
-      window.__alookCaptions = [];
+      const result = window.__onecaptainCaptions || [];
+      window.__onecaptainCaptions = [];
       return result.map(c => ({ speakerHtml: c.speakerHtml, textHtml: c.textHtml }));
     })()
   `.trim()

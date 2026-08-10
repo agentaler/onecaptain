@@ -60,6 +60,6 @@ export function sendTaskNotification(
   const title = agentName ? `${agentName} — ${label}` : label;
   new Notification(title, {
     body: body ?? "",
-    icon: "/alook.svg",
+    icon: "/onecaptain.svg",
   });
 }

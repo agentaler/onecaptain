@@ -8,7 +8,7 @@ import {
   MAX_SEARCH_LENGTH,
   DEFAULT_USER_SEARCH_LIMIT,
   parseNameAndTag,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   const url = new URL(req.url)

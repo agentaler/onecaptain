@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun, sqlQuery } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun, sqlQuery } from "@onecaptain/test-utils"
 
 describe("regression: invalid task state transitions return 400", () => {
   let seed: TestSeed

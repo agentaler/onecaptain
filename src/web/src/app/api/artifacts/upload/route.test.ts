@@ -11,8 +11,8 @@ vi.mock("nanoid", () => ({ nanoid: vi.fn(() => "xyz"), customAlphabet: () => () 
 const mockGetConversation = vi.fn();
 const mockCreateArtifact = vi.fn();
 const mockGetAgent = vi.fn();
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     queries: {

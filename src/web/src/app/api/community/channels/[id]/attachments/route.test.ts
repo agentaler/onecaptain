@@ -27,8 +27,8 @@ const mockGetDM = vi.fn()
 const mockGetDMBetween = vi.fn()
 const mockCreatePendingAttachment = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {

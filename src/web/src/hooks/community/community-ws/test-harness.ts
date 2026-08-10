@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query"
-import type { CommunityMessageCreate } from "@alook/shared"
+import type { CommunityMessageCreate } from "@onecaptain/shared"
 import { vi } from "vitest"
 import type { UseUserWsOptions } from "@/lib/use-user-ws"
 import { useMessageStreamStore } from "@/stores/community/message-stream"

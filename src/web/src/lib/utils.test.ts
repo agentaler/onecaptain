@@ -13,15 +13,15 @@ vi.mock("./utils", async () => {
     cliCmd: () => {
       if (process.env.NODE_ENV === "development") return "pnpm dev:cli";
       if (mockHostname && ["localhost", "127.0.0.1"].includes(mockHostname)) {
-        return "npx @alook/app cli";
+        return "npx @onecaptain/app cli";
       }
-      return "npx @alook/cli";
+      return "npx @onecaptain/cli";
     },
     daemonStartCmd: () => {
       let base: string;
       if (process.env.NODE_ENV === "development") base = "pnpm dev:cli";
-      else if (mockHostname && ["localhost", "127.0.0.1"].includes(mockHostname)) base = "npx @alook/app cli";
-      else base = "npx @alook/cli";
+      else if (mockHostname && ["localhost", "127.0.0.1"].includes(mockHostname)) base = "npx @onecaptain/app cli";
+      else base = "npx @onecaptain/cli";
       const cmd = `${base} daemon start`;
       if (process.env.NODE_ENV === "development") return `${cmd} --foreground`;
       return cmd;
@@ -51,33 +51,33 @@ describe("isLocalMode", () => {
   });
 
   it("returns false for non-local hostname in production build", () => {
-    mockHostname = "alook.ai";
+    mockHostname = "onecaptain.ai";
     expect(isLocalMode()).toBe(false);
   });
 });
 
 describe("cliCmd", () => {
-  it("returns 'npx @alook/cli' in production cloud", () => {
-    mockHostname = "alook.ai";
-    expect(cliCmd()).toBe("npx @alook/cli");
+  it("returns 'npx @onecaptain/cli' in production cloud", () => {
+    mockHostname = "onecaptain.ai";
+    expect(cliCmd()).toBe("npx @onecaptain/cli");
   });
 
-  it("returns 'npx @alook/app cli' on localhost (app mode)", () => {
+  it("returns 'npx @onecaptain/app cli' on localhost (app mode)", () => {
     mockHostname = "localhost";
-    expect(cliCmd()).toBe("npx @alook/app cli");
+    expect(cliCmd()).toBe("npx @onecaptain/app cli");
   });
 });
 
 describe("daemonStartCmd", () => {
   it("no --foreground in production cloud", () => {
-    mockHostname = "alook.ai";
-    expect(daemonStartCmd()).toBe("npx @alook/cli daemon start");
+    mockHostname = "onecaptain.ai";
+    expect(daemonStartCmd()).toBe("npx @onecaptain/cli daemon start");
     expect(daemonStartCmd()).not.toContain("--foreground");
   });
 
   it("no --foreground in app mode (localhost, production build)", () => {
     mockHostname = "localhost";
-    expect(daemonStartCmd()).toBe("npx @alook/app cli daemon start");
+    expect(daemonStartCmd()).toBe("npx @onecaptain/app cli daemon start");
     expect(daemonStartCmd()).not.toContain("--foreground");
   });
 });

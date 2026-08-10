@@ -22,7 +22,7 @@ import {
   setInboxFilterTypes,
   type InboxFilterType,
 } from "@/lib/inbox-filter";
-import type { WsMessage } from "@alook/shared";
+import type { WsMessage } from "@onecaptain/shared";
 
 const INBOX_LIMIT = 30;
 

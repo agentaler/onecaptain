@@ -26,11 +26,11 @@ export async function generateMetadata({
   return {
     title: post.title,
     description: post.excerpt,
-    alternates: { canonical: `https://alook.ai/blog/${post.slug}` },
+    alternates: { canonical: `https://onecaptain.ai/blog/${post.slug}` },
     openGraph: {
       title: post.title,
       description: post.excerpt,
-      url: `https://alook.ai/blog/${post.slug}`,
+      url: `https://onecaptain.ai/blog/${post.slug}`,
       type: "article",
       publishedTime: post.date,
       ...(post.dateModified ? { modifiedTime: post.dateModified } : {}),

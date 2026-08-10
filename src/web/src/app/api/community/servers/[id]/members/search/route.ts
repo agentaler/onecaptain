@@ -1,7 +1,7 @@
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, MAX_MEMBERS_PAGE_SIZE } from "@alook/shared"
+import { queries, MAX_MEMBERS_PAGE_SIZE } from "@onecaptain/shared"
 import { requireServerMember } from "@/lib/community/permissions"
 import { parseBoundedInt } from "@/lib/community/messages"
 import { mapMemberForApi } from "@/lib/community/member-payload"

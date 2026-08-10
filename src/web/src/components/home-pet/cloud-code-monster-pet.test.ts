@@ -259,7 +259,7 @@ describe("Cloud Code monster PET helpers", () => {
     });
   });
 
-  it("maps Alook active agent tasks into working and sleep-ready PET states", () => {
+  it("maps OneCaptain active agent tasks into working and sleep-ready PET states", () => {
     expect(CLOUD_CODE_MONSTER_NO_WORK_SLEEP_MS).toBe(60_000);
     expect(resolveCloudCodeMonsterAgentWorkState(1, null, 10_000)).toEqual({
       activityId: "coding",

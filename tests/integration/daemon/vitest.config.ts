@@ -5,7 +5,7 @@ import shared from "../../../vitest.shared"
 const dir = resolve(import.meta.dirname)
 const root = resolve(dir, "../../../")
 
-// No `@alook/daemon` alias: daemon internals (`WsControlChannel`,
+// No `@onecaptain/daemon` alias: daemon internals (`WsControlChannel`,
 // `startCredentialProxy`/`CredentialBroker`, `createProxyServerApi`) have no
 // package-level barrel export for this — test files import them via plain
 // relative paths straight into `src/daemon/src/**`, same as the package's own
@@ -13,9 +13,9 @@ const root = resolve(dir, "../../../")
 export default mergeConfig(shared, defineConfig({
   resolve: {
     alias: {
-      "@alook/shared/community-cli-contract": resolve(root, "src/shared/src/community-cli-contract.ts"),
-      "@alook/test-utils": resolve(root, "tests/utils/src/index.ts"),
-      "@alook/shared": resolve(root, "src/shared/src/index.ts"),
+      "@onecaptain/shared/community-cli-contract": resolve(root, "src/shared/src/community-cli-contract.ts"),
+      "@onecaptain/test-utils": resolve(root, "tests/utils/src/index.ts"),
+      "@onecaptain/shared": resolve(root, "src/shared/src/index.ts"),
     },
   },
   test: {

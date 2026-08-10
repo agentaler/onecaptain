@@ -1,4 +1,4 @@
-import { DEV_WEB_URL } from "@alook/shared"
+import { DEV_WEB_URL } from "@onecaptain/shared"
 import { fetchWithRetry } from "./fetch"
 
 const APP_URL = process.env.APP_URL ?? DEV_WEB_URL

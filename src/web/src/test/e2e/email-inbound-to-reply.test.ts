@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlQuery, postEmail } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlQuery, postEmail } from "@onecaptain/test-utils"
 
 let seed: TestSeed
 
@@ -38,7 +38,7 @@ async function waitForTask(
 describe("cross-service: email inbound → task creation", () => {
   it("whitelisted email via email-worker → app notify → task created with type=email_notification", async () => {
     const from = `${seed.userId}@test.local`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = `E2E cross-service ${randomUUID().slice(0, 8)}`
 
     const emailRes = await postEmail(from, to, subject, "Cross-service test body")
@@ -54,7 +54,7 @@ describe("cross-service: email inbound → task creation", () => {
 
   it("task has correct metadata: conversation_id set, context_key matches conversation", async () => {
     const from = `${seed.userId}@test.local`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = `E2E metadata ${randomUUID().slice(0, 8)}`
 
     await postEmail(from, to, subject, "Metadata test")
@@ -67,7 +67,7 @@ describe("cross-service: email inbound → task creation", () => {
 
   it("email record exists in DB with correct agent_id and is_whitelisted=1", async () => {
     const from = `${seed.userId}@test.local`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = `E2E email-record ${randomUUID().slice(0, 8)}`
 
     await postEmail(from, to, subject, "Record check")
@@ -83,7 +83,7 @@ describe("cross-service: email inbound → task creation", () => {
 
   it("non-whitelisted email does NOT create a task", async () => {
     const from = "unknown-sender@external.com"
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
     const subject = `E2E no-task ${randomUUID().slice(0, 8)}`
 
     await postEmail(from, to, subject, "Should not trigger task")

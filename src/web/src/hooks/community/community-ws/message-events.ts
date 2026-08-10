@@ -6,7 +6,7 @@ import type {
   CommunityReactionAdd,
   CommunityReactionRemove,
   CommunityWsEvent,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import { projectCommunityMessageCreate } from "@/lib/community/message-wire"
 import type { CanonicalMessage } from "@/lib/community/message-stream"

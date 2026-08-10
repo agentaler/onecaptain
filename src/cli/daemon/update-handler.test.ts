@@ -20,7 +20,7 @@ vi.mock("fs", () => ({
 
 vi.mock("./config.js", () => ({
   lastUpdateMarkerPath: vi.fn((profile?: string) =>
-    profile ? `/tmp/alook/last_update_${profile}` : "/tmp/alook/last_update",
+    profile ? `/tmp/onecaptain/last_update_${profile}` : "/tmp/onecaptain/last_update",
   ),
 }));
 
@@ -57,7 +57,7 @@ describe("update-handler", () => {
     await handleCliUpdate("1.0.0", onSuccess);
 
     expect(mockWriteFileSync).toHaveBeenCalledWith(
-      "/tmp/alook/last_update",
+      "/tmp/onecaptain/last_update",
       "1.0.0",
       { mode: 0o600 },
     );
@@ -152,7 +152,7 @@ describe("update marker helpers", () => {
   it("writeUpdateMarker writes version to file", () => {
     writeUpdateMarker("2.0.0");
     expect(mockWriteFileSync).toHaveBeenCalledWith(
-      "/tmp/alook/last_update",
+      "/tmp/onecaptain/last_update",
       "2.0.0",
       { mode: 0o600 },
     );
@@ -161,7 +161,7 @@ describe("update marker helpers", () => {
   it("writeUpdateMarker uses profile path when provided", () => {
     writeUpdateMarker("2.0.0", "staging");
     expect(mockWriteFileSync).toHaveBeenCalledWith(
-      "/tmp/alook/last_update_staging",
+      "/tmp/onecaptain/last_update_staging",
       "2.0.0",
       { mode: 0o600 },
     );
@@ -169,7 +169,7 @@ describe("update marker helpers", () => {
 
   it("clearUpdateMarker deletes the marker file", () => {
     clearUpdateMarker();
-    expect(mockUnlinkSync).toHaveBeenCalledWith("/tmp/alook/last_update");
+    expect(mockUnlinkSync).toHaveBeenCalledWith("/tmp/onecaptain/last_update");
   });
 
   it("clearUpdateMarker does not throw when file is missing", () => {

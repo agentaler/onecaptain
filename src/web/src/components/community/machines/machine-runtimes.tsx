@@ -1,6 +1,6 @@
 "use client"
 
-import type { CommunityMachineRuntime } from "@alook/shared"
+import type { CommunityMachineRuntime } from "@onecaptain/shared"
 import { CircleAlert } from "lucide-react"
 import { ProviderLogo } from "@/components/provider-logo"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"

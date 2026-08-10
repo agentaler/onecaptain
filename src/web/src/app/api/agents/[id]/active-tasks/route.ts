@@ -1,4 +1,4 @@
-import { createDb, queries } from "@alook/shared";
+import { createDb, queries } from "@onecaptain/shared";
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";
 import { writeJSON, writeError } from "@/lib/middleware/helpers";

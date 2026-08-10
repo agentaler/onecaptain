@@ -11,7 +11,7 @@ import {
   type SkillSyncRequest,
   type TaskApi,
   type WorkspaceFileReport,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 
 export class DaemonClient {
   constructor(private baseURL: string) {}

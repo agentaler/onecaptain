@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { sanitizeSlug } from "@alook/shared";
+import { sanitizeSlug } from "@onecaptain/shared";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useSession } from "@/lib/auth-client";
 import {

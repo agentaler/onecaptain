@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { signUp, signIn, sessionRequest, sqlRun, sqlQuery } from "@alook/test-utils"
+import { signUp, signIn, sessionRequest, sqlRun, sqlQuery } from "@onecaptain/test-utils"
 
 const testEmail = `e2e_ws_${randomUUID().slice(0, 8)}@test.local`
 const testPassword = "TestPassword123!"

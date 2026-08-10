@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetBody,
 } from "@/components/ui/sheet";
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 import { FileText, Download, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArtifactContentRenderer, getArtifactUrl, isHtmlType } from "@/components/artifact-content-renderer";

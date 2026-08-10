@@ -49,7 +49,7 @@ export function LandingReachMotion() {
       className={styles.stage}
       data-testid="landing-reach-motion"
       data-beat={beat}
-      aria-label="The same Alook room updating on desktop and mobile"
+      aria-label="The same OneCaptain room updating on desktop and mobile"
     >
       <div className={styles.desktopShell}>
         <div className={styles.deviceBar} aria-hidden>

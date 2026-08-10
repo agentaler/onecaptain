@@ -6,13 +6,14 @@ import {
   resolveModelConfig,
   formatHandle,
   CommunityAgentNapRequestSchema,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor, requireBot } from "@/lib/middleware/community-actor"
 import { pushAgentNapToMachine } from "@/lib/community/bot-push"
+import { resolveStoredProviderConfig } from "@/lib/community/bot-provider"
 
 /**
- * POST /api/community/bots/me/nap — `alook nap --handoff <file>|--text <s>`.
+ * POST /api/community/bots/me/nap — `onecaptain nap --handoff <file>|--text <s>`.
  *
  * Relocated from the flat /api/community/nap (route/disc 接口树统一, Gener #215
  * 乙; Blondie #527 placement). nap is a BOT-QUA-BOT self lifecycle action — the
@@ -73,6 +74,7 @@ export const POST = withCommunityActor(async (req: NextRequest, ctx) => {
   const config = makeRuntimeConfig({
     runtime: wakeCtx.runtime,
     model: resolveModelConfig(wakeCtx.runtime, wakeCtx.modelName),
+    provider: resolveStoredProviderConfig(ctx.env, wakeCtx),
     agentName: wakeCtx.name,
     agentHandle: `@${formatHandle(wakeCtx.name, wakeCtx.discriminator)}`,
   })

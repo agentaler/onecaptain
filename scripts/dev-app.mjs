@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Dev wrapper for @alook/app — run from monorepo root:
+ * Dev wrapper for @onecaptain/app — run from monorepo root:
  *   pnpm dev:app onboard
  *   pnpm dev:app start
  *   pnpm dev:app stop
@@ -20,7 +20,7 @@ const args = process.argv.slice(2);
 const child = spawn("bun", ["run", "src/index.ts", ...args], {
   cwd: appDir,
   stdio: "inherit",
-  env: { ...process.env, NODE_ENV: "development", ALOOK_PROJECT_ROOT: root },
+  env: { ...process.env, NODE_ENV: "development", ONECAPTAIN_PROJECT_ROOT: root },
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));

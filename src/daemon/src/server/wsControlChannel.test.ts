@@ -75,7 +75,7 @@ describe("WsControlChannel — resync on (re)connect", () => {
     ch.connect();
     sockets[0].emit("open");
     // First connect: ready + agent_session sent. `ready` fields are spread flat
-    // so the shape matches HostReadyMessageSchema in @alook/shared.
+    // so the shape matches HostReadyMessageSchema in @onecaptain/shared.
     let f = sockets[0].frames();
     expect(f[0]).toMatchObject({ type: "ready", runningAgents: ["a1"] });
     expect(f[1]).toMatchObject({ type: "agent_session", agentId: "a1", sessionId: "s1" });

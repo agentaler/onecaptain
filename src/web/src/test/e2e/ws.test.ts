@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { DEV_WS_DO_URL } from "@alook/shared"
-import { signUp, signIn, sessionRequest, sqlRun } from "@alook/test-utils"
+import { DEV_WS_DO_URL } from "@onecaptain/shared"
+import { signUp, signIn, sessionRequest, sqlRun } from "@onecaptain/test-utils"
 
 const WS_DO_WS = DEV_WS_DO_URL.replace(/^http/, "ws")
 

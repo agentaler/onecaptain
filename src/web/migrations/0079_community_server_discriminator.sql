@@ -7,7 +7,7 @@
 --
 -- New rows get an FNV-1a hash of community_server.id at INSERT time via
 -- createServer's `withUniqueDiscriminator` wrap (see computeDiscriminator in
--- @alook/shared) — hash on the immutable id, not the name, so renames don't
+-- @onecaptain/shared) — hash on the immutable id, not the name, so renames don't
 -- rotate the tag.
 --
 -- Existing rows are seeded with a random 4-digit tag right here in SQL so we

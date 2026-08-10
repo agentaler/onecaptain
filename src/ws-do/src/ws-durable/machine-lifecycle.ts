@@ -4,7 +4,7 @@ import {
   WS_EVENTS,
   createDb,
   queries,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { HANDLE_KEY, IDENTITY_KEY } from "./internal"
 import type {
   CommunityMachineConnectionState,

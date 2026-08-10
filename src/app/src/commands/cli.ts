@@ -20,7 +20,7 @@ function runCli(args: string[]): void {
 
 export function registerCommand(): Command {
   return new Command("register")
-    .description("Register CLI with local Alook server")
+    .description("Register CLI with local OneCaptain server")
     .allowUnknownOption()
     .passThroughOptions()
     .argument("[args...]")
@@ -31,7 +31,7 @@ export function registerCommand(): Command {
 
 export function daemonCommand(): Command {
   const daemon = new Command("daemon")
-    .description("Manage the local Alook daemon")
+    .description("Manage the local OneCaptain daemon")
     .enablePositionalOptions();
 
   daemon
@@ -63,7 +63,7 @@ export function daemonCommand(): Command {
 
 export function cliPassthroughCommand(): Command {
   return new Command("cli")
-    .description("Run any @alook/cli command against the local server")
+    .description("Run any @onecaptain/cli command against the local server")
     .allowUnknownOption()
     .passThroughOptions()
     .argument("[args...]")

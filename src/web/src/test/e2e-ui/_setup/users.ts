@@ -7,7 +7,7 @@ export type UserKey = "alice" | "bob" | "carol"
 export const USER_KEYS: UserKey[] = ["alice", "bob", "carol"]
 
 export function emailFor(key: UserKey, stamp: string): string {
-  return `e2e-${key}-${stamp}@alook.test`
+  return `e2e-${key}-${stamp}@onecaptain.test`
 }
 
 export interface SeededUser {

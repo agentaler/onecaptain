@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { ArrowUpRight } from "lucide-react";
-import type { Agent, AgentRuntime } from "@alook/shared";
+import type { Agent, AgentRuntime } from "@onecaptain/shared";
 
 interface RuntimeHealthProps {
   runtimes: AgentRuntime[];

@@ -3,8 +3,8 @@ import {
   HostReadyMessageSchema,
   queries,
   WS_EVENTS,
-} from "@alook/shared"
-import type { CommunityMachineRuntime, CommunityMachineSummary } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { CommunityMachineRuntime, CommunityMachineSummary } from "@onecaptain/shared"
 import {
   HANDLE_KEY,
   IDENTITY_KEY,

@@ -1,4 +1,4 @@
-import type { CommunityTypingStart, CommunityWsEvent } from "@alook/shared"
+import type { CommunityTypingStart, CommunityWsEvent } from "@onecaptain/shared"
 import {
   applyTypingIndicator,
   clearTypingIndicator,

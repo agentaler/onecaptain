@@ -1,4 +1,4 @@
-import { createDb, queries } from "@alook/shared"
+import { createDb, queries } from "@onecaptain/shared"
 import {
   HANDLE_KEY,
   IDENTITY_KEY,

@@ -9,8 +9,8 @@ const mockListDistinctTagsForChannel = vi.fn()
 vi.mock("@/lib/community/permissions", () => ({
   requireChannelAccess: (...args: unknown[]) => mockRequireChannelAccess(...args),
 }))
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {

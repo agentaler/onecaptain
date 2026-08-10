@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 export async function GET() {
   const posts = await getAllPosts();
-  const siteUrl = "https://alook.ai";
+  const siteUrl = "https://onecaptain.ai";
 
   const items = posts
     .map(
@@ -27,7 +27,7 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>Alook Blog</title>
+    <title>OneCaptain Blog</title>
     <link>${siteUrl}/blog</link>
     <description>Thoughts on building AI companies, agent collaboration, and the future of personal software.</description>
     <language>en-us</language>

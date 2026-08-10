@@ -109,7 +109,11 @@ export {
   communityBotSyntheticEmail,
   SELF_BOT_FRIENDSHIP_PREFIX,
   isSelfBotFriendship,
+  WORKSPACE_PLANS,
+  PLAN_LIMITS,
+  getPlanLimits,
 } from "./constants";
+export type { WorkspacePlan } from "./constants";
 
 export {
   DEFAULT_MESSAGE_PAGE_SIZE,
@@ -237,6 +241,7 @@ export {
   UpdateEmailAccountSchema,
   TestEmailConnectionSchema,
   UpdateWorkspaceRequestSchema,
+  UpdateMemberRoleRequestSchema,
   DeleteWorkspaceRequestSchema,
   GrantAgentAccessRequestSchema,
   FileRequestItemSchema,
@@ -471,6 +476,15 @@ export {
   modelNameFromSelect,
 } from "./community/bot-model";
 
+export {
+  BOT_PROVIDER_KINDS,
+  BOT_PROVIDER_LABELS,
+  PROVIDER_KIND_CUSTOM,
+  isBotProviderKind,
+  resolveProviderConfig,
+} from "./community/bot-provider";
+export type { BotProviderKind } from "./community/bot-provider";
+
 export { sendWakeToMachine, buildUnreadWakeCommand, dispatchOneUnreadWake } from "./community/wake-dispatch";
 export type { DispatchOneWakeResult } from "./community/wake-dispatch";
 export type { WakePayload, BuildUnreadWakeResult } from "./community/wake-dispatch";
@@ -571,7 +585,7 @@ export {
 } from "./db/queries/calendar-event";
 
 // Utils
-export { parseEmailHandle, toAlookAddress, isValidHandle, extractDomain, isSensitiveRecipient } from "./utils/email";
+export { parseEmailHandle, toOneCaptainAddress, isValidHandle, extractDomain, isSensitiveRecipient } from "./utils/email";
 export { parsePromptMentions } from "./utils/prompt-parser";
 export type { PromptAgent, PromptMention, ParseResult } from "./utils/prompt-parser";
 export { MENTION_TOKEN_RE, stripMentionTokens } from "./utils/mention-token";
@@ -627,4 +641,4 @@ export { extractMentionedUserIds, MENTION_TYPES, isMentionType } from "./utils/c
 export type { MentionCandidate, MentionType } from "./utils/community-mentions";
 export { semverGte } from "./semver";
 export { resolveMode, cliCommand, cliPackageName, updateCommand, daemonCommand, getBaseUrl, isTauri, isDesktop, isMobile, tauriInvoke } from "./mode";
-export type { AlookMode, ModeSignals, BaseUrlSignals } from "./mode";
+export type { OneCaptainMode, ModeSignals, BaseUrlSignals } from "./mode";

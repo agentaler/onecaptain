@@ -1,4 +1,4 @@
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import type { RouterContext } from "../router-context"
 
 export async function handleMachineModelSwitch({ request, env, url, traceId, log }: RouterContext): Promise<Response | null> {
@@ -45,7 +45,7 @@ export async function handleMachineModelSwitch({ request, env, url, traceId, log
 
   let doNames: string[] = []
   try {
-    const shared = await import("@alook/shared")
+    const shared = await import("@onecaptain/shared")
     const db = shared.createDb((env as unknown as { DB: D1Database }).DB)
     doNames = await queries.communityMachine.getActiveDoNamesForMachine(db, machineId)
   } catch (err) {
@@ -123,7 +123,7 @@ export async function handleMachineProviderSwitch({ request, env, url, traceId, 
 
   let doNames: string[] = []
   try {
-    const shared = await import("@alook/shared")
+    const shared = await import("@onecaptain/shared")
     const db = shared.createDb((env as unknown as { DB: D1Database }).DB)
     doNames = await queries.communityMachine.getActiveDoNamesForMachine(db, machineId)
   } catch (err) {

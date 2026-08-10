@@ -8,7 +8,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/Theme.alook_desktop"
+        android:theme="@style/Theme.onecaptain_desktop"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
@@ -16,7 +16,7 @@
             android:launchMode="singleTask"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
-            android:theme="@style/Theme.alook_desktop.Splash"
+            android:theme="@style/Theme.onecaptain_desktop.Splash"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -31,8 +31,8 @@
                 <action android:name="org.chromium.arc.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="alook" />
-                <data android:host="alook.ai" />
+                <data android:scheme="onecaptain" />
+                <data android:host="onecaptain.ai" />
                 
                 
                 

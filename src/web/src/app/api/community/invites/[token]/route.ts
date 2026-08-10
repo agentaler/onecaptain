@@ -1,7 +1,7 @@
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { logAudit } from "@/lib/community/audit"
 import { requireServerAdmin } from "@/lib/community/permissions"
 

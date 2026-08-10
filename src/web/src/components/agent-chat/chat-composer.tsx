@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
 import { rankMentionAgents } from "@/lib/mention-agents";
 import { buildChatMentionExtension, mentionTokensToHtml } from "@/lib/chat-mention-extension";
 import { decodeChatEntities } from "@/lib/chat-markdown";
-import { toAlookAddress } from "@alook/shared";
-import type { Agent, AgentLink } from "@alook/shared";
+import { toOneCaptainAddress } from "@onecaptain/shared";
+import type { Agent, AgentLink } from "@onecaptain/shared";
 import type { PopupKeyEvent } from "@/hooks/use-slash-command";
 
 /**
@@ -136,7 +136,7 @@ function MentionList({ state }: { state: MentionPopupState }) {
             <span className="truncate font-medium">{agent.name}</span>
             {agent.email_handle && (
               <span className="truncate text-xs text-muted-foreground">
-                {toAlookAddress(agent.email_handle)}
+                {toOneCaptainAddress(agent.email_handle)}
               </span>
             )}
           </button>

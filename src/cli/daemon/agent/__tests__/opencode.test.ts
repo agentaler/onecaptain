@@ -229,11 +229,11 @@ describe("OpenCodeBackend", () => {
   it("merges execenv vars into spawn env and OPENCODE_PERMISSION wins", () => {
     backend.execute("hello", {
       cwd: "/tmp",
-      env: { ALOOK_WORKSPACE_ID: "ws1", OPENCODE_PERMISSION: "should-be-overridden" },
+      env: { ONECAPTAIN_WORKSPACE_ID: "ws1", OPENCODE_PERMISSION: "should-be-overridden" },
     });
     expect(lastSpawnArgs).toBeTruthy();
     const env = lastSpawnArgs!.opts.env as Record<string, string>;
-    expect(env.ALOOK_WORKSPACE_ID).toBe("ws1");
+    expect(env.ONECAPTAIN_WORKSPACE_ID).toBe("ws1");
     expect(env.OPENCODE_PERMISSION).toBe('{"*":"allow"}');
   });
 

@@ -4,13 +4,13 @@
  */
 import type { LaunchConfig } from "../types.js";
 
-// The agent invokes the CLI via the `$ALOOK_CLI` env var, NOT a bare `alook`.
-// `$ALOOK_CLI` is an ABSOLUTE path the daemon injects (see spawnEnv
+// The agent invokes the CLI via the `$ONECAPTAIN_CLI` env var, NOT a bare `onecaptain`.
+// `$ONECAPTAIN_CLI` is an ABSOLUTE path the daemon injects (see spawnEnv
 // `<PREFIX>_CLI` / cliTransport), so it always resolves to the daemon-injected
-// agent CLI — never the host's own `alook` on PATH (a different package we don't
+// agent CLI — never the host's own `onecaptain` on PATH (a different package we don't
 // control, and PATH order a re-sourced shell rc can reorder). The `$`-form
 // expands in the agent's shell; the daemon exports the var into the process env.
-const CLI = "$ALOOK_CLI";
+const CLI = "$ONECAPTAIN_CLI";
 
 /* ------------------------------------------------------------------ */
 /* Section builders                                                     */
@@ -19,7 +19,7 @@ const CLI = "$ALOOK_CLI";
 /**
  * "Who am I, and to whom." Frames the agent as a member of the owner's
  * household — a peer inside their inner circle — rather than as a tool
- * "operating" in Alook. This framing is load-bearing: the tone, loyalty,
+ * "operating" in OneCaptain. This framing is load-bearing: the tone, loyalty,
  * privacy defaults, and channel etiquette elsewhere in the prompt all
  * derive from it. Placed first so identity and role read together.
  */
@@ -31,12 +31,12 @@ function identitySection(config: LaunchConfig): string {
 
   if (owner) {
     parts.push(
-      `You're ${name}, part of ${owner}'s household on Alook. Act like a housemate who shares ` +
+      `You're ${name}, part of ${owner}'s household on OneCaptain. Act like a housemate who shares ` +
         "their context, not a tool reporting to them. Watch their back, speak up when it matters.",
     );
   } else {
     parts.push(
-      `You're ${name} on Alook, part of a household. Act like a housemate who shares your ` +
+      `You're ${name} on OneCaptain, part of a household. Act like a housemate who shares your ` +
         "people's context, not a tool. Watch their back, speak up when it matters.",
     );
   }
@@ -44,7 +44,7 @@ function identitySection(config: LaunchConfig): string {
   if (config.agentHandle) {
     parts.push(
       "",
-      `Every Alook account is \`name#NNNN\`. Yours is \`${config.agentHandle}\`. ` +
+      `Every OneCaptain account is \`name#NNNN\`. Yours is \`${config.agentHandle}\`. ` +
         "Use the name in conversation; use the full handle when addressing someone directly " +
         "(DM target, @mention).",
     );
@@ -88,7 +88,7 @@ function identitySection(config: LaunchConfig): string {
 }
 
 /**
- * Reference list of every command `alook` exposes, grouped by category, plus
+ * Reference list of every command `onecaptain` exposes, grouped by category, plus
  * the universal output-format contract every command shares. This is the ONE
  * place commands are enumerated — when a future category is added (tasks,
  * calendar, …) it gets its own `### <Category>` subsection here, so the list
@@ -203,11 +203,11 @@ function messagingSection(): string {
       "the thread-ref grammar described above.",
     "",
     "Copyable refs must be standalone bare tokens. Examples:",
-    "/Alook#1234/chore",
-    "/Alook#1234/chore#28",
-    "/Alook#1234/chore/#28",
-    "/Alook#1234/chore/#28#5",
-    "/Alook#1234",
+    "/OneCaptain#1234/chore",
+    "/OneCaptain#1234/chore#28",
+    "/OneCaptain#1234/chore/#28",
+    "/OneCaptain#1234/chore/#28#5",
+    "/OneCaptain#1234",
     "/.dm/alice#0042",
     "",
     "### Reading history",
@@ -447,7 +447,7 @@ function workspaceMemorySection(): string {
     "### memory.md",
     "",
     "Read first on every wake. Pointers and facts, one line per entry. Examples: " +
-      '"Owner: @alice#0001", "Alook codebase: /Users/alice/alook/"',
+      '"Owner: @alice#0001", "OneCaptain codebase: /Users/alice/onecaptain/"',
     "",
     "Learn your voice and taste over time. Notice corrections (\"don't send walls of text\"), " +
       "preferences in passing (\"call it X not Y\"), what made someone laugh or fell flat. Write " +
@@ -492,7 +492,7 @@ function workspaceMemorySection(): string {
 /**
  * Assemble the standing/system prompt.
  *
- * Asserts what's universally true for any Alook agent workspace — identity,
+ * Asserts what's universally true for any OneCaptain agent workspace — identity,
  * CLI command reference, messaging mechanics, critical rules, startup
  * sequence, communication style, channel awareness, workspace/memory model,
  * and utilities. Uniform across drivers — the returned string does not

@@ -3,15 +3,15 @@
  *
  * This is the single shared contract that BOTH sides implement against:
  *   - the **agent CLI** (the client) calls these methods;
- *   - a **server** (real Alook, or the local mock for tests) answers them.
+ *   - a **server** (real OneCaptain, or the local mock for tests) answers them.
  *
- * Lifted from `src/daemon/src/server/contract.ts` into `@alook/shared` so the
+ * Lifted from `src/daemon/src/server/contract.ts` into `@onecaptain/shared` so the
  * real server routes (`src/web`) and the wake producer/consumer
  * (`src/web`, `src/wake-worker`) can share the exact same types the daemon's
  * CLI and mock server already implement against. `src/daemon`'s
  * `contract.ts` re-exports everything from here — see that file.
  *
- * Domain model (Alook is Discord-like):
+ * Domain model (OneCaptain is Discord-like):
  *   User ──< Agent ──< (participates in) Server/workspace ──< Channel ──< Message
  *   - one User owns many Agents;
  *   - one Agent participates in many Servers (workspaces);
@@ -379,7 +379,7 @@ export interface CommunityAgentReactAddResponse {
 }
 
 /**
- * Create a new forum post (`alook message post`). `forum` is a forum REF
+ * Create a new forum post (`onecaptain message post`). `forum` is a forum REF
  * (`/server/forum`), resolved server-side (bots hold refs, not ids — same reason
  * `send` takes a ref). The canonical messages door stores `title` as an opener
  * message in the forum and `content` as the first reply in its ordinary thread.
@@ -468,8 +468,8 @@ export interface ChannelGroup {
 }
 
 /**
- * `alook channel member` result — a public channel/forum returns a hint
- * pointing at `alook server member` (no roster enumeration); everything else
+ * `onecaptain channel member` result — a public channel/forum returns a hint
+ * pointing at `onecaptain server member` (no roster enumeration); everything else
  * (private channel, private forum, forum post, thread) returns the concrete
  * roster. The private roster carries the same `cursor?`/`hasMore` shape as
  * `server member` for a uniform agent mental model, but is NOT paginated this
@@ -513,7 +513,7 @@ export interface ServerMember {
 }
 
 /**
- * `alook server member` result — the server roster, forward-paginated with an
+ * `onecaptain server member` result — the server roster, forward-paginated with an
  * opaque cursor. `cursor` is present iff `hasMore` — the agent echoes it back
  * verbatim (never parses it) to fetch the next page; omitted on the last page.
  */
@@ -528,7 +528,7 @@ export interface ServerMemberListResult {
 /* ------------------------------------------------------------------ */
 
 /**
- * Result of `alook friend request`. Discriminated on `status`:
+ * Result of `onecaptain friend request`. Discriminated on `status`:
  *   - 'pending'  — human target or cross-owner bot target; owner-gated. `hint`
  *                  tells the agent to wait for its owner's DM approval.
  *   - 'accepted' — sibling-bot target (same owner); auto-accepted, no gate.
@@ -580,7 +580,7 @@ export interface ServerApi {
 
   /**
    * Members visible to the agent for a channel/thread ref. Public top-level
-   * channels/forums return a hint pointing at `alook server member`; private
+   * channels/forums return a hint pointing at `onecaptain server member`; private
    * channels, private forums, forum posts, and threads (regardless of parent
    * visibility) return the concrete roster.
    */
@@ -646,7 +646,7 @@ export interface ServerApi {
     pendingIncoming: FriendCard[];
   }>;
   /**
-   * `alook nap` — the agent resets its own session, carrying a mandatory
+   * `onecaptain nap` — the agent resets its own session, carrying a mandatory
    * `handoff` note to its reborn self. Self-scoped: the endpoint resolves the
    * bot from the runner key, so `agentId` isn't sent. Returns `{ napped }` on
    * delivery; throws (409) if the daemon is offline.
@@ -1332,9 +1332,9 @@ export function formatSeq(seq: Seq): string {
 // asymmetry — the uplink was validated, the downlink was not.
 //
 // Colocated with the `HostCommand` TYPE (above) rather than in `schemas.ts`
-// on purpose: the daemon reaches this file via the `@alook/shared/community-cli-contract`
+// on purpose: the daemon reaches this file via the `@onecaptain/shared/community-cli-contract`
 // subpath (see `src/daemon/src/server/contract.ts`) and deliberately never
-// imports the main `@alook/shared` barrel, which would drag the server/DB code
+// imports the main `@onecaptain/shared` barrel, which would drag the server/DB code
 // (drizzle, queries) into the daemon bundle. The lockstep guard below also only
 // compiles here, where the `HostCommand` type is in scope.
 //

@@ -126,7 +126,7 @@ export function calendarCommand(): Command {
       if (opts.description) body.description = opts.description;
       if (opts.repeat) body.repeat_interval = opts.repeat;
       if (opts.repeat_stop_date) body.repeat_stop_date = opts.repeat_stop_date;
-      if (process.env.ALOOK_CONVERSATION_ID) body.conversation_id = process.env.ALOOK_CONVERSATION_ID;
+      if (process.env.ONECAPTAIN_CONVERSATION_ID) body.conversation_id = process.env.ONECAPTAIN_CONVERSATION_ID;
 
       try {
         const created = await client.postJSON<CalendarEventResponse>(

@@ -3,7 +3,7 @@
  *
  * Used to attribute runtime errors in the chat UI so the user can see an error
  * came from the agent runtime CLI on their machine (Claude Code / Codex /
- * OpenCode) — not from Alook itself. See issue #236.
+ * OpenCode) — not from OneCaptain itself. See issue #236.
  */
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   claude: "Claude Code",

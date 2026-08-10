@@ -4,7 +4,7 @@ import type {
   CommunityMemberLeave,
   CommunityMemberUpdate,
   CommunityWsEvent,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import { useMessageStreamStore } from "@/stores/community/message-stream"
 import { useCommunityStore } from "@/stores/community"

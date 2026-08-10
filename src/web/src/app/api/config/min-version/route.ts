@@ -1,4 +1,4 @@
-import { semverGte } from "@alook/shared";
+import { semverGte } from "@onecaptain/shared";
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON } from "@/lib/middleware/helpers";
 import { fetchLatestCliVersion } from "@/lib/npm";

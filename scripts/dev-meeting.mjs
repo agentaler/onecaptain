@@ -6,7 +6,7 @@ const WEB_DIR = new URL("../src/web", import.meta.url).pathname;
 const MEET_CODE_RE = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 
 function d1(sql) {
-  const cmd = `npx wrangler d1 execute alook-app --local --json --command "${sql.replace(/"/g, '\\"')}"`;
+  const cmd = `npx wrangler d1 execute onecaptain-app --local --json --command "${sql.replace(/"/g, '\\"')}"`;
   const out = execSync(cmd, { cwd: WEB_DIR, stdio: "pipe" }).toString();
   const parsed = JSON.parse(out);
   return parsed[0]?.results ?? [];

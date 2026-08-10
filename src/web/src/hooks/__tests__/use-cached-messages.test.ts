@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
-import type { Message } from "@alook/shared";
+import type { Message } from "@onecaptain/shared";
 import {
   openCacheDB,
   clearAllCache,

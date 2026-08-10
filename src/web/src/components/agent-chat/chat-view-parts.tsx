@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 import { useAgentContext } from "@/contexts/agent-context";
 import { AgentPreviewCard } from "@/components/agent-preview-card";
 import {

@@ -3,11 +3,11 @@ import {
   formatCanonicalRef,
   formatHandle,
   type StoredChannelType,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import type {
   CommunityCliChannelGroup as ChannelGroup,
   ChannelListItem,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import type { getDb } from "@/lib/db"
 
 /**

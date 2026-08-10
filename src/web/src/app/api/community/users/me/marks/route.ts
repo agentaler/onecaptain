@@ -6,7 +6,7 @@ import {
   DEFAULT_INBOX_PAGE_SIZE,
   MAX_INBOX_PAGE_SIZE,
   readOrStale,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { parseBoundedInt } from "@/lib/community/messages"
 import { avatarInitial } from "@/lib/community/avatar"
 

@@ -1,6 +1,10 @@
-# Contributing to Alook
+# Contributing to OneCaptain (internal)
 
-Thanks for your interest in contributing to Alook. This guide covers everything you need to get started.
+> OneCaptain is proprietary, closed-source software. This guide is for the OneCaptain team
+> and authorized partners only — see [LICENSE](LICENSE). External contributions are not
+> accepted; by submitting work to this repository you assign it to OneCaptain.
+
+This guide covers everything you need to get started developing OneCaptain.
 
 ## Prerequisites
 
@@ -24,15 +28,15 @@ pnpm dev:cli
 
 ## Project Structure
 
-Alook is a monorepo with five packages:
+OneCaptain is a monorepo with five packages:
 
 | Package | Location | What it does |
 |---------|----------|-------------|
-| `@alook/web` | `src/web` | Next.js dashboard, REST API, auth, database |
-| `@alook/cli` | `src/cli` | Runtime daemon, task execution, agent orchestration |
-| `@alook/shared` | `src/shared` | Types, constants, DB schema, validation |
-| `@alook/email-worker` | `src/email-worker` | Inbound email parsing and storage |
-| `@alook/ws-do` | `src/ws-do` | Real-time WebSocket channels |
+| `@onecaptain/web` | `src/web` | Next.js dashboard, REST API, auth, database |
+| `@onecaptain/cli` | `src/cli` | Runtime daemon, task execution, agent orchestration |
+| `@onecaptain/shared` | `src/shared` | Types, constants, DB schema, validation |
+| `@onecaptain/email-worker` | `src/email-worker` | Inbound email parsing and storage |
+| `@onecaptain/ws-do` | `src/ws-do` | Real-time WebSocket channels |
 
 ## Making Changes
 

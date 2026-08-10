@@ -24,7 +24,7 @@ export function resolveClientOpts(command: Command, opts: ResolveClientOptions =
   const result = resolveClientOptsPartial(command, opts);
   if (!result.workspaceId) {
     console.error(
-      "Error: cannot determine workspace. Set ALOOK_WORKSPACE_ID env var or use --workspace flag.",
+      "Error: cannot determine workspace. Set ONECAPTAIN_WORKSPACE_ID env var or use --workspace flag.",
     );
     process.exit(1);
   }
@@ -36,10 +36,10 @@ export function resolveClientOptsPartial(command: Command, opts: ResolveClientOp
   const cfg = loadCLIConfigForProfile(parentOpts.profile);
 
   // Server URL: flag > env > config
-  const serverUrl = parentOpts.server || process.env.ALOOK_SERVER_URL || cfg.server_url;
+  const serverUrl = parentOpts.server || process.env.ONECAPTAIN_SERVER_URL || cfg.server_url;
 
   if (!serverUrl) {
-    console.error("Error: no server URL configured. Set ALOOK_SERVER_URL or run register.");
+    console.error("Error: no server URL configured. Set ONECAPTAIN_SERVER_URL or run register.");
     process.exit(1);
   }
 
@@ -47,7 +47,7 @@ export function resolveClientOptsPartial(command: Command, opts: ResolveClientOp
 
   // Workspace resolution: flag > env > config lookup by agent_id > single workspace fallback
   let ws;
-  const envWorkspaceId = process.env.ALOOK_WORKSPACE_ID;
+  const envWorkspaceId = process.env.ONECAPTAIN_WORKSPACE_ID;
 
   if (opts.workspace) {
     ws = workspaces.find((w) => w.id === opts.workspace);
@@ -71,7 +71,7 @@ export function resolveClientOptsPartial(command: Command, opts: ResolveClientOp
   }
 
   // Token resolution: env > config > session_token
-  const envToken = process.env.ALOOK_TOKEN;
+  const envToken = process.env.ONECAPTAIN_TOKEN;
   const token = envToken || ws?.token || cfg.session_token;
 
   if (!token) {

@@ -1,4 +1,4 @@
-name = "alook-wake-worker"
+name = "onecaptain-wake-worker"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
@@ -25,19 +25,19 @@ inspector_port = 9232
 
 [[services]]
 binding = "WS_DO_WORKER"
-service = "alook-ws-do"
+service = "onecaptain-ws-do"
 
-# Same `alook-app` database `src/web/wrangler.toml` binds as `DB`
+# Same `onecaptain-app` database `src/web/wrangler.toml` binds as `DB`
 # (minimal-wake-queue-unread-notice plan §3) — the consumer re-derives the
 # `agent:wake` command from current D1 state at consume time instead of
 # trusting a possibly-stale queue-carried command.
 [[d1_databases]]
 binding = "DB"
 database_id = "1593b87c-d8a8-4cdf-b6c0-c80d94442654"
-database_name = "alook-app"
+database_name = "onecaptain-app"
 
 [[queues.consumers]]
-queue = "alook-wake"
+queue = "onecaptain-wake"
 max_batch_size = 25
 max_retries = 3
-dead_letter_queue = "alook-wake-dlq"
+dead_letter_queue = "onecaptain-wake-dlq"

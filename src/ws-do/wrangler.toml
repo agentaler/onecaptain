@@ -1,4 +1,4 @@
-name = "alook-ws-do"
+name = "onecaptain-ws-do"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
@@ -32,7 +32,7 @@ inspector_port = 9230
 [[d1_databases]]
 binding = "DB"
 database_id = "1593b87c-d8a8-4cdf-b6c0-c80d94442654"
-database_name = "alook-app"
+database_name = "onecaptain-app"
 
 [[durable_objects.bindings]]
 name = "WS_DO"

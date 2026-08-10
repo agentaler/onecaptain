@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server"
 import { getDb } from "@/lib/db"
-import { isForum, parseNameAndTag, queries } from "@alook/shared"
+import { isForum, parseNameAndTag, queries } from "@onecaptain/shared"
 import { withCommunityActor } from "@/lib/middleware/community-actor"
 import { buildServerChannelGroups } from "@/lib/community/list-channels"
 import { requireServerMember } from "@/lib/community/permissions"

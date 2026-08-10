@@ -6,7 +6,7 @@ import type {
   CreateIssueRequest,
   TaskApi,
   UpdateIssueRequest,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { ApiError } from "@/lib/errors";
 import { apiFetch, redirectToSignIn, wsQuery } from "./client";
 

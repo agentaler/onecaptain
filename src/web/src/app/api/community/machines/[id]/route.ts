@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { queries, WS_EVENTS } from "@alook/shared"
-import type { CommunityWsEvent } from "@alook/shared"
+import { queries, WS_EVENTS } from "@onecaptain/shared"
+import type { CommunityWsEvent } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError, writeJSON } from "@/lib/middleware/helpers"

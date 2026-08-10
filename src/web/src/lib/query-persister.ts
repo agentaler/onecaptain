@@ -12,7 +12,7 @@ import type { MessagesPage } from "@/hooks/community/use-messages"
  * cached payload — use it as the escape hatch when the persisted query shape
  * changes in a way the runtime can't reconcile against fresh server data.
  */
-const IDB_PREFIX = "alook:qc:v1"
+const IDB_PREFIX = "onecaptain:qc:v1"
 
 /**
  * Buster tag paired with `PersistedClient`. TanStack throws away restored
@@ -222,7 +222,7 @@ export function createIdbPersister(userId: string | null): Persister {
     // Passed to storage under the covers, but our storage adapter ignores the
     // key argument (we own the namespace). Leaving a stable literal keeps the
     // persister's internal throttle bookkeeping predictable.
-    key: "alook-query-cache",
+    key: "onecaptain-query-cache",
     serialize: (client) => JSON.stringify(scrubDehydratedClient(client)),
     deserialize: (raw) => JSON.parse(raw) as PersistedClient,
   })

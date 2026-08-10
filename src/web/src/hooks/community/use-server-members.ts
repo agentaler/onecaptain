@@ -14,7 +14,7 @@ import type {
   CommunityMemberLeave,
   CommunityMemberUpdate,
   CommunityRole,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { avatarInitial } from "@/lib/community/avatar"
 
 // Debounce window for the search input (ms). Kept short — the endpoint is

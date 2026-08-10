@@ -10,8 +10,8 @@ const mockWarn = vi.fn()
 const mockWithD1Retry = vi.fn(async (fn: () => Promise<unknown>, _opts?: unknown) => fn())
 const mockResolveChannelRecipientUserIds = vi.fn(() => Promise.resolve([] as string[]))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     createLogger: () => ({
@@ -89,7 +89,7 @@ import {
   broadcastToUserSafe,
   resolveChannelRecipients,
 } from "./fanout"
-import { WS_EVENTS } from "@alook/shared"
+import { WS_EVENTS } from "@onecaptain/shared"
 
 describe("fanOutToServerMembers", () => {
   beforeEach(() => {

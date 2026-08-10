@@ -1,10 +1,10 @@
 {
-  "productName": "Alook",
+  "productName": "OneCaptain",
   "version": "0.0.160",
-  "identifier": "ai.alook.desktop",
+  "identifier": "ai.onecaptain.desktop",
   "build": {
     "devUrl": "http://localhost:3000/workspaces?auto",
-    "frontendDist": "https://alook.ai/workspaces?auto"
+    "frontendDist": "https://onecaptain.ai/workspaces?auto"
   },
   "bundle": {
     "active": true,
@@ -27,7 +27,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Alook",
+        "title": "OneCaptain",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -49,22 +49,22 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://alook.ai/api/desktop/update/{{target}}/{{arch}}/{{current_version}}"
+        "https://onecaptain.ai/api/desktop/update/{{target}}/{{arch}}/{{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg4QUQ2RTkxNENEOTZGRDEKUldUUmI5bE1rVzZ0aUY5SGgxVmRjZkUxeTNUKzlpZC8rQXQ3R0xDTFBsUFV4Kzc0U3pXc3hRV1MK"
     },
     "deep-link": {
       "desktop": {
         "schemes": [
-          "alook"
+          "onecaptain"
         ]
       },
       "mobile": [
         {
           "scheme": [
-            "alook"
+            "onecaptain"
           ],
-          "host": "alook.ai"
+          "host": "onecaptain.ai"
         }
       ]
     }

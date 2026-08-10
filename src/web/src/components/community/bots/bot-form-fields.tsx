@@ -6,7 +6,7 @@ import { type AvatarDraft, BotAvatarPickerDialog } from "@/components/avatar"
 import {
   COMMUNITY_BOT_NAME_MAX,
   COMMUNITY_BOT_DESCRIPTION_MAX,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 /**
  * Shared Name/Description/Avatar block for the bot create and edit sheets —

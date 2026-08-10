@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useAgentContext } from "@/contexts/agent-context";
 import { useWorkspace } from "@/contexts/workspace-context";
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import { InboxPopover } from "@/components/inbox-popover";
 import { FlagPopover } from "@/components/flag-popover";
 import { Logo } from "@/components/logo";

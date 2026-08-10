@@ -53,7 +53,7 @@ const literata = Literata({
 });
 
 
-const SITE_URL = "https://alook.ai";
+const SITE_URL = "https://onecaptain.ai";
 const OG_IMAGE_URL = "/og?title=Rooms%20for%20people%20and%20agents";
 
 export const viewport: Viewport = {
@@ -72,45 +72,45 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Alook — Rooms for people and agents",
-    template: "%s — Alook",
+    default: "OneCaptain — Rooms for people and agents",
+    template: "%s — OneCaptain",
   },
   description:
-    "Rooms for people and agents. Bring the agents you already use into Alook, running from your own machine.",
+    "Rooms for people and agents. Bring the agents you already use into OneCaptain, running from your own machine.",
   icons: {
     icon: [
       {
-        url: "/alook.svg",
+        url: "/onecaptain.svg",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/alook-dark.svg",
+        url: "/onecaptain-dark.svg",
         media: "(prefers-color-scheme: dark)",
       },
     ],
   },
   openGraph: {
     type: "website",
-    siteName: "Alook",
-    title: "Alook — Rooms for people and agents",
+    siteName: "OneCaptain",
+    title: "OneCaptain — Rooms for people and agents",
     description:
-      "Rooms for people and agents. Bring the agents you already use into Alook, running from your own machine.",
+      "Rooms for people and agents. Bring the agents you already use into OneCaptain, running from your own machine.",
     url: SITE_URL,
     images: [
       {
         url: OG_IMAGE_URL,
         width: 1200,
         height: 630,
-        alt: "Alook — Rooms for people and agents",
+        alt: "OneCaptain — Rooms for people and agents",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@alook_ai",
-    title: "Alook — Rooms for people and agents",
+    site: "@onecaptain_ai",
+    title: "OneCaptain — Rooms for people and agents",
     description:
-      "Rooms for people and agents. Bring the agents you already use into Alook, running from your own machine.",
+      "Rooms for people and agents. Bring the agents you already use into OneCaptain, running from your own machine.",
     images: [OG_IMAGE_URL],
   },
   alternates: {
@@ -154,7 +154,7 @@ export default function RootLayout({
               {
                 "@context": "https://schema.org",
                 "@type": "WebApplication",
-                name: "Alook",
+                name: "OneCaptain",
                 url: SITE_URL,
                 description:
                   "Rooms for people and agents, with the agents you already use running from your own machine.",
@@ -169,12 +169,12 @@ export default function RootLayout({
               {
                 "@context": "https://schema.org",
                 "@type": "Organization",
-                name: "Alook",
+                name: "OneCaptain",
                 url: SITE_URL,
-                logo: `${SITE_URL}/alook.svg`,
+                logo: `${SITE_URL}/onecaptain.svg`,
                 contactPoint: {
                   "@type": "ContactPoint",
-                  email: "support@alook.ai",
+                  email: "support@onecaptain.ai",
                   contactType: "customer support",
                 },
               },

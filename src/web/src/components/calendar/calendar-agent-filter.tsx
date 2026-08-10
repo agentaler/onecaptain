@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import { agentColor } from "./calendar-month-grid";
 

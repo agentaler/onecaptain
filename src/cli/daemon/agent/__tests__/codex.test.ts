@@ -145,8 +145,8 @@ describe("CodexBackend", () => {
     const initWrite = mock.stdinWrites.find((w) => w.includes('"initialize"'));
     expect(initWrite).toBeDefined();
     const parsed = JSON.parse(initWrite!);
-    expect(parsed.params.clientInfo.name).toBe("alook-daemon");
-    expect(parsed.params.clientInfo.title).toBe("Alook Agent SDK");
+    expect(parsed.params.clientInfo.name).toBe("onecaptain-daemon");
+    expect(parsed.params.clientInfo.title).toBe("OneCaptain Agent SDK");
     expect(parsed.params.capabilities.experimentalApi).toBe(true);
     expect(parsed.id).toBe(1);
 

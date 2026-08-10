@@ -42,7 +42,7 @@ function walk(dir: string, acc: string[] = []): string[] {
 
 describe("createCommunityMessage caller allowlist (③ shrink-gate)", () => {
   it("only the intended doors call createCommunityMessage — no flat-verb / bypass caller", () => {
-    // Resolve @alook/web's `src` regardless of vitest cwd (repo root vs package).
+    // Resolve @onecaptain/web's `src` regardless of vitest cwd (repo root vs package).
     // This file is at src/lib/community/, so climb two levels to `src`.
     const srcRoot = join(__dirname, "..", "..")
     const files = walk(srcRoot)

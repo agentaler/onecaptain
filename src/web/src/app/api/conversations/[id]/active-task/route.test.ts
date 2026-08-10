@@ -10,7 +10,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
 }));
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   createDb: vi.fn(() => ({})),
   createLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
   TASK_TYPES: { USER_DM_MESSAGE: "user_dm_message", KILL_TASK: "kill_task" },

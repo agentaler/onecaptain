@@ -16,8 +16,8 @@ vi.mock("@/lib/db", () => ({ getDb: (...a: unknown[]) => mockGetDb(...a) }))
 
 const mockGetChannelType = vi.fn()
 const mockCreatePendingAttachment = vi.fn()
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -49,7 +49,7 @@ import {
   handleBotAvatarUpload,
   runAttachmentUpload,
 } from "./upload"
-import { MAX_ATTACHMENT_SIZE_BYTES, MAX_SERVER_ICON_SIZE_BYTES } from "@alook/shared"
+import { MAX_ATTACHMENT_SIZE_BYTES, MAX_SERVER_ICON_SIZE_BYTES } from "@onecaptain/shared"
 
 function envWithR2(put: ReturnType<typeof vi.fn>) {
   return { COMMUNITY_MEDIA: { put } } as unknown as Env

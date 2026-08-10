@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Message } from "@alook/shared";
+import type { Message } from "@onecaptain/shared";
 import { getCachedMessages, mergeCachedMessages, openCacheDB } from "@/lib/chat-cache";
 
 interface UseCachedMessagesResult {

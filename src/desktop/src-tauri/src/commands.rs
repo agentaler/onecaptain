@@ -78,7 +78,7 @@ fn cli_config() -> CliConfig {
     } else {
         CliConfig {
             command: "npx",
-            base_args: &["@alook/cli"],
+            base_args: &["@onecaptain/cli"],
             env: vec![],
             cwd: None,
         }
@@ -172,7 +172,7 @@ pub fn create_splash_window(app: &tauri::App) -> Result<(), Box<dyn std::error::
     use tauri::{WebviewUrl, WebviewWindowBuilder};
 
     WebviewWindowBuilder::new(app, "splash", WebviewUrl::CustomProtocol("splash://index".parse()?))
-        .title("Alook")
+        .title("OneCaptain")
         .inner_size(200.0, 200.0)
         .center()
         .decorations(false)
@@ -259,7 +259,7 @@ pub fn fatal_exit(handle: &AppHandle, msg: &str) {
     let h = handle.clone();
     handle.dialog()
         .message(msg)
-        .title("Alook — Fatal Error")
+        .title("OneCaptain — Fatal Error")
         .buttons(MessageDialogButtons::OkCustom("Quit".into()))
         .show(move |_| {
             h.exit(1);
@@ -350,14 +350,14 @@ pub async fn cli_update(app: AppHandle) -> Result<CommandResult, String> {
     let mut stop_cmd = app.shell().command("npx");
     stop_cmd = stop_cmd.env("PATH", resolve_path());
     let _ = stop_cmd
-        .args(["--yes", "@alook/cli", "daemon", "stop"])
+        .args(["--yes", "@onecaptain/cli", "daemon", "stop"])
         .output()
         .await;
 
     let mut start_cmd = app.shell().command("npx");
     start_cmd = start_cmd.env("PATH", resolve_path());
     let start_output = start_cmd
-        .args(["--yes", "@alook/cli@latest", "daemon", "start"])
+        .args(["--yes", "@onecaptain/cli@latest", "daemon", "start"])
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -577,7 +577,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .icon_as_template(true)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("Alook")
+        .tooltip("OneCaptain")
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
@@ -640,7 +640,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                                 };
                                 let _ = h2.notification()
                                     .builder()
-                                    .title("Alook")
+                                    .title("OneCaptain")
                                     .body(&msg)
                                     .show();
                             }
@@ -650,7 +650,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             if restart_attempts == 0 {
                                 let _ = h2.notification()
                                     .builder()
-                                    .title("Alook")
+                                    .title("OneCaptain")
                                     .body(&format!("Could not restart daemon: {}", e))
                                     .show();
                             }
@@ -704,7 +704,7 @@ pub fn quit_with_daemon_prompt(handle: &AppHandle) {
     let h = handle.clone();
     handle.dialog()
         .message(msg)
-        .title("Quit Alook")
+        .title("Quit OneCaptain")
         .buttons(MessageDialogButtons::OkCancelCustom("Quit".into(), "Cancel".into()))
         .show(move |confirmed| {
             if !confirmed { return; }
@@ -730,7 +730,7 @@ async fn do_install_update(handle: &AppHandle) {
     if UPDATE_IN_PROGRESS.swap(true, Ordering::SeqCst) {
         handle.dialog()
             .message("An update is already in progress.")
-            .title("Alook")
+            .title("OneCaptain")
             .buttons(MessageDialogButtons::OkCustom("OK".into()))
             .show(|_| {});
         return;
@@ -776,7 +776,7 @@ async fn do_install_update(handle: &AppHandle) {
 
             let _ = handle.notification()
                 .builder()
-                .title("Alook")
+                .title("OneCaptain")
                 .body(&format!("Downloading v{}...", version))
                 .show();
 
@@ -865,7 +865,7 @@ pub fn auto_check_updates(handle: AppHandle) {
                     drop(guard);
                     let _ = handle.notification()
                         .builder()
-                        .title("Alook Update Available")
+                        .title("OneCaptain Update Available")
                         .body(&format!("Version {} is ready to install. Use the tray menu to update.", version))
                         .show();
                 }
@@ -1001,7 +1001,7 @@ mod tests {
             assert!(cfg.cwd.is_some());
         } else {
             assert_eq!(cfg.command, "npx");
-            assert_eq!(args, vec!["@alook/cli", "register", "--token"]);
+            assert_eq!(args, vec!["@onecaptain/cli", "register", "--token"]);
             assert!(cfg.cwd.is_none());
         }
     }
@@ -1015,7 +1015,7 @@ mod tests {
         if cfg!(debug_assertions) {
             assert_eq!(args, vec!["dev:cli", "daemon", "start"]);
         } else {
-            assert_eq!(args, vec!["@alook/cli", "daemon", "start"]);
+            assert_eq!(args, vec!["@onecaptain/cli", "daemon", "start"]);
         }
     }
 
@@ -1028,7 +1028,7 @@ mod tests {
         if cfg!(debug_assertions) {
             assert_eq!(args, vec!["dev:cli", "daemon", "status"]);
         } else {
-            assert_eq!(args, vec!["@alook/cli", "daemon", "status"]);
+            assert_eq!(args, vec!["@onecaptain/cli", "daemon", "status"]);
         }
     }
 
@@ -1041,7 +1041,7 @@ mod tests {
         if cfg!(debug_assertions) {
             assert_eq!(args, vec!["dev:cli", "--version"]);
         } else {
-            assert_eq!(args, vec!["@alook/cli", "--version"]);
+            assert_eq!(args, vec!["@onecaptain/cli", "--version"]);
         }
     }
 }

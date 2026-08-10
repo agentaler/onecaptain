@@ -1,4 +1,4 @@
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 import { apiFetch, wsQuery } from "./client";
 
 export const listArtifacts = (conversationId: string, workspaceId: string) =>

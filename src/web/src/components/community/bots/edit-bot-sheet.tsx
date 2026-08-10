@@ -32,6 +32,7 @@ import { useUpdateBot, useUploadBotAvatar, type BotSummary } from "@/hooks/commu
 import { useMachines } from "@/hooks/community/use-machines"
 import { BotFormFields } from "./bot-form-fields"
 import { BotRuntimeFields } from "./bot-runtime-fields"
+import { CloudProviderField, type CloudProviderPatch } from "./cloud-provider-field"
 import { validateBotModel } from "./bot-form-validation"
 import { uniqueNamesGenerator, names } from "unique-names-generator"
 import { normalizeRuntimes } from "./create-bot-sheet"
@@ -62,6 +63,7 @@ export function EditBotSheet({
   const [model, setModel] = useState<string | null>(bot?.modelName ?? null)
   const [runtime, setRuntime] = useState(bot?.runtime ?? "")
   const [confirmProviderSwitch, setConfirmProviderSwitch] = useState(false)
+  const [providerPatch, setProviderPatch] = useState<CloudProviderPatch>(undefined)
   const [nameError, setNameError] = useState<string | undefined>(undefined)
   const [avatarDraft, setAvatarDraft] = useState<AvatarDraft>(() =>
     bot ? draftFromBot(bot) : { kind: "procedural", image: serializeBeamSeed("initial") },
@@ -94,6 +96,7 @@ export function EditBotSheet({
     setAvatarDraft(draftFromBot(bot))
     setNameError(undefined)
     setConfirmProviderSwitch(false)
+    setProviderPatch(undefined)
   }, [open, bot])
 
   function updateName(value: string) {
@@ -132,6 +135,7 @@ export function EditBotSheet({
         // never triggers a stop-and-rewake.
         ...(modelChanged ? { model } : {}),
         ...(runtimeChanged ? { runtime } : {}),
+        ...(providerPatch !== undefined ? { provider: providerPatch } : {}),
       })
       let avatarFailed = false
       if (avatarDraft.kind === "photo" && avatarDraft.file) {
@@ -203,6 +207,13 @@ export function EditBotSheet({
               model={model}
               onRuntimeChange={setRuntime}
               onModelChange={setModel}
+            />
+          )}
+          {bot && (
+            <CloudProviderField
+              savedKind={bot.providerKind}
+              hasSavedKey={bot.hasProviderKey}
+              onChange={setProviderPatch}
             />
           )}
         </SheetBody>

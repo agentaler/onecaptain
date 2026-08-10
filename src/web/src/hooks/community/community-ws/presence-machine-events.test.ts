@@ -4,7 +4,7 @@ import type {
   CommunityMachineStatus,
   CommunityPresenceUpdate,
   CommunityStatusUpdate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import {
   capturedOnMessage,

@@ -102,9 +102,9 @@ describe("createPiSdkDriverDeps — buildSpawnEnv", () => {
 
     const env = await deps.buildSpawnEnv();
 
-    expect(env.ALOOK_PROXY_URL).toBe("http://127.0.0.1:9/proxy");
-    expect(env.ALOOK_PROXY_TOKEN_FILE).toBeTruthy();
-    expect((env.PATH ?? "").split(path.delimiter)[0]).toContain(path.join(".alook", "bin"));
+    expect(env.ONECAPTAIN_PROXY_URL).toBe("http://127.0.0.1:9/proxy");
+    expect(env.ONECAPTAIN_PROXY_TOKEN_FILE).toBeTruthy();
+    expect((env.PATH ?? "").split(path.delimiter)[0]).toContain(path.join(".onecaptain", "bin"));
   });
 });
 
@@ -223,7 +223,7 @@ describe("createPiSdkDriverDeps — createAgentSession", () => {
     const fake = fakeSdk();
     const ctx = baseCtx();
     const deps = createPiSdkDriverDeps(ctx, fake.loader);
-    const spawnEnv = { ALOOK_PROXY_URL: "http://proxy" };
+    const spawnEnv = { ONECAPTAIN_PROXY_URL: "http://proxy" };
 
     await deps.createAgentSession({ cwd: ctx.workingDirectory, spawnEnv });
 
@@ -235,7 +235,7 @@ describe("createPiSdkDriverDeps — createAgentSession", () => {
       spawnHook: (c: { command: string; cwd: string; env: NodeJS.ProcessEnv }) => { env: NodeJS.ProcessEnv };
     };
     const result = spawnHook({ command: "ls", cwd: "/tmp", env: { PATH: "/usr/bin" } });
-    expect(result.env).toEqual({ PATH: "/usr/bin", ALOOK_PROXY_URL: "http://proxy" });
+    expect(result.env).toEqual({ PATH: "/usr/bin", ONECAPTAIN_PROXY_URL: "http://proxy" });
   });
 
   it("returns the sessionId from session.sessionId when createAgentSession doesn't return one directly", async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const mockDispatchOneUnreadWake = vi.fn()
 const mockCreateDb = vi.fn((..._a: unknown[]) => ({ __db: true }))
-vi.mock("@alook/shared", () => {
+vi.mock("@onecaptain/shared", () => {
   const noopLogger = { debug: () => { }, info: () => { }, warn: () => { }, error: () => { }, child() { return this } }
   return {
     createLogger: () => noopLogger,

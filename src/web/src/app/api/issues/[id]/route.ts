@@ -4,7 +4,7 @@ import {
   UpdateIssueRequestSchema,
   TASK_TYPES,
   queries,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { nanoid } from "nanoid";
 import { getDb } from "@/lib/db";
 import { withAuth } from "@/lib/middleware/auth";

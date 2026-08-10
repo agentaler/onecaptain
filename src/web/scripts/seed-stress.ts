@@ -5,11 +5,11 @@
  * — it is not wired into CI and ships nothing to prod.
  *
  * Usage:
- *   pnpm --filter @alook/web seed:stress [--servers=30] [--channels=40] \
+ *   pnpm --filter @onecaptain/web seed:stress [--servers=30] [--channels=40] \
  *     [--messages=60] [--server-url=http://localhost:3000] [--owner=perf-seed]
  *
  * Prerequisites:
- *   - The local dev stack is running (`pnpm --filter @alook/web dev`).
+ *   - The local dev stack is running (`pnpm --filter @onecaptain/web dev`).
  *
  * Identity pinning (why this doesn't reuse the e2e `.auth` state):
  *   The Playwright e2e `global-setup` registers a NEW stamped user each run, so
@@ -33,7 +33,7 @@
 import { parseArgs } from "node:util"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { DEV_PASSWORD, slugify } from "@alook/shared"
+import { DEV_PASSWORD, slugify } from "@onecaptain/shared"
 import { log } from "../src/lib/logger"
 
 export interface SeedStressOptions {
@@ -341,7 +341,7 @@ async function topUpMessages(
 
 export async function runSeedStress(opts: SeedStressOptions): Promise<SeedManifest> {
   const client = new SeedClient(opts.serverUrl)
-  const email = `${opts.owner}@alook.test`
+  const email = `${opts.owner}@onecaptain.test`
 
   log.info("[seed] establishing stable identity", { email })
   await client.authenticate(email)

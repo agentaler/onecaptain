@@ -19,14 +19,14 @@ describe("useFolders / foldersQueryFn", () => {
           id: "fld_1",
           name: "Group",
           position: 2,
-          servers: [{ id: "srv_1", name: "Alook", icon: null }],
+          servers: [{ id: "srv_1", name: "OneCaptain", icon: null }],
         },
       ],
     })
     const { foldersQueryFn } = await import("./use-folders")
     const data = await foldersQueryFn()
     expect(apiFetchMock).toHaveBeenCalledWith("/api/community/users/me/server-folders")
-    expect(data.folders[0].servers[0].initial).toBe("A")
+    expect(data.folders[0].servers[0].initial).toBe("O")
     expect(data.folders[0].position).toBe(2)
   })
 

@@ -4,7 +4,7 @@ import {
   CommunityDaemonEnrollAgentRequestSchema,
   type CommunityDaemonEnrollAgentResponse,
   withD1Retry,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityDaemonAuth } from "@/lib/middleware/community-daemon-auth"
 

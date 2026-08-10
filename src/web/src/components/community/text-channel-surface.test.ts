@@ -22,7 +22,7 @@ vi.mock("next/navigation", () => ({
 }))
 vi.mock("sonner", () => ({ toast: vi.fn() }))
 vi.mock("@/lib/api/client", () => ({ apiFetch: vi.fn(), toastApiError: vi.fn() }))
-vi.mock("@alook/shared", () => ({ deriveThreadName: () => "thread" }))
+vi.mock("@onecaptain/shared", () => ({ deriveThreadName: () => "thread" }))
 vi.mock("@/stores/community", () => {
   const state = {
     pendingReply: null,

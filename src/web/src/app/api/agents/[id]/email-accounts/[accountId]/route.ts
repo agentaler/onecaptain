@@ -1,6 +1,6 @@
-import { queries, UpdateEmailAccountSchema, DEV_EMAIL_WORKER_URL } from "@alook/shared"
+import { queries, UpdateEmailAccountSchema, DEV_EMAIL_WORKER_URL } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
-import { encrypt } from "@alook/shared/crypto"
+import { encrypt } from "@onecaptain/shared/crypto"
 import { withAuth } from "@/lib/middleware/auth"
 import { withWorkspaceMember } from "@/lib/middleware/workspace"
 import { writeJSON, writeError, parseBody, formatTimestamp, formatTimestampNullable } from "@/lib/middleware/helpers"

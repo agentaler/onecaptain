@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import type { HostCommand, UnreadNotice } from "../community-cli-contract";
-import { makeRuntimeConfig } from "../runtime-config";
+import { makeRuntimeConfig, type ProviderConfig } from "../runtime-config";
 import { resolveModelConfig } from "./bot-model";
+import { resolveProviderConfig } from "./bot-provider";
 import { formatHandle } from "../lib/discriminator";
 import { utcDayKey } from "../utils/day-key";
 import * as message from "../db/queries/community/message";
@@ -16,8 +17,8 @@ import type { Database } from "../db/index";
 
 /**
  * Deliberately NOT `@cloudflare/workers-types`' `Fetcher` — this module is
- * imported (transitively, via the `@alook/shared` barrel) by non-Workers
- * consumers too (`@alook/cli`, `@alook/daemon`), whose tsconfigs don't
+ * imported (transitively, via the `@onecaptain/shared` barrel) by non-Workers
+ * consumers too (`@onecaptain/cli`, `@onecaptain/daemon`), whose tsconfigs don't
  * include `@cloudflare/workers-types` in `types`. A real `Fetcher` service
  * binding satisfies this structurally at the two real call sites
  * (`src/web`, `src/wake-worker`, both of which DO have workers-types).
@@ -28,6 +29,53 @@ interface FetcherLike {
 
 interface WakeDispatchEnv {
   WS_DO_WORKER: FetcherLike;
+  /**
+   * Secret for decrypting a bot's stored cloud-provider API key
+   * (`community_bot_binding.provider_api_key_enc`). Optional so unit tests
+   * and legacy deploys without the secret keep working — a wake for a bot
+   * with a stored key but no decryption secret degrades to the runtime's
+   * own auth (with a warn), never to a failed wake.
+   */
+  ENCRYPTION_KEY?: string;
+}
+
+/**
+ * Decrypt + resolve a bot's stored provider attachment into the
+ * `ProviderConfig` the daemon consumes. `node:crypto` is loaded lazily so
+ * this module stays importable from browser bundles via the shared barrel —
+ * only server-side callers (Workers with nodejs_compat) ever reach the
+ * import. Any decrypt failure degrades to `undefined` (runtime default).
+ */
+async function resolveWakeProviderConfig(
+  botCtx: {
+    botUserId: string;
+    providerKind: string | null;
+    providerApiUrl: string | null;
+    providerApiKeyEnc: string | null;
+  },
+  env: WakeDispatchEnv | undefined
+): Promise<ProviderConfig | undefined> {
+  if (!botCtx.providerKind || !botCtx.providerApiKeyEnc) return undefined;
+  if (!env?.ENCRYPTION_KEY) {
+    // eslint-disable-next-line no-console
+    console.warn("wake_provider_no_encryption_key", { botUserId: botCtx.botUserId });
+    return undefined;
+  }
+  try {
+    const { decrypt } = await import("../utils/crypto");
+    return resolveProviderConfig({
+      providerKind: botCtx.providerKind,
+      providerApiUrl: botCtx.providerApiUrl,
+      apiKey: decrypt(botCtx.providerApiKeyEnc, env.ENCRYPTION_KEY),
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("wake_provider_key_decrypt_failed", {
+      botUserId: botCtx.botUserId,
+      err: String(err),
+    });
+    return undefined;
+  }
 }
 
 /**
@@ -50,7 +98,7 @@ export interface WakePayload {
  * context — this module does a plain `Fetcher.fetch`, nothing
  * CF-Workers-Next.js-specific.
  *
- * `env.WS_DO_WORKER` is a service binding to the `alook-ws-do` worker's HTTP
+ * `env.WS_DO_WORKER` is a service binding to the `onecaptain-ws-do` worker's HTTP
  * surface (never a raw DO namespace — `src/web`/`src/wake-worker` cannot
  * fetch a DO stub directly). This function POSTs an already-fully-built
  * `HostCommand` to that worker's `/community-machine/by-id/<machineId>/forward-agent-wake`
@@ -166,6 +214,7 @@ export async function buildUnreadWakeCommand(
   const config = makeRuntimeConfig({
     runtime: botCtx.runtime,
     model: resolveModelConfig(botCtx.runtime, botCtx.modelName),
+    provider: await resolveWakeProviderConfig(botCtx, env),
     agentName: botCtx.name,
     agentHandle: `@${formatHandle(botCtx.name, botCtx.discriminator)}`,
   });
@@ -303,7 +352,7 @@ export type DispatchOneWakeResult =
  */
 export async function dispatchOneUnreadWake(
   db: Database,
-  env: { WS_DO_WORKER: FetcherLike },
+  env: WakeDispatchEnv,
   input: { messageId: string; botUserId: string }
 ): Promise<DispatchOneWakeResult> {
   const result = await buildUnreadWakeCommand(db, input, env);

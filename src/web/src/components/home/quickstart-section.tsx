@@ -70,7 +70,7 @@ export function QuickstartSection() {
             opacity: 0.6,
           }}
         >
-          Open Source & Self-Hosted
+          Your Agents, Your Control
         </div>
         <h2
           style={{
@@ -91,8 +91,9 @@ export function QuickstartSection() {
             opacity: 0.65,
           }}
         >
-          Alook is fully open source. Self-host the entire platform, keep
-          your data private, and run your AI company on hardware you control.
+          Run agents on your own machines with local runtimes, or on cloud
+          models with your own API keys. Your codebase stays on hardware you
+          control.
         </p>
       </div>
 
@@ -130,7 +131,7 @@ export function QuickstartSection() {
               textShadow: "0 0 6px oklch(0.75 0.18 80 / 30%)",
             }}
           >
-            $ npx @alook/app onboard
+            $ npx @onecaptain/app onboard
           </code>
         </div>
       </div>

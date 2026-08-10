@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, WS_EVENTS, isThread, PARTICIPANT_SOURCE } from "@alook/shared"
+import { queries, WS_EVENTS, isThread, PARTICIPANT_SOURCE } from "@onecaptain/shared"
 import { broadcastToUserSafe } from "@/lib/community/fanout"
 import { requireChannelAccess } from "@/lib/community/permissions"
 

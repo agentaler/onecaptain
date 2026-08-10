@@ -6,7 +6,7 @@ export function runMigrations(): void {
   const webDir = join(SELF_HOSTED_DIR, "web");
   console.log("Running database migrations...");
   try {
-    const output = execSync("npx wrangler d1 migrations apply alook-app --local", {
+    const output = execSync("npx wrangler d1 migrations apply onecaptain-app --local", {
       cwd: webDir,
       stdio: ["pipe", "pipe", "pipe"],
     });

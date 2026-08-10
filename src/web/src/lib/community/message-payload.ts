@@ -14,8 +14,8 @@
  * embeds pass-through, and mentionType projection so adding/removing a
  * field on the wire is one edit, not four.
  */
-import { truncateMessagePreview, type MentionType } from "@alook/shared"
-import type { FriendApprovalPayload } from "@alook/shared"
+import { truncateMessagePreview, type MentionType } from "@onecaptain/shared"
+import type { FriendApprovalPayload } from "@onecaptain/shared"
 import { avatarInitial } from "@/lib/community/avatar"
 
 // The subset of fields on rows returned by

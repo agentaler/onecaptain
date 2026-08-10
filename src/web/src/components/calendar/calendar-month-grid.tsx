@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { CalendarEvent, Agent } from "@alook/shared";
+import type { CalendarEvent, Agent } from "@onecaptain/shared";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CalendarDayPopover } from "./calendar-day-popover";

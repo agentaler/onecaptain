@@ -533,7 +533,7 @@ describe("createProxyServerApi — callDownload", () => {
       return bufferResponse(bytes, {
         "content-type": "image/png",
         "content-length": String(bytes.length),
-        "x-alook-filename": encodeURIComponent("hi.png"),
+        "x-onecaptain-filename": encodeURIComponent("hi.png"),
       });
     });
     const api = createProxyServerApi({ ...cfg, fetchImpl: fetchWithCapture as typeof fetch });
@@ -602,7 +602,7 @@ describe("createProxyServerApi — friendRequest / listFriends", () => {
     });
     const api = createProxyServerApi({ ...cfg, fetchImpl: fetchImpl as typeof fetch });
     const res = await api.listFriends({ agentId: "a1" as never });
-    // Composed the flat 3-bucket shape `alook friend list` renders — CLI unchanged.
+    // Composed the flat 3-bucket shape `onecaptain friend list` renders — CLI unchanged.
     expect(res).toEqual({
       accepted: [{ userId: "u1", handle: "A#1" }],
       pendingIncoming: [{ userId: "u2", handle: "B#2" }],

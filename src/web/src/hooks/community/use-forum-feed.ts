@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query"
-import { DEFAULT_MESSAGE_PAGE_SIZE } from "@alook/shared"
+import { DEFAULT_MESSAGE_PAGE_SIZE } from "@onecaptain/shared"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import { avatarInitial } from "@/lib/community/avatar"

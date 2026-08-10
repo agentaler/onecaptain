@@ -1,5 +1,5 @@
 /**
- * `alook daemon start|stop|list` — daemon lifecycle commands.
+ * `onecaptain daemon start|stop|list` — daemon lifecycle commands.
  *
  * Multiple daemons can run on one physical machine — each machine key represents
  * one logical machine on the server side. Per-key pidfiles at
@@ -14,7 +14,7 @@ import { WebSocket } from "ws";
 import { createDaemon } from "../daemon/createDaemon.js";
 import type { DaemonStatusSnapshot } from "../util/statusFile.js";
 import { getDriver, listRuntimeIds } from "../drivers/index.js";
-import { resolveAlookCliPathWithFallback, detectRuntimes, type RuntimeInfo } from "../discovery.js";
+import { resolveOneCaptainCliPathWithFallback, detectRuntimes, type RuntimeInfo } from "../discovery.js";
 import { createLogger } from "../logger.js";
 import { UnknownRuntimeError } from "../manager/agentRouter.js";
 import { readDaemonVersion } from "../version.js";
@@ -34,13 +34,13 @@ const POLL_MS = 100;
 const MACHINE_KEY_HASH_PREFIX_LEN = 12;
 
 function resolveDefaultBaseDir(): string {
-  const root = process.env.ALOOK_PROJECT_ROOT || path.join(homedir(), ".alook");
+  const root = process.env.ONECAPTAIN_PROJECT_ROOT || path.join(homedir(), ".onecaptain");
   return path.join(root, "daemon");
 }
 
 export const DEFAULT_BASE_DIR = resolveDefaultBaseDir();
 
-const log = createLogger({ header: "@alook/daemon" });
+const log = createLogger({ header: "@onecaptain/daemon" });
 
 /* ------------------------------------------------------------------ */
 /* Per-key pidfile helpers                                              */
@@ -195,7 +195,7 @@ export interface DaemonInfo {
 }
 
 export function daemonList(opts: DaemonListOpts): DaemonInfo[] {
-  const baseDir = opts.baseDir || process.env.ALOOK_DATA_DIR || DEFAULT_BASE_DIR;
+  const baseDir = opts.baseDir || process.env.ONECAPTAIN_DATA_DIR || DEFAULT_BASE_DIR;
   const dir = daemonsDir(baseDir);
   if (!fs.existsSync(dir)) return [];
 
@@ -318,7 +318,7 @@ function daemonIdsWithStatus(baseDir: string): string[] {
 }
 
 export function daemonStatus(opts: DaemonStatusOpts): DaemonStatusResult {
-  const baseDir = opts.baseDir || process.env.ALOOK_DATA_DIR || DEFAULT_BASE_DIR;
+  const baseDir = opts.baseDir || process.env.ONECAPTAIN_DATA_DIR || DEFAULT_BASE_DIR;
   const nowMs = (opts.now ?? (() => Date.now()))();
   // Explicit id → that daemon's per-key status.
   if (opts.id) {
@@ -383,13 +383,13 @@ async function stopByPidfile(pf: string, notFoundHint: string): Promise<void> {
 }
 
 export async function daemonStop(opts: DaemonStopOpts): Promise<void> {
-  const baseDir = opts.baseDir || process.env.ALOOK_DATA_DIR || DEFAULT_BASE_DIR;
+  const baseDir = opts.baseDir || process.env.ONECAPTAIN_DATA_DIR || DEFAULT_BASE_DIR;
   // Stop by the id `daemon list` shows — it IS the daemon's subdir name, so it
   // resolves the pidfile directly. The machine key (a credential) never enters
   // the human's stop command (red line 2): `daemon stop <id>`.
   await stopByPidfile(
     path.join(daemonDirById(baseDir, opts.id), "daemon.pid"),
-    `no daemon with id '${opts.id}' (pidfile not found — check \`alook daemon list\`)`,
+    `no daemon with id '${opts.id}' (pidfile not found — check \`onecaptain daemon list\`)`,
   );
 }
 
@@ -489,19 +489,19 @@ async function activatePairingToken(
 }
 
 export async function daemonStart(opts: DaemonStartOpts): Promise<void> {
-  const serverUrl = opts.serverUrl || process.env.ALOOK_SERVER_URL;
-  const wsUrl = opts.wsUrl || process.env.ALOOK_SERVER_WS_URL;
+  const serverUrl = opts.serverUrl || process.env.ONECAPTAIN_SERVER_URL;
+  const wsUrl = opts.wsUrl || process.env.ONECAPTAIN_SERVER_WS_URL;
 
   if (!serverUrl) {
-    log.error("Server URL required — pass --server-url or set ALOOK_SERVER_URL");
+    log.error("Server URL required — pass --server-url or set ONECAPTAIN_SERVER_URL");
     process.exit(2);
   }
   if (!wsUrl) {
-    log.error("WebSocket URL required — pass --ws-url or set ALOOK_SERVER_WS_URL");
+    log.error("WebSocket URL required — pass --ws-url or set ONECAPTAIN_SERVER_WS_URL");
     process.exit(2);
   }
 
-  const baseDir = opts.baseDir || process.env.ALOOK_DATA_DIR || DEFAULT_BASE_DIR;
+  const baseDir = opts.baseDir || process.env.ONECAPTAIN_DATA_DIR || DEFAULT_BASE_DIR;
 
   // Two-stage locking (C0.1): the daemon dir/pidfile anchor on the stable
   // machineId, which for a `cmt_` start isn't known until after async
@@ -516,7 +516,7 @@ export async function daemonStart(opts: DaemonStartOpts): Promise<void> {
   const coarsePf = isPairingStart ? acquireCoarseLock(baseDir) : null;
   let pf: string | null = null;
 
-  const agentCliPath = resolveAlookCliPathWithFallback() ?? process.argv[1];
+  const agentCliPath = resolveOneCaptainCliPathWithFallback() ?? process.argv[1];
 
   // Detect installed agent CLIs. The list is reported to the server on
   // `ready` so the machine card can show a chip per CLI (with version).
@@ -655,7 +655,7 @@ export async function daemonStart(opts: DaemonStartOpts): Promise<void> {
     // <baseDir> path — so multiple daemons on one baseDir never interleave their
     // traces or clobber each other's status.json, and each daemon's trace gets
     // its OWN rotation budget (restoring T4's ≥12h-per-daemon retention). The
-    // ALOOK_FSM_TRACE env override (createDaemon) still wins for deep dives.
+    // ONECAPTAIN_FSM_TRACE env override (createDaemon) still wins for deep dives.
     fsmTraceDir: daemonDirById(baseDir, daemonIdentity),
     statusFilePath: statusFilePathById(baseDir, daemonIdentity),
     hostname: os.hostname(),

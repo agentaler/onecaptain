@@ -5,7 +5,7 @@ import { nanoid } from "nanoid"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import type { ServerDetail } from "@/hooks/community/use-servers"
-import { UNCATEGORIZED_CATEGORY_ID, type ChannelType } from "@alook/shared"
+import { UNCATEGORIZED_CATEGORY_ID, type ChannelType } from "@onecaptain/shared"
 
 // Prefix marks an optimistic row so every consumer can tell it from a real
 // `ch_…` id without a separate flag, and guarantees it never collides with one.

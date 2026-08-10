@@ -6,7 +6,7 @@ import { useGSAP } from "@gsap/react"
 import { TileDefs, tileIds } from "./tile-defs"
 import { OT_EASE } from "./tile-motion"
 
-// "Local workspace" — the owning agent sits in the path title-bar (~/.alook/agent);
+// "Local workspace" — the owning agent sits in the path title-bar (~/.onecaptain/agent);
 // named files (memory.md / work.pdf / todo.md) are written into the dir one by
 // one, rest populated, then clear for the loop. No moving cursor.
 export function WorkspaceTile({ idPrefix = "ot-workspace" }: { idPrefix?: string }) {
@@ -40,7 +40,7 @@ export function WorkspaceTile({ idPrefix = "ot-workspace" }: { idPrefix?: string
     <svg ref={ref} viewBox="0 0 200 130" className="ot-svg h-full w-full">
       <TileDefs idPrefix={idPrefix} />
       <rect className="ot-art" x="20" y="20" width="160" height="100" rx="9" opacity="0.9" />
-      {/* title bar: [agent avatar] ~/.alook/agent — avatar (22px) & file icons (11px) share center-x=40 */}
+      {/* title bar: [agent avatar] ~/.onecaptain/agent — avatar (22px) & file icons (11px) share center-x=40 */}
       <svg x="29" y="30" width="22" height="22" viewBox="0 0 36 36">
         <g clipPath={`url(#${id.disc})`}>
           <use href={`#${id.faceA}`} />
@@ -50,7 +50,7 @@ export function WorkspaceTile({ idPrefix = "ot-workspace" }: { idPrefix?: string
         <circle cx="48" cy="49" r="4" fill="var(--card)" />
         <circle cx="48" cy="49" r="2.5" fill="var(--status-online)" />
       </g>
-      <text x="60" y="45" fontFamily="DM Mono, monospace" fontSize="10" fill="var(--foreground)">~/.alook/agent</text>
+      <text x="60" y="45" fontFamily="DM Mono, monospace" fontSize="10" fill="var(--foreground)">~/.onecaptain/agent</text>
       <line className="ot-art" x1="20" y1="58" x2="180" y2="58" opacity="0.35" />
       {files.map((f) => (
         <g key={f.cls} className={`ot-wfile ${f.cls}`} transform={`translate(34.5 ${f.ty})`}>

@@ -1,4 +1,4 @@
-import { eq, and, desc, or, exists, inArray } from "drizzle-orm";
+import { eq, and, desc, or, exists, inArray, count } from "drizzle-orm";
 import { agent, agentAccess } from "../schema";
 import type { Database } from "../index";
 import { isPublic } from "../../utils/visibility";
@@ -164,6 +164,14 @@ export async function getAgentsByIds(db: Database, ids: string[], workspaceId: s
     .select()
     .from(agent)
     .where(and(inArray(agent.id, ids), eq(agent.workspaceId, workspaceId)));
+}
+
+export async function countAgentsForWorkspace(db: Database, workspaceId: string): Promise<number> {
+  const rows = await db
+    .select({ n: count(agent.id) })
+    .from(agent)
+    .where(eq(agent.workspaceId, workspaceId));
+  return rows[0]?.n ?? 0;
 }
 
 export async function getAllAgentsForWorkspace(db: Database, workspaceId: string) {

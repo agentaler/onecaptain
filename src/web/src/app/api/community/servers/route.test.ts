@@ -10,8 +10,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -44,7 +44,7 @@ vi.mock("@/lib/middleware/helpers", () => {
 })
 
 import { POST } from "./route"
-import { WS_EVENTS, ROLES } from "@alook/shared"
+import { WS_EVENTS, ROLES } from "@onecaptain/shared"
 
 function postReq(body: unknown) {
   return new NextRequest("http://localhost/api/community/servers", {

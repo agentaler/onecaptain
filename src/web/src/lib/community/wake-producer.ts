@@ -5,7 +5,7 @@
  * botUserId }` payload per candidate off to a `WakeTransport`
  * (minimal-wake-queue-unread-notice plan §1/§5). Deliberately carries NO
  * `HostCommand`, `machineId`, runtime, or message content — the consumer
- * (real `alook-wake-worker`, in both transports — see `wake-transport.ts`)
+ * (real `onecaptain-wake-worker`, in both transports — see `wake-transport.ts`)
  * rebuilds the `agent:wake` command from CURRENT D1 state at consume time
  * (`dispatchOneUnreadWake`/`buildUnreadWakeCommand`), so a stale item never
  * wakes an old machine or carries stale content.
@@ -17,8 +17,8 @@
  * `wrangler dev`/`next dev` processes today).
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries, createLogger, withD1Retry } from "@alook/shared"
-import type { WakePayload } from "@alook/shared"
+import { queries, createLogger, withD1Retry } from "@onecaptain/shared"
+import type { WakePayload } from "@onecaptain/shared"
 import { getDb } from "../db"
 import { shouldDeliver } from "./notify"
 import { createQueueWakeTransport, createDevHttpWakeTransport } from "./wake-transport"

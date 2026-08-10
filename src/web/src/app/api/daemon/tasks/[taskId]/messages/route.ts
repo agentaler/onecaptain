@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb, withD1Retry } from "@/lib/db";
-import type { TaskMessageResponse } from "@alook/shared"
+import type { TaskMessageResponse } from "@onecaptain/shared"
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers";
 import { taskMessageToResponse } from "@/lib/api/responses";
-import { ReportMessagesRequestSchema } from "@alook/shared";
+import { ReportMessagesRequestSchema } from "@onecaptain/shared";
 import { broadcastToUser } from "@/lib/broadcast";
 import { log } from "@/lib/logger";
 

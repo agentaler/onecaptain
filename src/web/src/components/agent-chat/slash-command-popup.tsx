@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import type { SkillEntry } from "@alook/shared"
+import type { SkillEntry } from "@onecaptain/shared"
 import { cn } from "@/lib/utils"
 
 interface SlashCommandPopupProps {

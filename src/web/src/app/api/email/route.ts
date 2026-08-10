@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, toAlookAddress } from "@alook/shared";
+import { queries, toOneCaptainAddress } from "@onecaptain/shared";
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";
@@ -27,7 +27,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
 
   const folder = req.nextUrl.searchParams.get("folder");
   const address = req.nextUrl.searchParams.get("address");
-  const agentEmail = address || (agent.emailHandle ? toAlookAddress(agent.emailHandle) : "");
+  const agentEmail = address || (agent.emailHandle ? toOneCaptainAddress(agent.emailHandle) : "");
 
   const limitParam = req.nextUrl.searchParams.get("limit");
   const offsetParam = req.nextUrl.searchParams.get("offset");

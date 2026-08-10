@@ -1,6 +1,6 @@
 import { DEV_WEB_URL } from "./constants";
 
-export type AlookMode = "production" | "dev" | "app" | "desktop" | "mobile";
+export type OneCaptainMode = "production" | "dev" | "app" | "desktop" | "mobile";
 
 export interface ModeSignals {
   serverUrl?: string;
@@ -60,7 +60,7 @@ export async function tauriInvoke<T>(command: string, args?: Record<string, unkn
   return core.invoke(command, args);
 }
 
-export function resolveMode(signals: ModeSignals): AlookMode {
+export function resolveMode(signals: ModeSignals): OneCaptainMode {
   if (signals.tauri || isTauri()) {
     if (signals.tauriPlatform === "mobile" || isMobile()) return "mobile";
     return "desktop";
@@ -73,29 +73,29 @@ export function resolveMode(signals: ModeSignals): AlookMode {
   return "production";
 }
 
-export function cliCommand(mode: AlookMode): string {
+export function cliCommand(mode: OneCaptainMode): string {
   switch (mode) {
     case "dev":
       return "pnpm dev:cli";
     case "app":
-      return "npx @alook/app cli";
+      return "npx @onecaptain/app cli";
     case "desktop":
     case "mobile":
     case "production":
-      return "npx @alook/cli";
+      return "npx @onecaptain/cli";
   }
 }
 
-export function daemonCommand(mode: AlookMode): string {
+export function daemonCommand(mode: OneCaptainMode): string {
   const base = `${cliCommand(mode)} daemon start`;
   return mode === "dev" ? `${base} --foreground` : base;
 }
 
-export function cliPackageName(mode: AlookMode): string {
-  return mode === "app" ? "@alook/app" : "@alook/cli";
+export function cliPackageName(mode: OneCaptainMode): string {
+  return mode === "app" ? "@onecaptain/app" : "@onecaptain/cli";
 }
 
-export function updateCommand(mode: AlookMode): string {
+export function updateCommand(mode: OneCaptainMode): string {
   const pkg = cliPackageName(mode);
   if (mode === "app") {
     return `npx ${pkg} stop && npx ${pkg}@latest update && npx ${pkg} start`;
@@ -109,7 +109,7 @@ export interface BaseUrlSignals {
   nodeEnv?: string;
 }
 
-const DEFAULT_BASE_URL = "https://alook.ai";
+const DEFAULT_BASE_URL = "https://onecaptain.ai";
 
 export function getBaseUrl(signals: BaseUrlSignals): string {
   if (signals.serverUrl) return signals.serverUrl;

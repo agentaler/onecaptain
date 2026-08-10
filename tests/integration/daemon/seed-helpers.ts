@@ -15,8 +15,8 @@ import {
   type TestSeed,
   type PairedMachine,
   type SeededCommunityBot,
-} from "@alook/test-utils"
-import { computeDiscriminator, formatHandle } from "@alook/shared"
+} from "@onecaptain/test-utils"
+import { computeDiscriminator, formatHandle } from "@onecaptain/shared"
 
 export function nanoid() {
   return randomUUID().replace(/-/g, "").slice(0, 21)

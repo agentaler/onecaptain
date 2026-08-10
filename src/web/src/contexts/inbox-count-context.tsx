@@ -14,7 +14,7 @@ import { useAgentContext } from "@/contexts/agent-context";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { sendTaskNotification } from "@/lib/browser-notification";
 import { getInboxFilterTypes } from "@/lib/inbox-filter";
-import type { WsMessage } from "@alook/shared";
+import type { WsMessage } from "@onecaptain/shared";
 
 interface InboxCountContextValue {
   count: number;

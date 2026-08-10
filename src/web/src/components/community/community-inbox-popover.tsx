@@ -1,5 +1,5 @@
 import { Bookmark, ChevronRight, Inbox, MoreHorizontal, Trash2 } from "lucide-react"
-import { stripInlineMarkup } from "@alook/shared"
+import { stripInlineMarkup } from "@onecaptain/shared"
 import { EntityIcon } from "./entity-icon"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"

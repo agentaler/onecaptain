@@ -1,4 +1,4 @@
-import type { Channel } from "@alook/shared";
+import type { Channel } from "@onecaptain/shared";
 import { apiFetch, wsQuery } from "./client";
 
 export const listChannels = (workspaceId: string) =>

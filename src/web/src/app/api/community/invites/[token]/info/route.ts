@@ -1,7 +1,7 @@
 import { withOptionalAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { serverIconUrl } from "@/lib/community/storage"
 import { avatarInitial } from "@/lib/community/avatar"
 

@@ -50,8 +50,8 @@ export async function handleCliUpdate(
   if (updating) return;
   if (retryCount >= MAX_RETRIES) return;
 
-  if (process.env.ALOOK_CMD_PREFIX) {
-    log.info(`Skipping auto-update in app mode — user should run: npx @alook/app@latest update`);
+  if (process.env.ONECAPTAIN_CMD_PREFIX) {
+    log.info(`Skipping auto-update in app mode — user should run: npx @onecaptain/app@latest update`);
     return;
   }
 

@@ -2,9 +2,9 @@
  * Perf-diagnosis harness for community server/channel switching.
  *
  * ## Perf diagnosis (workflow)
- *   1. pnpm --filter @alook/web seed:stress          # heavy local dataset
- *   2. NEXT_PUBLIC_PERF_TRACE=1 pnpm --filter @alook/web dev
- *   3. pnpm --filter @alook/web perf:switch          # this spec + report
+ *   1. pnpm --filter @onecaptain/web seed:stress          # heavy local dataset
+ *   2. NEXT_PUBLIC_PERF_TRACE=1 pnpm --filter @onecaptain/web dev
+ *   3. pnpm --filter @onecaptain/web perf:switch          # this spec + report
  *   → perf-artifacts/switch-report.md
  *
  * Caveats:
@@ -33,7 +33,7 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test"
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { DEV_PASSWORD } from "@alook/shared"
+import { DEV_PASSWORD } from "@onecaptain/shared"
 import type {
   CacheState,
   CaptureFile,
@@ -41,7 +41,7 @@ import type {
   SwitchKind,
 } from "./perf-capture-types"
 
-const BASE_URL = process.env.ALOOK_SERVER_URL || "http://localhost:3000"
+const BASE_URL = process.env.ONECAPTAIN_SERVER_URL || "http://localhost:3000"
 const ARTIFACTS_DIR = resolve(__dirname, "..", "..", "..", "..", "perf-artifacts")
 const SEED_MANIFEST = resolve(ARTIFACTS_DIR, "seed-manifest.json")
 const CAPTURE_OUT = resolve(ARTIFACTS_DIR, "switch-events.json")
@@ -56,7 +56,7 @@ function loadManifest(): SeedManifest {
     return JSON.parse(readFileSync(SEED_MANIFEST, "utf8")) as SeedManifest
   } catch {
     throw new Error(
-      `Missing ${SEED_MANIFEST}. Run \`pnpm --filter @alook/web seed:stress\` first.`,
+      `Missing ${SEED_MANIFEST}. Run \`pnpm --filter @onecaptain/web seed:stress\` first.`,
     )
   }
 }
@@ -136,7 +136,7 @@ async function drainSwitch(page: Page, sinceTs: number, markName: string): Promi
       const marks = performance.getEntriesByName(markName, "mark")
       const clickTs = marks.length ? marks[marks.length - 1].startTime : sinceTs
 
-      const events = (window.__ALOOK_PERF__ || []).filter((e) => e.ts >= clickTs)
+      const events = (window.__ONECAPTAIN_PERF__ || []).filter((e) => e.ts >= clickTs)
       const commits = events
         .filter((e) => e.kind === "commit")
         .map((e) => {
@@ -187,7 +187,7 @@ async function drainSwitch(page: Page, sinceTs: number, markName: string): Promi
         commits,
         unmounts,
         layoutShifts,
-        degraded: window.__ALOOK_PERF_DEGRADED__ === true,
+        degraded: window.__ONECAPTAIN_PERF_DEGRADED__ === true,
       }
     },
     { sinceTs, markName },
@@ -211,10 +211,10 @@ test("community switch perceived-latency capture", async ({ browser }) => {
   await page.goto(`${BASE_URL}/c/channels/${targetServer.id}`, { waitUntil: "commit" })
   // Prove the react-scan hook registered early enough: commit events must
   // actually arrive (not merely that hooks are "available").
-  await page.waitForFunction(() => Array.isArray(window.__ALOOK_PERF__) && window.__ALOOK_PERF__.length > 0, {
+  await page.waitForFunction(() => Array.isArray(window.__ONECAPTAIN_PERF__) && window.__ONECAPTAIN_PERF__.length > 0, {
     timeout: 20_000,
   })
-  const degraded = await page.evaluate(() => window.__ALOOK_PERF_DEGRADED__ === true)
+  const degraded = await page.evaluate(() => window.__ONECAPTAIN_PERF_DEGRADED__ === true)
   expect(degraded, "react-scan profiling hooks live").toBe(false)
 
   // Warm the LEAF routes (channel + server) so first-hit dev compile isn't
@@ -237,7 +237,7 @@ test("community switch perceived-latency capture", async ({ browser }) => {
       window.__PERF_PAINTED_TS__ = null
       window.__PERF_ATTACH_RESIZE__?.()
     })
-    const markName = `alook:switch:${kind}:${targetId}`
+    const markName = `onecaptain:switch:${kind}:${targetId}`
     const t0 = await page.evaluate(() => performance.now())
 
     await navigate()

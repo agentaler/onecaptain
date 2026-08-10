@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { Agent, AgentRuntime } from "@alook/shared";
+import type { Agent, AgentRuntime } from "@onecaptain/shared";
 import { AgentPreviewCard } from "@/components/agent-preview-card";
 import { cn } from "@/lib/utils";
 

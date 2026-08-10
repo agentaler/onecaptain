@@ -1,4 +1,4 @@
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import type { RouterContext } from "../router-context"
 
 export async function handleUpgrade({ request, env, url, traceId, log }: RouterContext): Promise<Response> {

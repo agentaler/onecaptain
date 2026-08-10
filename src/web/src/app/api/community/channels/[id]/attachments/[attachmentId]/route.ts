@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries, createLogger, CACHE_IMMUTABLE } from "@alook/shared"
+import { queries, createLogger, CACHE_IMMUTABLE } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor, type CommunityActor } from "@/lib/middleware/community-actor"
 import { requireChannelMember, requireDMAccess } from "@/lib/community/permissions"
@@ -7,7 +7,7 @@ import { requireChannelMember, requireDMAccess } from "@/lib/community/permissio
 const log = createLogger({ service: "community-attachments-download" })
 
 /**
- * RFC 5987 filename encoding for `X-Alook-Filename`. Percent-encodes
+ * RFC 5987 filename encoding for `X-OneCaptain-Filename`. Percent-encodes
  * everything outside the RFC 5987 attr-char set. The daemon-side client
  * decodes before writing to disk so non-ASCII filenames (`图表.png`) round
  * trip safely.
@@ -25,7 +25,7 @@ function encodeRfc5987(value: string): string {
  * part):
  *   - human/web (`<img src>` / link) → cookie session → bytes + inline/attach
  *     `Content-Disposition` + immutable cache (the media route's serve shape).
- *   - bot/CLI (crk_ bearer) → raw body + `X-Alook-Filename` (RFC 5987), the
+ *   - bot/CLI (crk_ bearer) → raw body + `X-OneCaptain-Filename` (RFC 5987), the
  *     shape the daemon `callDownload` buffers and writes to disk.
  *
  * ⚠ CONFUSED-DEPUTY (top red line, Aigneis ② / Blondie): authorization is
@@ -69,7 +69,7 @@ export const GET = withCommunityActor(async (req: NextRequest, ctx) => {
       row.contentType || obj.httpMetadata?.contentType || "application/octet-stream"
 
     if (ctx.actor.kind === "bot") {
-      // Bot arm — raw body + X-Alook-Filename. Buffer inside the try/catch so an
+      // Bot arm — raw body + X-OneCaptain-Filename. Buffer inside the try/catch so an
       // R2 stream mid-read error surfaces as a structured 500 rather than a
       // truncated 200 the daemon-side helper can't parse. The daemon
       // `callDownload` buffers via arrayBuffer (attachments cap at 25 MB), so
@@ -77,7 +77,7 @@ export const GET = withCommunityActor(async (req: NextRequest, ctx) => {
       const size = row.size ?? obj.size
       const headers: Record<string, string> = {
         "Content-Type": contentType,
-        "X-Alook-Filename": encodeRfc5987(row.filename),
+        "X-OneCaptain-Filename": encodeRfc5987(row.filename),
       }
       if (typeof size === "number") headers["Content-Length"] = String(size)
       const buffer = await obj.arrayBuffer()

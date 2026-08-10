@@ -33,7 +33,7 @@ export default function Error({
               >
                 <div className="tw-email-line">
                   <span style={{ color: "var(--landing-text)" }}>From:</span>{" "}
-                  system@alook.ai
+                  system@onecaptain.ai
                 </div>
                 <div className="tw-email-line">
                   <span style={{ color: "var(--landing-text)" }}>To:</span>{" "}

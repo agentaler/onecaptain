@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { CircleDot, Eye, EyeOff, Loader2, Plus, Trash2 } from "lucide-react";
-import type { Agent, Artifact, Issue, IssueComment, Message, WsMessage } from "@alook/shared";
+import type { Agent, Artifact, Issue, IssueComment, Message, WsMessage } from "@onecaptain/shared";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useAgentContext } from "@/contexts/agent-context";
 import { createIssue, deleteIssue, getIssue, getTask, getTrace, listIssues, updateIssue } from "@/lib/api";
 import type { IssueListItem, TraceTask } from "@/lib/api";
-import type { TaskApi } from "@alook/shared";
+import type { TaskApi } from "@onecaptain/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";

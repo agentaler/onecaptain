@@ -12,7 +12,7 @@ import {
   type ChannelType,
   type StoredChannelType,
   type Database,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { fanOutToServerMembers, fanOutToChannel } from "@/lib/community/fanout"
 import { createWithCollisionPolicy } from "@/lib/community/create-collision"
 import { logAudit } from "@/lib/community/audit"

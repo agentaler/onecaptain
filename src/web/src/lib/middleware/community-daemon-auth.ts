@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries, withD1Retry } from "@alook/shared"
+import { queries, withD1Retry } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 
 interface CommunityDaemonAuthContext {

@@ -1,4 +1,4 @@
-import { queries, PRESENCE_MEMBER_CAP, readOrStale } from "@alook/shared"
+import { queries, PRESENCE_MEMBER_CAP, readOrStale } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON } from "@/lib/middleware/helpers"

@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
-import { isForum as isForumType } from "@alook/shared"
+import { isForum as isForumType } from "@onecaptain/shared"
 import { useServer } from "./use-servers"
 import { useCommunityStore, useCurrentChannelMeta } from "@/stores/community"
 import { toastApiError } from "@/lib/api/client"

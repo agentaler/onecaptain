@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { CommunityMemberJoin, CommunityMemberLeave, CommunityMemberUpdate } from "@alook/shared"
+import type { CommunityMemberJoin, CommunityMemberLeave, CommunityMemberUpdate } from "@onecaptain/shared"
 import { getMessageOverlay, useMessageStreamStore } from "@/stores/community/message-stream"
 import { communityKeys } from "@/lib/query-keys"
 import {

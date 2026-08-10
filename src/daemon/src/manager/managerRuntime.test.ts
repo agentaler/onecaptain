@@ -7,7 +7,7 @@ import {
   truncateThinking,
   canonicalToolName,
   extractToolAudit,
-  isAlookShellInvocation,
+  isOneCaptainShellInvocation,
   truncateTargetToCodeUnits,
   type ManagedSession,
   type SessionFactory,
@@ -1143,7 +1143,7 @@ describe("AgentProcessManager — bot audit event emission", () => {
     );
   });
 
-  it("DROPS bash-family tool_call whose command is `alook <sub>` for BOTH capitalized and lowercase names", () => {
+  it("DROPS bash-family tool_call whose command is `onecaptain <sub>` for BOTH capitalized and lowercase names", () => {
     const onBotAuditEvent = vi.fn();
     const { mgr, session } = makeManager({ onBotAuditEvent });
     mgr.deliver("a1", { seq: 1, text: "hello" });
@@ -1151,22 +1151,22 @@ describe("AgentProcessManager — bot audit event emission", () => {
     session.fire("runtime_event", {
       kind: "tool_call",
       name: "Bash",
-      input: { command: "alook inbox pull --max 5" },
+      input: { command: "onecaptain inbox pull --max 5" },
     });
     session.fire("runtime_event", {
       kind: "tool_call",
       name: "bash",
-      input: { command: "  alook message send @gus hi" },
+      input: { command: "  onecaptain message send @gus hi" },
     });
     session.fire("runtime_event", {
       kind: "tool_call",
       name: "Bash",
-      input: { command: "alook" },
+      input: { command: "onecaptain" },
     });
     session.fire("runtime_event", {
       kind: "tool_call",
       name: "shell",
-      input: { command: "alook inbox pull" },
+      input: { command: "onecaptain inbox pull" },
     });
 
     const bashCalls = onBotAuditEvent.mock.calls.filter(
@@ -1175,7 +1175,7 @@ describe("AgentProcessManager — bot audit event emission", () => {
     expect(bashCalls).toHaveLength(0);
   });
 
-  it("EMITS bash tool_call for non-alook shell work with canonical `bash` name + target", () => {
+  it("EMITS bash tool_call for non-onecaptain shell work with canonical `bash` name + target", () => {
     const onBotAuditEvent = vi.fn();
     const { mgr, session } = makeManager({ onBotAuditEvent });
     mgr.deliver("a1", { seq: 1, text: "hello" });
@@ -1569,28 +1569,28 @@ describe("canonicalToolName", () => {
 });
 
 describe("extractToolAudit — shell class", () => {
-  it("Anthropic Bash + non-alook command yields {name: 'bash', target, suppressed: false}", () => {
+  it("Anthropic Bash + non-onecaptain command yields {name: 'bash', target, suppressed: false}", () => {
     expect(extractToolAudit("Bash", { command: "rm -rf tmp" })).toEqual({
       name: "bash",
       target: "rm -rf tmp",
       suppressed: false,
     });
   });
-  it("pi lowercase bash + non-alook command yields the same shape", () => {
+  it("pi lowercase bash + non-onecaptain command yields the same shape", () => {
     expect(extractToolAudit("bash", { command: "sed -i '' '/x/d' todo.md" })).toEqual({
       name: "bash",
       target: "sed -i '' '/x/d' todo.md",
       suppressed: false,
     });
   });
-  it("suppresses alook invocations for capitalized Bash", () => {
-    expect(extractToolAudit("Bash", { command: "alook inbox pull" }).suppressed).toBe(true);
+  it("suppresses onecaptain invocations for capitalized Bash", () => {
+    expect(extractToolAudit("Bash", { command: "onecaptain inbox pull" }).suppressed).toBe(true);
   });
-  it("suppresses alook invocations for lowercase bash (pi)", () => {
-    expect(extractToolAudit("bash", { command: "alook" }).suppressed).toBe(true);
+  it("suppresses onecaptain invocations for lowercase bash (pi)", () => {
+    expect(extractToolAudit("bash", { command: "onecaptain" }).suppressed).toBe(true);
   });
   it("suppresses even with leading whitespace (raw command trimmed for the check)", () => {
-    expect(extractToolAudit("Bash", { command: "  alook  message send" }).suppressed).toBe(true);
+    expect(extractToolAudit("Bash", { command: "  onecaptain  message send" }).suppressed).toBe(true);
   });
   it("codex shell (string command) — driver already unwrapped params.item", () => {
     expect(extractToolAudit("shell", { command: "pnpm test" })).toEqual({
@@ -1606,11 +1606,11 @@ describe("extractToolAudit — shell class", () => {
       suppressed: false,
     });
   });
-  it("codex shell array wrapping `alook …` inside `bash -lc` does NOT suppress — outer shell is real work", () => {
-    const out = extractToolAudit("shell", { command: ["bash", "-lc", "alook inbox pull"] });
+  it("codex shell array wrapping `onecaptain …` inside `bash -lc` does NOT suppress — outer shell is real work", () => {
+    const out = extractToolAudit("shell", { command: ["bash", "-lc", "onecaptain inbox pull"] });
     expect(out.suppressed).toBe(false);
     expect(out.name).toBe("bash");
-    expect(out.target).toBe("bash -lc alook inbox pull");
+    expect(out.target).toBe("bash -lc onecaptain inbox pull");
   });
 });
 
@@ -1777,28 +1777,28 @@ describe("truncateTargetToCodeUnits", () => {
   });
 });
 
-describe("isAlookShellInvocation", () => {
-  it("matches `alook <sub>` and bare `alook`", () => {
-    expect(isAlookShellInvocation("alook")).toBe(true);
-    expect(isAlookShellInvocation("alook inbox pull")).toBe(true);
-    expect(isAlookShellInvocation("  alook message send")).toBe(true);
+describe("isOneCaptainShellInvocation", () => {
+  it("matches `onecaptain <sub>` and bare `onecaptain`", () => {
+    expect(isOneCaptainShellInvocation("onecaptain")).toBe(true);
+    expect(isOneCaptainShellInvocation("onecaptain inbox pull")).toBe(true);
+    expect(isOneCaptainShellInvocation("  onecaptain message send")).toBe(true);
   });
-  it("matches the `$ALOOK_CLI` env-var form the system prompt now teaches", () => {
-    expect(isAlookShellInvocation("$ALOOK_CLI inbox pull")).toBe(true);
-    expect(isAlookShellInvocation("${ALOOK_CLI} message send")).toBe(true);
-    expect(isAlookShellInvocation("$ALOOK_CLI")).toBe(true);
-    expect(isAlookShellInvocation("  $ALOOK_CLI nap")).toBe(true);
+  it("matches the `$ONECAPTAIN_CLI` env-var form the system prompt now teaches", () => {
+    expect(isOneCaptainShellInvocation("$ONECAPTAIN_CLI inbox pull")).toBe(true);
+    expect(isOneCaptainShellInvocation("${ONECAPTAIN_CLI} message send")).toBe(true);
+    expect(isOneCaptainShellInvocation("$ONECAPTAIN_CLI")).toBe(true);
+    expect(isOneCaptainShellInvocation("  $ONECAPTAIN_CLI nap")).toBe(true);
   });
-  it("does NOT match commands that merely mention alook", () => {
-    expect(isAlookShellInvocation("rm alook.log")).toBe(false);
-    expect(isAlookShellInvocation("echo alook")).toBe(false);
-    expect(isAlookShellInvocation("alookalike")).toBe(false);
+  it("does NOT match commands that merely mention onecaptain", () => {
+    expect(isOneCaptainShellInvocation("rm onecaptain.log")).toBe(false);
+    expect(isOneCaptainShellInvocation("echo onecaptain")).toBe(false);
+    expect(isOneCaptainShellInvocation("onecaptainalike")).toBe(false);
     // A different env var that merely starts with the same prefix must not match.
-    expect(isAlookShellInvocation("$ALOOK_CLIENT foo")).toBe(false);
+    expect(isOneCaptainShellInvocation("$ONECAPTAIN_CLIENT foo")).toBe(false);
   });
   it("returns false for missing input", () => {
-    expect(isAlookShellInvocation(undefined)).toBe(false);
-    expect(isAlookShellInvocation("")).toBe(false);
+    expect(isOneCaptainShellInvocation(undefined)).toBe(false);
+    expect(isOneCaptainShellInvocation("")).toBe(false);
   });
 });
 
@@ -1892,14 +1892,14 @@ describe("onBotAuditEvent — integration through onRuntimeEvent (T9/T10)", () =
     expect(payloads).toEqual(combos.map((c) => c.expect));
   });
 
-  it("alook-shell suppression fires for Bash, pi bash, AND codex shell", () => {
+  it("onecaptain-shell suppression fires for Bash, pi bash, AND codex shell", () => {
     const onBotAuditEvent = vi.fn();
     const { mgr, session } = makeManager({ onBotAuditEvent });
     mgr.deliver("a1", { seq: 1, text: "hello" });
 
-    session.fire("runtime_event", { kind: "tool_call", name: "Bash", input: { command: "alook inbox pull" } });
-    session.fire("runtime_event", { kind: "tool_call", name: "bash", input: { command: "alook" } });
-    session.fire("runtime_event", { kind: "tool_call", name: "shell", input: { command: "alook message send" } });
+    session.fire("runtime_event", { kind: "tool_call", name: "Bash", input: { command: "onecaptain inbox pull" } });
+    session.fire("runtime_event", { kind: "tool_call", name: "bash", input: { command: "onecaptain" } });
+    session.fire("runtime_event", { kind: "tool_call", name: "shell", input: { command: "onecaptain message send" } });
 
     const toolCalls = onBotAuditEvent.mock.calls.filter(
       ([, ev]) => (ev as { kind?: string })?.kind === "tool_call"

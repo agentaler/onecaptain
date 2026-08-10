@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers"
-import { createLogger } from "@alook/shared"
+import { createLogger } from "@onecaptain/shared"
 import type { WsDurableContext } from "./ws-durable/internal"
 import {
   acceptUserWebSocket,

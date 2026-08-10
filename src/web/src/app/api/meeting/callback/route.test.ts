@@ -20,8 +20,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
   return {
     ...real,
     queries: {
@@ -111,8 +111,8 @@ describe("POST /api/meeting/callback", () => {
     expect(mimeCall).toBeDefined();
     expect(mimeCall![0]).toBe("emails/test-nanoid-123/raw");
     const mimeContent = mimeCall![1] as string;
-    expect(mimeContent).toContain("From: no-reply@alook.ai");
-    expect(mimeContent).toContain("To: jarvis@alook.ai");
+    expect(mimeContent).toContain("From: no-reply@onecaptain.ai");
+    expect(mimeContent).toContain("To: jarvis@onecaptain.ai");
     expect(mimeContent).toContain("Subject: Meeting completed: Weekly");
     expect(mimeContent).toContain("MIME-Version: 1.0");
     expect(mimeContent).toContain("Content-Type: text/plain; charset=utf-8");
@@ -126,11 +126,11 @@ describe("POST /api/meeting/callback", () => {
       (mockSelfRefFetch.mock.calls[0][1] as RequestInit).body as string
     );
     expect(notifyBody.r2Key).toBe("emails/test-nanoid-123/raw");
-    expect(notifyBody.from).toBe("no-reply@alook.ai");
-    expect(notifyBody.to).toBe("jarvis@alook.ai");
+    expect(notifyBody.from).toBe("no-reply@onecaptain.ai");
+    expect(notifyBody.to).toBe("jarvis@onecaptain.ai");
     expect(notifyBody.subject).toContain("Meeting completed: Weekly");
     expect(notifyBody.isWhitelisted).toBe(true);
-    expect(notifyBody.messageId).toBe("<meeting-ms1@alook.ai>");
+    expect(notifyBody.messageId).toBe("<meeting-ms1@onecaptain.ai>");
   });
 
   it("skips email notify when agent has no emailHandle", async () => {

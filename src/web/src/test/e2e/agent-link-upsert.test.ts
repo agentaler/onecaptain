@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest, sqlRun } from "@onecaptain/test-utils"
 import { nanoid } from "nanoid"
 
 let seed: TestSeed

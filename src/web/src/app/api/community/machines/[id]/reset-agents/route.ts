@@ -1,9 +1,10 @@
 import { nanoid } from "nanoid"
-import { queries, makeRuntimeConfig, resolveModelConfig, formatHandle } from "@alook/shared"
+import { queries, makeRuntimeConfig, resolveModelConfig, formatHandle } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { pushBatchResetToMachine } from "@/lib/community/bot-push"
+import { resolveStoredProviderConfig } from "@/lib/community/bot-provider"
 
 /**
  * Owner-triggered BATCH reset — reset EVERY agent bound to a machine in one
@@ -43,6 +44,7 @@ export const POST = withAuth(async (_req, ctx) => {
     config: makeRuntimeConfig({
       runtime: bot.runtime,
       model: resolveModelConfig(bot.runtime, bot.modelName),
+      provider: resolveStoredProviderConfig(ctx.env, bot),
       agentName: bot.name,
       agentHandle: `@${formatHandle(bot.name, bot.discriminator)}`,
     }),

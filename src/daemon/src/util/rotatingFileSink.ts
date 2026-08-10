@@ -5,7 +5,7 @@
  * WHY net-new: the daemon has no rotation utility (recon-confirmed), and the
  * raw `appendFileSync` sink the trace shipped with (createDaemon.ts) is
  * UNBOUNDED — ~15MB/4h, only grows. That's fine for an opt-in deep-dive
- * (`ALOOK_FSM_TRACE`), but the whole point of E1 is to make the trace DEFAULT
+ * (`ONECAPTAIN_FSM_TRACE`), but the whole point of E1 is to make the trace DEFAULT
  * ON so we're never blind to a wedge again — and a default that silently fills
  * the disk is a bug, not a feature. This sink caps total on-disk bytes.
  *

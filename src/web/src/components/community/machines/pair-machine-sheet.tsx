@@ -31,7 +31,7 @@ function buildPairCommand(machineKey: string): string {
   const wsUrl = isLocal
     ? `ws://localhost:${WS_DO_PORT_DEFAULT}`
     : `${location.origin.replace("http", "ws")}/api/ws/community-daemon`
-  const bin = isLocal ? "pnpm daemon" : "npx @alook/daemon"
+  const bin = isLocal ? "pnpm daemon" : "npx @onecaptain/daemon"
   return `${bin} start --machine-key ${machineKey} --server-url ${location.origin} --ws-url ${wsUrl}`
 }
 

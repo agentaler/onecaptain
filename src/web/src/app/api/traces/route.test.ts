@@ -21,7 +21,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(() => ({ env: { DB: {} } })),
 }));
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   queries: {
     task: {
       listTraces: (...args: any[]) => mockListTraces(...args),

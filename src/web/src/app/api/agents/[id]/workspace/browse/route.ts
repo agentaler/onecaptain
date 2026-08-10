@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, WorkspaceFileBrowseRequestSchema } from "@alook/shared";
+import { queries, WorkspaceFileBrowseRequestSchema } from "@onecaptain/shared";
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";
 import { parseBody, writeJSON, writeError } from "@/lib/middleware/helpers";

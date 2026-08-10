@@ -140,7 +140,7 @@ export class OpenCodeBackend implements AgentBackend {
 
     // spawn({ shell: true }) on Windows joins args with spaces without quoting
     // — see win-quote.ts. Pre-quote so args with spaces (workspace paths under
-    // C:\Users\<name with space>\.alook\...) survive cmd.exe parsing.
+    // C:\Users\<name with space>\.onecaptain\...) survive cmd.exe parsing.
     const isWin = process.platform === "win32";
     const spawnCmd = isWin ? quoteWinArg(this.cliPath) : this.cliPath;
     const spawnArgs = isWin ? quoteWinArgs(args) : args;

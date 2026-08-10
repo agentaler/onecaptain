@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
 import { communityKeys } from "@/lib/query-keys"
-import { UNCATEGORIZED_CATEGORY_ID } from "@alook/shared"
+import { UNCATEGORIZED_CATEGORY_ID } from "@onecaptain/shared"
 
 vi.mock("react", () => ({
   useRef: (initial: unknown) => ({ current: initial }),

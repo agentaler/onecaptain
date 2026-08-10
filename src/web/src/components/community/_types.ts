@@ -11,7 +11,7 @@
  */
 
 import type React from "react"
-import type { ChannelType, CommunityRole, MentionKind } from "@alook/shared"
+import type { ChannelType, CommunityRole, MentionKind } from "@onecaptain/shared"
 import type { EntityKind } from "./entity-icon"
 
 // ── Presence / enums ───────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export type Msg = {
   }
   // Present only on a friend-approval DM card. Its presence (not the message
   // `type`) is the discriminator for rendering <BotApprovalCard>.
-  approval?: import("@alook/shared").FriendApprovalPayload
+  approval?: import("@onecaptain/shared").FriendApprovalPayload
 }
 
 // `grouped` is a RENDER-TIME decision (computed by `message-list.tsx`'s
@@ -187,7 +187,7 @@ export type ForumThread = Thread & {
 // ── Members / friends / DMs ──────────────────────────────────────────────────
 export type Role = CommunityRole
 
-export { canManageServer, isServerOwner, ROLES, isPresenceOnline, isPresenceOffline } from "@alook/shared"
+export { canManageServer, isServerOwner, ROLES, isPresenceOnline, isPresenceOffline } from "@onecaptain/shared"
 
 // Identity fields shared by every community user view-model (member / friend /
 // DM). All three are required `string`: `user.name`/`user.discriminator` are
@@ -269,7 +269,7 @@ export type Profile = {
   // Variable-width (≥4-digit) decimal discriminator derived from user.id
   // (`"0042"`, widens on collision) — undefined while the profile fetch is in
   // flight. Shown at its true width, never re-padded. See computeDiscriminator
-  // in @alook/shared.
+  // in @onecaptain/shared.
   discriminator?: string
   avatar: string
   role: string

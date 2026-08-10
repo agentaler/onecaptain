@@ -1,5 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { resolveMode } from "@alook/shared"
+import { resolveMode } from "@onecaptain/shared"
 import SignInPageClient from "./sign-in-client"
 
 export default async function SignInPage() {

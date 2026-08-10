@@ -1,6 +1,6 @@
 "use client";
 
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import type { AgentFolder } from "@/hooks/use-agent-folders";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";

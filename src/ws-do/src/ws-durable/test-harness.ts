@@ -72,7 +72,7 @@ vi.mock("cloudflare:workers", () => ({
   },
 }))
 
-// Mock @alook/shared
+// Mock @onecaptain/shared
 export const mockGetValidSession = vi.fn<(db: unknown, token: string) => Promise<string | null>>()
 export const mockGetValidSessionWithIdentity = vi.fn<(db: unknown, token: string) => Promise<{ userId: string; name: string; discriminator: string } | null>>()
 export const mockGetMachineTokenByToken = vi.fn()
@@ -145,7 +145,7 @@ export const mockToSummary = vi.fn((row: any) => ({
   updatedAt: row.updatedAt ?? "",
 }))
 
-vi.mock("@alook/shared", () => {
+vi.mock("@onecaptain/shared", () => {
   const noopLogger = {
     debug: mockLogDebug,
     info: mockLogInfo,
@@ -155,7 +155,7 @@ vi.mock("@alook/shared", () => {
   }
   // Bare-minimum safeParse stubs — the DO only calls `.safeParse(msg)` and
   // reads `.success` / `.data`. Enough to route the test frames correctly
-  // without pulling in zod (which isn't a direct dep of @alook/ws-do).
+  // without pulling in zod (which isn't a direct dep of @onecaptain/ws-do).
   const SessionErrorFrameSchema = {
     safeParse(v: unknown) {
       const m = v as { type?: unknown; code?: unknown; agentId?: unknown; launchId?: unknown; payload?: unknown }
@@ -280,7 +280,7 @@ vi.mock("@alook/shared", () => {
   return {
     // Real WS event-type strings the DO reads at runtime (#5 T2 — ws-do
     // broadcasts now use WS_EVENTS.* instead of raw literals). Values match
-    // @alook/shared so the event assertions still hold.
+    // @onecaptain/shared so the event assertions still hold.
     WS_EVENTS: {
       TYPING_START: "community:typing.start",
       TYPING_STOP: "community:typing.stop",

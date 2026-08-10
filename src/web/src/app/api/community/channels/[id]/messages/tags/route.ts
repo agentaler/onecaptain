@@ -1,4 +1,4 @@
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 
 import { getDb } from "@/lib/db"
 import { requireChannelAccess } from "@/lib/community/permissions"

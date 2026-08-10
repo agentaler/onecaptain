@@ -13,10 +13,10 @@ export function markSwitch(kind: "server" | "channel", id: string): void {
   if (!perfTraceEnabled()) return
   if (typeof window === "undefined" || typeof performance === "undefined") return
 
-  const markName = `alook:switch:${kind}:${id}`
+  const markName = `onecaptain:switch:${kind}:${id}`
   performance.mark(markName)
 
   const entry: PerfSwitchMark = { kind, id, ts: performance.now(), markName }
-  const buf = window.__ALOOK_PERF_MARKS__ ?? (window.__ALOOK_PERF_MARKS__ = [])
+  const buf = window.__ONECAPTAIN_PERF_MARKS__ ?? (window.__ONECAPTAIN_PERF_MARKS__ = [])
   buf.push(entry)
 }

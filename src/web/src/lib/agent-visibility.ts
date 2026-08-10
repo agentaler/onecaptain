@@ -1,4 +1,4 @@
-import { isPublic } from "@alook/shared";
+import { isPublic } from "@onecaptain/shared";
 
 interface AgentRow {
   id: string;

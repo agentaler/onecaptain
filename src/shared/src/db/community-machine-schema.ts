@@ -128,6 +128,15 @@ export const communityBotBinding = sqliteTable(
     // stored. Hand-maintained in lockstep with migration 0063 (no drizzle-kit
     // generate in this repo).
     modelName: text("model_name"),
+    // Cloud LLM provider attachment. `provider_kind` is one of
+    // BOT_PROVIDER_KINDS ("anthropic" | "openai" | "openrouter" | "custom"),
+    // or NULL for the runtime's own auth. The API key is stored ONLY
+    // encrypted (AES-256-GCM via @onecaptain/shared/crypto with
+    // ENCRYPTION_KEY) and is never returned by any API after write.
+    // Hand-maintained in lockstep with migration 0085.
+    providerKind: text("provider_kind"),
+    providerApiUrl: text("provider_api_url"),
+    providerApiKeyEnc: text("provider_api_key_enc"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),

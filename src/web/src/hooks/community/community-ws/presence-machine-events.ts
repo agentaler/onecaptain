@@ -7,7 +7,7 @@ import type {
   CommunityMachineUpdated,
   CommunityPresenceUpdate,
   CommunityStatusUpdate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import { useCommunityStore } from "@/stores/community"
 import { useCommunityWsStore } from "@/stores/community/ws"

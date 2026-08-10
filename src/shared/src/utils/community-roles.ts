@@ -91,7 +91,7 @@ export function isMessageBearingSurface(t: string | null | undefined): boolean {
 // Channel-type TRAIT model (plan: unify-forum-forumpost-channel-thread B0).
 //
 // A channel `type` is not one fact but a COMBINATION of orthogonal behavioral
-// traits (Aigneis's decomposition, thread /Alook/discuss/#462): three read/
+// traits (Aigneis's decomposition, thread /OneCaptain/discuss/#462): three read/
 // routing axes — how you ADDRESS it, who can SEE it, who it REACHES — plus one
 // write axis, how it's CREATED. Historically each axis was hand-branched on the
 // `type` literal in four separate places (resolver / write-guard / inbox /

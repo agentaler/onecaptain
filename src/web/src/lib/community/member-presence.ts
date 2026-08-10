@@ -1,5 +1,5 @@
 import { wsDoFetch } from "@/lib/broadcast"
-import type { CommunityCliMemberStatus as MemberStatus } from "@alook/shared"
+import type { CommunityCliMemberStatus as MemberStatus } from "@onecaptain/shared"
 
 // One bulk presence read for a set of user ids — NEVER a per-member fan-out.
 // The ws-do worker fans out to each user's DO internally, so this stays a

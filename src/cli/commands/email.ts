@@ -34,7 +34,7 @@ interface EmailResponse {
 
 const VALID_STATUSES = ["unread", "read", "archived", "sent"];
 const VALID_FOLDERS = ["inbox", "sent", "untrust"];
-const EMAIL_BASE = tempDir("alook-emails");
+const EMAIL_BASE = tempDir("onecaptain-emails");
 
 interface SendResponse {
   id: string;
@@ -53,7 +53,7 @@ export function emailCommand(): Command {
 
   cmd
     .command("pull")
-    .description("Download and parse emails to /tmp/alook-emails/{workspaceId}/{agentId}/")
+    .description("Download and parse emails to /tmp/onecaptain-emails/{workspaceId}/{agentId}/")
     .option("--agent_id <id>", "Agent ID")
     .option("--email_id <id>", "Fetch a single email by ID (mutually exclusive with --status/--folder/--limit/--offset)")
     .option("--status <status>", "Filter by status (unread, read, archived)")

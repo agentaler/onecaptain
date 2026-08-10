@@ -45,7 +45,7 @@ describe("renderSeededBackdropSvg", () => {
   })
 
   it("varies the upstream color and transform data across seeds", () => {
-    const normalizeIds = (svg: string) => svg.replace(/alook-marble-\d+/g, "id")
+    const normalizeIds = (svg: string) => svg.replace(/onecaptain-marble-\d+/g, "id")
     expect(normalizeIds(renderSeededBackdropSvg("server-a"))).not.toBe(
       normalizeIds(renderSeededBackdropSvg("server-b")),
     )

@@ -4,7 +4,7 @@ const mockGetUserInternal = vi.fn()
 const mockAreFriends = vi.fn()
 const mockIsBlocked = vi.fn()
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   queries: {
     user: { getUserInternal: (...a: unknown[]) => mockGetUserInternal(...a) },
     communityFriendship: {

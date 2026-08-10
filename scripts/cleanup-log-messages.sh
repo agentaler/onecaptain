@@ -9,7 +9,7 @@ TOTAL_DELETED=0
 
 while true; do
   echo "Deleting batch of $BATCH rows..."
-  RESULT=$(npx wrangler d1 execute alook-app --remote --json --command "DELETE FROM task_message WHERE type = 'log' LIMIT $BATCH;" 2>&1)
+  RESULT=$(npx wrangler d1 execute onecaptain-app --remote --json --command "DELETE FROM task_message WHERE type = 'log' LIMIT $BATCH;" 2>&1)
 
   if [ $? -ne 0 ]; then
     echo "Wrangler command failed. Output:"

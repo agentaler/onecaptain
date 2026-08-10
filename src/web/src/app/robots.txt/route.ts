@@ -6,10 +6,10 @@ export function GET() {
     "Disallow: /workspaces",
     "Disallow: /api/",
     "",
-    "Sitemap: https://alook.ai/sitemap.xml",
+    "Sitemap: https://onecaptain.ai/sitemap.xml",
     "",
     "# Agent discovery map (https://llmstxt.org/)",
-    "# https://alook.ai/llms.txt",
+    "# https://onecaptain.ai/llms.txt",
     "",
   ].join("\n");
 

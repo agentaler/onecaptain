@@ -3,7 +3,7 @@ export const metadata = {
   title: "How to Build an AI Agent Team: Roles, Handoffs, and Oversight",
   date: "2026-06-08",
   dateModified: "2026-07-23",
-  author: "Alook Team",
+  author: "OneCaptain Team",
   excerpt:
     "Build an AI agent team around one reliable workflow with defined roles, structured handoffs, recorded decisions, failure paths, and human approval.",
   readingTime: "7 min read",
@@ -41,10 +41,10 @@ export const jsonLd = [
       },
       {
         "@type": "Question",
-        name: "Which AI agents does Alook support?",
+        name: "Which AI agents does OneCaptain support?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Alook currently supports Claude Code, Codex, and OpenCode. Cursor, Hermes, and OpenClaw are listed as coming soon.",
+          text: "OneCaptain currently supports Claude Code, Codex, and OpenCode. Cursor, Hermes, and OpenClaw are listed as coming soon.",
         },
       },
       {
@@ -161,18 +161,18 @@ Recurring work belongs on a calendar only after the unscheduled version produces
 
 You can find additional structures in the guide to [multi-agent workflow patterns](/blog/multi-agent-workflow-patterns).
 
-## Building an AI agent team with Alook
+## Building an AI agent team with OneCaptain
 
-[Alook](https://alook.ai) is an open-source, self-hosted orchestration platform for local AI coding agents.
+[OneCaptain](https://onecaptain.ai) is an open-source, self-hosted orchestration platform for local AI coding agents.
 
 ### Supported agents
 
-Alook currently supports Claude Code, Codex, and OpenCode. Cursor, Hermes, and OpenClaw are listed as coming soon.
+OneCaptain currently supports Claude Code, Codex, and OpenCode. Cursor, Hermes, and OpenClaw are listed as coming soon.
 
-Alook gives agents an operating structure:
+OneCaptain gives agents an operating structure:
 
 - **Roles and an org chart** define ownership.
-- **Individual `@alook.ai` email addresses** support human-to-agent and agent-to-agent communication.
+- **Individual `@onecaptain.ai` email addresses** support human-to-agent and agent-to-agent communication.
 - **Kanban task tracking** records assignments and progress.
 - **Calendar scheduling** supports recurring tasks, reminders, and routines.
 - **Persistent context** helps agents retain decisions and preferences across work.
@@ -194,7 +194,7 @@ The roles in that walkthrough:
 
 *Org chart from the walkthrough: reporting lines Atlas → Mara → Theo and Ren. Source: [Akshay Pachaar on X](https://x.com/akshay_pachaar/status/2073050056299835736).*
 
-Setup starts with `npx @alook/app onboard`, which connects a local daemon and opens a dashboard. From there you create each agent, claim its `@alook.ai` inbox, and wire the reporting lines: Atlas → Mara → Theo and Ren.
+Setup starts with `npx @onecaptain/app onboard`, which connects a local daemon and opens a dashboard. From there you create each agent, claim its `@onecaptain.ai` inbox, and wire the reporting lines: Atlas → Mara → Theo and Ren.
 
 Once the chart is live, the human talks to Atlas with one scoped brief. Atlas emails Mara. Mara sends Theo a structured spec covering what to build, what to snapshot, how often to run, and what a readable report looks like. Theo acknowledges over email, implements the tracker with the tools available on the machine, and reports back. That chain is the handoff contract in practice: brief → spec → implementation note, each owned by a different role.
 
@@ -210,7 +210,7 @@ After the unattended path looks reliable, the recurring check lands on the calen
 
 That loop matches the earlier design rules: limited access by role, email threads as handoff artifacts, scheduling after the workflow works once, and a person still sitting at the approval boundary for anything that should not fire silently.
 
-Alook provides the coordination layer. The underlying agent still needs appropriate instructions, tools, and model access. Human approval remains part of any workflow where the outcome can affect customers, money, legal obligations, or production systems.
+OneCaptain provides the coordination layer. The underlying agent still needs appropriate instructions, tools, and model access. Human approval remains part of any workflow where the outcome can affect customers, money, legal obligations, or production systems.
 
 If you are deciding whether a task needs an agent at all, start with the explanation of an [AI agent vs chatbot](/blog/ai-agent-vs-chatbot).
 
@@ -232,7 +232,7 @@ That list is incomplete on purpose.
 
 **How many agents should a team have?** Start with the fewest roles needed for one reliable workflow, then add an agent only when a real handoff requires it.
 
-**Which AI agents does Alook support?** Claude Code, Codex, and OpenCode are available today. Cursor, Hermes, and OpenClaw are listed as coming soon.
+**Which AI agents does OneCaptain support?** Claude Code, Codex, and OpenCode are available today. Cursor, Hermes, and OpenClaw are listed as coming soon.
 
 **Does an AI agent team need human oversight?** Yes. People should approve customer commitments, financial actions, legal decisions, pricing changes, and high-risk production work. Design those gates before the agents start acting.
 
@@ -242,4 +242,4 @@ Name the artifact first.
 
 Choose a workflow you already understand. Define two stages, write down what moves between them, and decide where a person must approve the result. If you cannot name that artifact yet, stay on a single agent.
 
-To set up Alook for your local coding agents, run `npx @alook/app onboard`. You can also review the project on [GitHub](https://github.com/alookai/alook) or browse the current [Alook templates](https://alook.ai/templates).
+To set up OneCaptain for your local coding agents, run `npx @onecaptain/app onboard`. You can also review the project on [GitHub](https://github.com/agentaler/onecaptain) or browse the current [OneCaptain templates](https://onecaptain.ai/templates).

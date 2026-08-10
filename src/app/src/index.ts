@@ -23,8 +23,8 @@ function getVersion(): string {
 const program = new Command();
 
 program
-  .name("alook-app")
-  .description("Run Alook locally — one command, no clone needed")
+  .name("onecaptain-app")
+  .description("Run OneCaptain locally — one command, no clone needed")
   .version(getVersion())
   .enablePositionalOptions();
 

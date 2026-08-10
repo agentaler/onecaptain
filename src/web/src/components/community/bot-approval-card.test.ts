@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import type { FriendApprovalPayload } from "@alook/shared"
+import type { FriendApprovalPayload } from "@onecaptain/shared"
 import { BotApprovalCard } from "./bot-approval-card"
 
 const OTHER = { id: "u_alice", name: "Alice", discriminator: "0042", image: null }

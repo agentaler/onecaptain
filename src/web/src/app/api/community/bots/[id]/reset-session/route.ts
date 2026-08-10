@@ -1,9 +1,10 @@
 import { nanoid } from "nanoid"
-import { queries, makeRuntimeConfig, resolveModelConfig, formatHandle } from "@alook/shared"
+import { queries, makeRuntimeConfig, resolveModelConfig, formatHandle } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { pushAgentResetToMachine } from "@/lib/community/bot-push"
+import { resolveStoredProviderConfig } from "@/lib/community/bot-provider"
 
 /**
  * Owner-triggered synchronous session reset.
@@ -32,6 +33,7 @@ export const POST = withAuth(async (_req, ctx) => {
   const config = makeRuntimeConfig({
     runtime: wakeCtx.runtime,
     model: resolveModelConfig(wakeCtx.runtime, wakeCtx.modelName),
+    provider: resolveStoredProviderConfig(ctx.env, wakeCtx),
     agentName: wakeCtx.name,
     agentHandle: `@${formatHandle(wakeCtx.name, wakeCtx.discriminator)}`,
   })

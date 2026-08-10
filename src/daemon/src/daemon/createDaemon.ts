@@ -17,7 +17,7 @@
  *      doors; the deleted flat `/api/<verb>` catalog is rejected by the proxy.
  *
  * It is agnostic on both axes:
- *   - whether the server is a real Alook server or a local `wrangler dev`
+ *   - whether the server is a real OneCaptain server or a local `wrangler dev`
  *     instance — same wire contract either way;
  *   - whether an agent is a real runtime (Claude, Codex, …) or a test stub
  *     — the `driverFor` is INJECTED by the caller.
@@ -33,13 +33,13 @@ import { AgentProcessManager, AgentRouter, createTypingScopeTracker } from "../m
 import type { TypingScopeTracker } from "../manager/index.js";
 import { UnknownBotError, BotEnrollFailedError, UnknownRuntimeError } from "../manager/agentRouter.js";
 import { createTimelineRecorder } from "../timeline/index.js";
-import { resolveAlookCliPathWithFallback } from "../discovery.js";
+import { resolveOneCaptainCliPathWithFallback } from "../discovery.js";
 import { createPiSdkDriverDeps } from "../drivers/piSdkDeps.js";
 import { createLogger, type Logger } from "../logger.js";
 import type { Driver, LaunchContext } from "../types.js";
 import type { RuntimeConfig } from "../runtimeConfig.js";
 import type { UnreadNotice, HostCommand } from "../server/contract.js";
-import { formatHandle } from "@alook/shared/lib/discriminator";
+import { formatHandle } from "@onecaptain/shared/lib/discriminator";
 
 // Cold-start warmup backoff schedule (ms).
 const WARMUP_BACKOFF_MS = [250, 500, 1000, 2000, 4000] as const;
@@ -51,12 +51,12 @@ const WARMUP_CEILING_MS = 30_000;
  * → only ~2h of history unsampled; the T4 heartbeat sampler (createTraceSampler)
  * folds that noise so TRANSITION rows survive ≥12h @ N=8 in the same budget.
  * (≥12h is @ N=8 — write rate scales with agent count, so a much larger fleet
- * warrants revisiting this cap.) The `ALOOK_FSM_TRACE` override is unbounded and
+ * warrants revisiting this cap.) The `ONECAPTAIN_FSM_TRACE` override is unbounded and
  * unsampled (full-fidelity deep dives).
  */
 const FSM_TRACE_MAX_BYTES = 8 * 1024 * 1024;
 const RUNTIME_RAW_TRACE_MAX_BYTES = 8 * 1024 * 1024;
-export const RUNTIME_RAW_TRACE_AGENT_IDS_ENV = "ALOOK_RUNTIME_RAW_TRACE_AGENT_IDS";
+export const RUNTIME_RAW_TRACE_AGENT_IDS_ENV = "ONECAPTAIN_RUNTIME_RAW_TRACE_AGENT_IDS";
 /** How often the daemon rewrites the `daemon status` snapshot file (batch E2). */
 const STATUS_WRITE_INTERVAL_MS = 5_000;
 
@@ -196,7 +196,7 @@ export function deriveAuditLogSubcommand(pathname: string, method?: string): str
 }
 
 /**
- * Implicit typing.stop on `alook message send`. Emits `agent_typing_stop` for
+ * Implicit typing.stop on `onecaptain message send`. Emits `agent_typing_stop` for
  * every DM scope currently tracked for the agent, and DELIBERATELY leaves the
  * `typingTracker` + heartbeat interval untouched. Semantics:
  *   - Client pill drops immediately (nice UX when the reply just landed).
@@ -256,7 +256,7 @@ export interface CreateDaemonOptions {
   /**
    * Directory for the DEFAULT-ON bounded FSM transition trace
    * (`<fsmTraceDir>/fsm-trace.jsonl`, size-capped/rotating — batch E1). When
-   * omitted the default trace is off (test stubs). `ALOOK_FSM_TRACE=<path>`
+   * omitted the default trace is off (test stubs). `ONECAPTAIN_FSM_TRACE=<path>`
    * overrides BOTH: it takes precedence and uses an unbounded single-file
    * append (deep-investigation mode). See plans/daemon-fsm-desync.md batch E.
    */
@@ -285,7 +285,7 @@ export interface CreateDaemonOptions {
   daemonVersion?: string;
   /**
    * Shared logger for the whole daemon process. Defaults to
-   * `createLogger({ header: "@alook/daemon" })`; `.child("ws")` /
+   * `createLogger({ header: "@onecaptain/daemon" })`; `.child("ws")` /
    * `.child("router")` / `.child("manager")` are passed into the respective
    * collaborators so every line from one daemon process shares one header
    * family. `daemonStart.ts` passes its own instance here so the process has
@@ -319,12 +319,12 @@ export interface RunningDaemon {
  * the agent manager. The full real code path is exercised — no shortcuts.
  */
 export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDaemon> {
-  const log = opts.logger ?? createLogger({ header: "@alook/daemon" });
-  const fallbackBase = (process.env.ALOOK_PROJECT_ROOT || `${homedir()}/.alook`) + "/daemon";
+  const log = opts.logger ?? createLogger({ header: "@onecaptain/daemon" });
+  const fallbackBase = (process.env.ONECAPTAIN_PROJECT_ROOT || `${homedir()}/.onecaptain`) + "/daemon";
   const workdirFor = (agentId: string) => `${opts.workingDirectoryBase ?? fallbackBase}/${agentId}`;
 
   // Self-healing: resolve CLI path with fallback if primary is missing
-  const resolvedCliPath = resolveAlookCliPathWithFallback(opts.agentCliPath);
+  const resolvedCliPath = resolveOneCaptainCliPathWithFallback(opts.agentCliPath);
   const onRuntimeRawLine = createRuntimeRawLineTap({
     traceDir: opts.fsmTraceDir,
     enabledAgentIds: parseRuntimeRawTraceAgentIds(process.env[RUNTIME_RAW_TRACE_AGENT_IDS_ENV]),
@@ -376,7 +376,7 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
   const broker = new CredentialBroker({ upstreamBaseUrl: opts.serverUrl });
   const proxy = await startCredentialProxy(broker, {
     onInboxPullResponse: (agentId, messages) => timeline.appendEntryForAgent(agentId, messages),
-    // Bot audit log — Producer B (authoritative for `alook <sub>`). Fires
+    // Bot audit log — Producer B (authoritative for `onecaptain <sub>`). Fires
     // ONLY on `verdict.ok === true`, before the upstream request is written.
     onProxyRequest: (agentId, method, pathname) => {
       const subcommand = deriveAuditLogSubcommand(pathname, method);
@@ -746,11 +746,11 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
     //   - DEFAULT ON (batch E1): a bounded, size-capped/rotating sink at
     //     `<fsmTraceDir>/fsm-trace.jsonl` — so we're never blind to the last
     //     wedge without pre-setting an env, and it can't fill the disk.
-    //   - `ALOOK_FSM_TRACE=<path>` OVERRIDE: unbounded single-file append at
+    //   - `ONECAPTAIN_FSM_TRACE=<path>` OVERRIDE: unbounded single-file append at
     //     that path (deep-investigation mode; takes precedence over the
     //     default). Content is FSM metadata only (no PII) — safe to default on.
     ...(() => {
-      const overridePath = process.env.ALOOK_FSM_TRACE;
+      const overridePath = process.env.ONECAPTAIN_FSM_TRACE;
       if (overridePath) {
         return {
           onFsmTransition: (rec: Record<string, unknown>) => {
@@ -776,7 +776,7 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
         // redundant unchanged-state ticks + progress/runtime_signal noise so the
         // bounded file retains transition rows ≥12h (@ N=8) instead of ~2h.
         // Transitions and watchdog-fired (effects-carrying) frames are never
-        // dropped. The ALOOK_FSM_TRACE override above is unbounded → unsampled,
+        // dropped. The ONECAPTAIN_FSM_TRACE override above is unbounded → unsampled,
         // for full-fidelity deep dives.
         const sampler = createTraceSampler((rec) => sink.write(JSON.stringify(rec)));
         return {
@@ -789,7 +789,7 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
     // SDK, no child process) — this is only ever consulted for that case.
     sdkDriverDepsFor: (ctx) => createPiSdkDriverDeps(ctx),
     timeline,
-    wakePromptFooter: "Use `alook inbox pull` to read your messages.",
+    wakePromptFooter: "Use `onecaptain inbox pull` to read your messages.",
     stampWakePromptTime: true,
     logger: log.child("manager"),
   });

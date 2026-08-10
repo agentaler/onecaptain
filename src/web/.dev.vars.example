@@ -22,4 +22,4 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
 # Device Code Flow — comma-separated allowed client IDs
-DEVICE_CLIENT_IDS=alook-cli
+DEVICE_CLIENT_IDS=onecaptain-cli

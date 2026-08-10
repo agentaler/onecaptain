@@ -10,7 +10,7 @@ import {
   RUNNING_PRESETS,
   withD1Retry,
   WS_EVENTS,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { handleFrameForBoundBot } from "./bound-bot-frame"
 import type { CommunityMachineIdentity, WsDurableContext } from "./internal"
 import {

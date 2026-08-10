@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const mockGetWorkspacePlan = vi.fn(async () => "free");
+const mockCountMembers = vi.fn(async () => 1);
 const mockGetInviteByToken = vi.fn();
 const mockGetMemberByUserAndWorkspace = vi.fn();
 const mockRedeemInvite = vi.fn();
@@ -12,8 +14,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
   return {
     ...real,
     queries: {
@@ -24,6 +26,13 @@ vi.mock("@alook/shared", async () => {
       member: {
         getMemberByUserAndWorkspace: (...args: unknown[]) => mockGetMemberByUserAndWorkspace(...args),
         createMember: (...args: unknown[]) => mockCreateMember(...args),
+        countMembers: (...args: unknown[]) => mockCountMembers(...args),
+      },
+      workspace: {
+        getWorkspacePlan: (...args: unknown[]) => mockGetWorkspacePlan(...args),
+      },
+      workspaceAudit: {
+        logAction: vi.fn(async () => ({ id: "wal_1" })),
       },
     },
   };
@@ -117,6 +126,27 @@ describe("GET /api/invite/[token]", () => {
 
 describe("POST /api/invite/[token]", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("rejects a join beyond the plan's seat quota without consuming the invite", async () => {
+    mockGetInviteByToken.mockResolvedValue({
+      id: "inv1",
+      workspaceId: "w1",
+      workspaceSlug: "acme",
+      usedBy: null,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    mockGetMemberByUserAndWorkspace.mockResolvedValue(null);
+    mockGetWorkspacePlan.mockResolvedValueOnce("free");
+    mockCountMembers.mockResolvedValueOnce(5);
+
+    const req = new NextRequest("http://localhost/api/invite/tok1", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ token: "tok1" }) } as any);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("PLAN_SEAT_LIMIT_REACHED");
+    expect(mockRedeemInvite).not.toHaveBeenCalled();
+    expect(mockCreateMember).not.toHaveBeenCalled();
+  });
 
   it("accepts a valid invite and creates membership", async () => {
     mockGetInviteByToken.mockResolvedValue(sampleInvite);

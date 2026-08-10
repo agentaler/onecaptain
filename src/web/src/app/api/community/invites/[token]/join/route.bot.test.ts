@@ -26,8 +26,8 @@ const mockFanOutToServerMembers = vi.fn()
 const mockBroadcastToUserSafe = vi.fn()
 const mockLogAudit = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -57,7 +57,7 @@ vi.mock("@/lib/community/audit", async () => {
 })
 
 import { POST } from "./route"
-import { isUniqueConstraintError } from "@alook/shared"
+import { isUniqueConstraintError } from "@onecaptain/shared"
 
 // Bot-path coverage for the UNIFIED join route (folded from /agent/joinServer,
 // plan §9 phase 4/5). The token is a ROUTE PARAM now (`[token]`), not a body

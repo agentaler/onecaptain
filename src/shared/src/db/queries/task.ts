@@ -428,7 +428,7 @@ export async function cancelTask(db: Database, id: string, workspaceId: string) 
   return rows[0] ?? null;
 }
 
-const DEFAULT_STALE_SECONDS = Number(process.env.ALOOK_STALE_DISPATCH_TIMEOUT_S) || 20;
+const DEFAULT_STALE_SECONDS = Number(process.env.ONECAPTAIN_STALE_DISPATCH_TIMEOUT_S) || 20;
 
 export async function failStaleDispatchedTasks(db: Database, workspaceId: string, staleSeconds = DEFAULT_STALE_SECONDS) {
   const threshold = new Date(Date.now() - staleSeconds * 1000).toISOString();
@@ -672,7 +672,7 @@ export async function failStaleKillTasks(db: Database, workspaceId: string) {
   return rows;
 }
 
-const DEFAULT_STALE_RUNNING_SECONDS = Number(process.env.ALOOK_STALE_RUNNING_TIMEOUT_S) || 3600;
+const DEFAULT_STALE_RUNNING_SECONDS = Number(process.env.ONECAPTAIN_STALE_RUNNING_TIMEOUT_S) || 3600;
 
 export async function failStaleRunningTasks(db: Database, workspaceId: string, staleSeconds = DEFAULT_STALE_RUNNING_SECONDS) {
   const threshold = new Date(Date.now() - staleSeconds * 1000).toISOString();

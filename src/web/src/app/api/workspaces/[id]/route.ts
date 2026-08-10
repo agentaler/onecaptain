@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
-import { queries, UpdateWorkspaceRequestSchema, DeleteWorkspaceRequestSchema, isUniqueConstraintError } from "@alook/shared"
+import { queries, UpdateWorkspaceRequestSchema, DeleteWorkspaceRequestSchema, isUniqueConstraintError } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceOwner } from "@/lib/middleware/workspace";
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers";
 import { workspaceToResponse } from "@/lib/api/responses";
+import { logWorkspaceAudit, WORKSPACE_AUDIT_ACTIONS } from "@/lib/workspace-audit";
 
 export const GET = withAuth(async (_req, ctx) => {
   const db = getDb(ctx.env.DB)
@@ -37,6 +38,14 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const updated = await queries.workspace.updateWorkspace(db, owner.workspaceId, body);
     if (!updated) return writeError("workspace not found", 404);
+    logWorkspaceAudit(db, {
+      workspaceId: owner.workspaceId,
+      actorId: ctx.userId,
+      action: WORKSPACE_AUDIT_ACTIONS.WORKSPACE_UPDATED,
+      targetType: "workspace",
+      targetId: owner.workspaceId,
+      changes: JSON.stringify({ name: body.name, slug: body.slug }),
+    });
     return writeJSON(workspaceToResponse(updated));
   } catch (err: unknown) {
     if (isUniqueConstraintError(err)) return writeError("slug already in use", 409);
@@ -57,6 +66,16 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   if (!ws) return writeError("workspace not found", 404);
   if (ws.name !== body.confirm_name) return writeError("workspace name does not match", 400);
 
+  // The audit table has no FK on purpose, so this row survives the tenant it
+  // documents being deleted.
+  logWorkspaceAudit(db, {
+    workspaceId: owner.workspaceId,
+    actorId: ctx.userId,
+    action: WORKSPACE_AUDIT_ACTIONS.WORKSPACE_DELETED,
+    targetType: "workspace",
+    targetId: owner.workspaceId,
+    changes: JSON.stringify({ name: ws.name }),
+  });
   await queries.workspace.deleteWorkspace(db, owner.workspaceId);
   return new Response(null, { status: 204 });
 });

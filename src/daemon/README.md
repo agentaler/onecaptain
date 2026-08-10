@@ -1,4 +1,4 @@
-# @alook/daemon
+# @onecaptain/daemon
 
 A **pure, host-neutral agent-runtime "driver" abstraction** in TypeScript.
 
@@ -8,11 +8,11 @@ Antigravity) behind one uniform interface, and how it delivers messages into a
 running agent (the "steering" mechanism).
 
 The backend hardcodes **no specific host platform**. The agent always invokes a
-stable CLI name (`alook`); `cliTransport.ts` writes a small wrapper by that
+stable CLI name (`onecaptain`); `cliTransport.ts` writes a small wrapper by that
 name into a per-launch state dir, prepends it to `PATH`, and forwards to the
 host's real `targetCommand` — **decoupling the agent-facing name from the host's
 real binary** (the host can rename/relocate its CLI without touching the agent
-surface). It also injects an `ALOOK_*` env contract. The default
+surface). It also injects an `ONECAPTAIN_*` env contract. The default
 `MOCK_CLI_CONFIG` wires no `targetCommand` (the wrapper errors if invoked); a
 real deployment passes its own `CliTransportConfig` (CLI name, env prefix,
 `targetCommand`) and its own system-prompt communication guide. The abstraction
@@ -115,7 +115,7 @@ message and terminates the process on turn end.
 src/
   types.ts                       # Driver interface + ParsedEvent + lifecycle/capability types
   index.ts                       # public entry point
-  logger.ts                      # tiny structured logger (ALOOK_LOG_LEVEL); wired through
+  logger.ts                      # tiny structured logger (ONECAPTAIN_LOG_LEVEL); wired through
                                   #   wsControlChannel.ts/agentRouter.ts/managerRuntime.ts too, not just cli/daemonStart.ts
   drivers/
     index.ts                     # getDriver(runtimeId) registry  ← start here
@@ -150,12 +150,12 @@ src/
   daemon/
     createDaemon.ts              # runtime-agnostic daemon factory (driver/sessionFactory/runtimes INJECTED; no test code)
   cli/
-    index.ts                     # the `alook` agent CLI skeleton (message send / inbox pull)
+    index.ts                     # the `onecaptain` agent CLI skeleton (message send / inbox pull)
     proxyServerApi.ts            # agent data-plane client: voucher → proxy → server (identity from the voucher)
   credentials/
     credentialProxy.ts           # CredentialBroker (mint/revoke/check per-voucher vouchers) + local key-swapping proxy
 scripts/
-  daemon.ts                      # DAEMON process: thin launcher — wraps `alook daemon start` for local dev
+  daemon.ts                      # DAEMON process: thin launcher — wraps `onecaptain daemon start` for local dev
 ```
 
 ## Host orchestration (manager + server)
@@ -170,7 +170,7 @@ orchestration so it can run agents end-to-end:
   feeds runtime events back in. `AgentRouter` consumes the control plane (below).
 - **`server/`** — the agent ⇄ server boundary, split into two planes that share
   one contract (`contract.ts`):
-  - **data plane** (`ServerApi`): what the `alook` CLI calls — `send` / `inboxPull` /
+  - **data plane** (`ServerApi`): what the `onecaptain` CLI calls — `send` / `inboxPull` /
     `ack` / `read` / `listChannels`, addressed by path-style `ChannelRef`s.
   - **control plane** (`HostCommand` + `HostControlChannel`): server → host commands
     (`agent:wake` / `agent:stop`; plus `bot:*` lifecycle frames). `agent:wake` carries a
@@ -252,7 +252,7 @@ gated:
   messages by target (channel / DM / thread) and projects each into the
   metadata-only summary surfaced as an `[inbox notice: …]` (count, first,
   latest, sender, flags). No bodies — the agent pulls those with
-  `alook inbox pull`.
+  `onecaptain inbox pull`.
 - **`inbox/stateMachine.ts`** — `planAgentInboxSideEffect` is the "don't reply on
   stale context" guard. Before an outward action (`send` / `task_claim` /
   `task_update`) it compares the model's seen `seq` boundary against pending
@@ -291,8 +291,8 @@ real servers and walk the real credential chain (`cmt_` pairing token →
 **Terminal 1 — the web app + control-plane DO:**
 
 ```bash
-pnpm --filter @alook/web dev      # http://localhost:3000
-pnpm --filter @alook/ws-do dev    # ws://localhost:8789
+pnpm --filter @onecaptain/web dev      # http://localhost:3000
+pnpm --filter @onecaptain/ws-do dev    # ws://localhost:8789
 ```
 
 **Terminal 2 — pair + activate a machine**, then start a daemon with the
@@ -312,9 +312,9 @@ curl -s -X POST http://localhost:3000/api/community/daemon/activate \
 # → { "credential": "cmk_…", "machineId": "cm_…", "expiresAt": null }
 
 # 3. Start the daemon with that credential:
-ALOOK_MACHINE_KEY=cmk_… \
-ALOOK_SERVER_URL=http://localhost:3000 \
-ALOOK_SERVER_WS_URL=ws://localhost:8789 \
+ONECAPTAIN_MACHINE_KEY=cmk_… \
+ONECAPTAIN_SERVER_URL=http://localhost:3000 \
+ONECAPTAIN_SERVER_WS_URL=ws://localhost:8789 \
 pnpm run daemon
 ```
 
@@ -332,7 +332,7 @@ daemon's real `WsControlChannel`.
 ## Usage sketch
 
 ```ts
-import { getDriver, createChildProcessRuntimeSession } from "@alook/daemon";
+import { getDriver, createChildProcessRuntimeSession } from "@onecaptain/daemon";
 
 const driver = getDriver("claude");
 const session = createChildProcessRuntimeSession(driver, ctx);

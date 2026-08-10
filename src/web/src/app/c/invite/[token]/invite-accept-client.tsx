@@ -142,7 +142,7 @@ export function InviteAcceptClient({ token }: { token: string }) {
             : error.message}
         </p>
         <Button className="mt-6" variant="secondary" onClick={() => router.push("/c/me")}>
-          Back to Alook
+          Back to OneCaptain
         </Button>
       </Shell>
     )

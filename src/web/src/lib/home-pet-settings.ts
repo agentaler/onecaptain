@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-const HOME_PET_SETTINGS_CHANGED_EVENT = "alook-home-pet-settings-changed";
-const HOME_PET_ENABLED_STORAGE_KEY = "alook-home-pet-enabled-v1";
+const HOME_PET_SETTINGS_CHANGED_EVENT = "onecaptain-home-pet-settings-changed";
+const HOME_PET_ENABLED_STORAGE_KEY = "onecaptain-home-pet-enabled-v1";
 
 export type HomePetSettings = {
   enabled: boolean;

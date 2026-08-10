@@ -19,8 +19,8 @@ const mockResolveEffectiveLevelForUsers = vi.fn(
 const mockWarn = vi.fn()
 const mockInfo = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     createLogger: () => ({
@@ -349,7 +349,7 @@ describe("enqueueBotWakes — dev HTTP transport selection (NODE_ENV=development
 
   it("logs and does not throw when the dev HTTP transport rejects", async () => {
     mockFindWakeCandidates.mockResolvedValue([{ botUserId: "bot1", name: "zoe", machineId: "m1", runtime: "claude" }])
-    mockDevHttpSend.mockRejectedValue(new Error("alook-wake-worker unreachable"))
+    mockDevHttpSend.mockRejectedValue(new Error("onecaptain-wake-worker unreachable"))
 
     await expect(
       enqueueBotWakes({ recipients: ["bot1"], channelId: "c1", messageRow }),
@@ -357,7 +357,7 @@ describe("enqueueBotWakes — dev HTTP transport selection (NODE_ENV=development
 
     expect(mockWarn).toHaveBeenCalledWith(
       "wake_batch_chunk_failed",
-      expect.objectContaining({ err: expect.stringContaining("alook-wake-worker unreachable") }),
+      expect.objectContaining({ err: expect.stringContaining("onecaptain-wake-worker unreachable") }),
     )
   })
 })

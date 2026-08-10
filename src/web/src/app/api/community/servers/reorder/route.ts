@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   const db = getDb(ctx.env.DB)

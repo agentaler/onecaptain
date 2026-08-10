@@ -7,7 +7,7 @@ import { runtimeDisplayName } from "@/lib/runtime-display";
 /**
  * A visually distinct error block that attributes a runtime error to the agent
  * runtime CLI (Claude Code / Codex / OpenCode) on the user's machine, making it
- * clear the error did NOT originate from Alook. See issue #236.
+ * clear the error did NOT originate from OneCaptain. See issue #236.
  *
  * Shared by message-list (failed-task chat message) and task-stream (in-stream
  * + task-level errors) so the presentation is identical everywhere.
@@ -57,7 +57,7 @@ export function RuntimeErrorBlock({
       </div>
       <p className="mt-2 text-sm text-destructive/90 wrap-anywhere whitespace-pre-wrap">{message}</p>
       <p className="mt-2 text-xs text-muted-foreground">
-        This came from the agent runtime on your machine, not from Alook.
+        This came from the agent runtime on your machine, not from OneCaptain.
       </p>
     </div>
   );

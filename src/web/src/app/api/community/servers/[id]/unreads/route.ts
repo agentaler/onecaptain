@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { queries, readOrStale } from "@alook/shared"
+import { queries, readOrStale } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { requireServerMember } from "@/lib/community/permissions"

@@ -2,7 +2,7 @@
  * RuntimeConfig — the structured, versioned agent runtime configuration.
  *
  * The canonical `RuntimeConfig`/`makeRuntimeConfig` now live in
- * `@alook/shared/runtime-config` (lifted there so the `src/web` wake producer
+ * `@onecaptain/shared/runtime-config` (lifted there so the `src/web` wake producer
  * and `src/wake-worker` consumer, neither of which can depend on this
  * CLI/daemon package, can construct the `config` field of an `agent:wake`
  * `HostCommand` — see `plans/community-agent-cli-bridge.md` §1 and
@@ -19,16 +19,16 @@
 export {
   RUNTIME_CONFIG_VERSION,
   makeRuntimeConfig,
-} from "@alook/shared/runtime-config";
+} from "@onecaptain/shared/runtime-config";
 export type {
   ReasoningEffort,
   ModelConfig,
   ProviderConfig,
   ModeConfig,
   RuntimeConfig,
-} from "@alook/shared/runtime-config";
+} from "@onecaptain/shared/runtime-config";
 
-import type { ReasoningEffort, RuntimeConfig } from "@alook/shared/runtime-config";
+import type { ReasoningEffort, RuntimeConfig } from "@onecaptain/shared/runtime-config";
 
 /* ------------------------------------------------------------------ */
 /* Resolution — RuntimeConfig → flat launch fields                     */
@@ -64,12 +64,28 @@ const PI_BUILTIN_PROVIDER_ENV_KEYS: Record<string, string> = {
   openrouter: "OPENROUTER_API_KEY",
 };
 
+/**
+ * Env delivery per cloud provider id (`ProviderConfig.kind === "cloud"`).
+ * The key rides the protected providerEnv layer; runtimes that support the
+ * provider (claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY, opencode/pi→any)
+ * pick it up from their environment. `baseUrlEnv` is only set when the
+ * config carries an explicit `apiUrl`.
+ */
+const CLOUD_PROVIDER_ENV: Record<string, { keyEnv: string; baseUrlEnv: string }> = {
+  anthropic: { keyEnv: "ANTHROPIC_API_KEY", baseUrlEnv: "ANTHROPIC_BASE_URL" },
+  openai: { keyEnv: "OPENAI_API_KEY", baseUrlEnv: "OPENAI_BASE_URL" },
+  openrouter: { keyEnv: "OPENROUTER_API_KEY", baseUrlEnv: "OPENROUTER_BASE_URL" },
+};
+
 /** Env keys the host must not set directly — provider config owns them. */
 const CONTROLLED_ENV_KEYS = new Set([
   "ANTHROPIC_BASE_URL",
   "ANTHROPIC_API_KEY",
   "ANTHROPIC_CUSTOM_MODEL_OPTION",
+  "OPENAI_BASE_URL",
+  "OPENROUTER_BASE_URL",
   ...Object.values(PI_BUILTIN_PROVIDER_ENV_KEYS),
+  ...Object.values(CLOUD_PROVIDER_ENV).map((v) => v.keyEnv),
 ]);
 
 /**
@@ -106,6 +122,12 @@ export function resolveLaunchFields(config: RuntimeConfig): ResolvedLaunchFields
   } else if (p?.kind === "pi-builtin") {
     const key = PI_BUILTIN_PROVIDER_ENV_KEYS[p.providerId];
     if (key) providerEnv[key] = p.apiKey;
+  } else if (p?.kind === "cloud") {
+    const cloud = CLOUD_PROVIDER_ENV[p.providerId];
+    if (cloud) {
+      providerEnv[cloud.keyEnv] = p.apiKey;
+      if (p.apiUrl) providerEnv[cloud.baseUrlEnv] = p.apiUrl;
+    }
   }
 
   return {

@@ -1,5 +1,5 @@
 {
-  "name": "@alook/web",
+  "name": "@onecaptain/web",
   "version": "0.0.160",
   "private": true,
   "scripts": {
@@ -24,7 +24,7 @@
     "seo:check": "lhci autorun --config=lighthouserc.json && node scripts/print-lighthouse-scores.mjs"
   },
   "dependencies": {
-    "@alook/shared": "workspace:*",
+    "@onecaptain/shared": "workspace:*",
     "@base-ui/react": "^1.7.0",
     "@dagrejs/dagre": "^3.1.0",
     "@dnd-kit/core": "^6.3.1",
@@ -106,7 +106,7 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
-    "@alook/test-utils": "workspace:*",
+    "@onecaptain/test-utils": "workspace:*",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/node": "^4.3.3",

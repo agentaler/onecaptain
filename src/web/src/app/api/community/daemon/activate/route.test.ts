@@ -15,8 +15,8 @@ vi.mock("@/lib/broadcast", () => ({
 const mockActivate = vi.fn()
 const mockGetMachine = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<any>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<any>("@onecaptain/shared")
   class MockActivateError extends Error {
     constructor(public readonly kind: string, message: string) {
       super(message)
@@ -51,7 +51,7 @@ vi.mock("@alook/shared", async () => {
 
 // Retrieve the MockActivateError constructor after mocks have been hoisted.
 async function getMockError(): Promise<any> {
-  const { queries } = await import("@alook/shared")
+  const { queries } = await import("@onecaptain/shared")
   return (queries as any).communityMachine.ActivateCredentialError
 }
 

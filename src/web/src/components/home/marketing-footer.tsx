@@ -13,9 +13,9 @@ const footerLinks = [
   { href: "/templates", label: "Templates" },
   { href: "/blog", label: "Blog" },
   { href: "/llms.txt", label: "llms.txt" },
-  { href: "https://github.com/alookai/alook", label: "GitHub", external: true },
-  { href: "https://discord.alook.ai", label: "Discord", external: true },
-  { href: "https://x.com/alook_ai", label: "X", external: true },
+  { href: "https://github.com/agentaler/onecaptain", label: "GitHub", external: true },
+  { href: "https://discord.onecaptain.ai", label: "Discord", external: true },
+  { href: "https://x.com/onecaptain_ai", label: "X", external: true },
   { href: "/privacy", label: "Privacy" },
 ];
 
@@ -59,7 +59,7 @@ export function MarketingFooter() {
       <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
-            <Image src="/alook.svg" alt="Alook" width={20} height={20} />
+            <Image src="/onecaptain.svg" alt="OneCaptain" width={20} height={20} />
             <span
               className="text-lg tracking-tight"
               style={{
@@ -68,7 +68,7 @@ export function MarketingFooter() {
                 fontWeight: 700,
               }}
             >
-              Alook
+              OneCaptain
             </span>
           </div>
           <span
@@ -117,7 +117,7 @@ export function MarketingFooter() {
               opacity: 0.5,
             }}
           >
-            &copy; {new Date().getFullYear()} Alook AI
+            &copy; {new Date().getFullYear()} OneCaptain AI
           </span>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, TASK_TYPES, CreateMessageRequestSchema, parsePromptMentions, truncateTitle, stripMentionTokens } from "@alook/shared"
+import { queries, TASK_TYPES, CreateMessageRequestSchema, parsePromptMentions, truncateTitle, stripMentionTokens } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { nanoid } from "nanoid";
 import { withAuth } from "@/lib/middleware/auth";

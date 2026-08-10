@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { utcDayKeyDaysAgo } from "@alook/shared"
+import { utcDayKeyDaysAgo } from "@onecaptain/shared"
 import {
   Tooltip,
   TooltipContent,

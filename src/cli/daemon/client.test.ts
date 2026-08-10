@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { fromApiTask } from "./types.js";
-import type { TaskApi } from "@alook/shared";
-import { PollResponseSchema } from "@alook/shared";
+import type { TaskApi } from "@onecaptain/shared";
+import { PollResponseSchema } from "@onecaptain/shared";
 import { DaemonClient } from "./client.js";
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ describe("DaemonClient.register() with mocked fetch", () => {
       daemon_id: "d1",
       device_name: "mac",
       cli_version: "1.0",
-      workspaces_root: "/home/.alook/workspaces",
+      workspaces_root: "/home/.onecaptain/workspaces",
       runtimes: [{ type: "claude", version: "1.0" }],
     });
     expect(resp.runtimes[0].id).toBe("rt1");
@@ -302,7 +302,7 @@ describe("DaemonClient.register() with mocked fetch", () => {
       daemon_id: "d1",
       device_name: "mac",
       cli_version: "1.0",
-      workspaces_root: "/home/.alook/workspaces",
+      workspaces_root: "/home/.onecaptain/workspaces",
       runtimes: [{ type: "claude", version: "1.0" }],
     });
 

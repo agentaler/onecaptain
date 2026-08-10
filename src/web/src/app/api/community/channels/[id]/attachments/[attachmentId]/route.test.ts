@@ -8,8 +8,8 @@ const mockGetAttachmentById = vi.fn()
 const mockGetMessage = vi.fn()
 const mockGetChannelType = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -141,14 +141,14 @@ describe("GET /api/community/channels/[id]/attachments/[attachmentId]", () => {
     expect(mockR2Get).not.toHaveBeenCalled()
   })
 
-  it("bot: pending row owned by the requesting bot round-trips (200 + X-Alook-Filename)", async () => {
+  it("bot: pending row owned by the requesting bot round-trips (200 + X-OneCaptain-Filename)", async () => {
     mockGetAttachmentById.mockResolvedValue(persistedRow({ messageId: null, uploaderId: "bot_1" }))
     mockR2Get.mockResolvedValue(r2Object())
     const res = await GET(req({ Authorization: "Bearer crk_abc" }), ctx())
     expect(res.status).toBe(200)
     expect(res.headers.get("Content-Type")).toBe("image/png")
     expect(res.headers.get("Content-Length")).toBe("10")
-    expect(res.headers.get("X-Alook-Filename")).toBe(encodeURIComponent("a.png"))
+    expect(res.headers.get("X-OneCaptain-Filename")).toBe(encodeURIComponent("a.png"))
   })
 
   it("bot: percent-encodes non-ASCII filenames per RFC 5987", async () => {
@@ -156,12 +156,12 @@ describe("GET /api/community/channels/[id]/attachments/[attachmentId]", () => {
     mockR2Get.mockResolvedValue(r2Object())
     const res = await GET(req({ Authorization: "Bearer crk_abc" }), ctx())
     expect(res.status).toBe(200)
-    const encoded = res.headers.get("X-Alook-Filename")
+    const encoded = res.headers.get("X-OneCaptain-Filename")
     expect(encoded).toBeTruthy()
     expect(decodeURIComponent(encoded!)).toBe("图表.png")
   })
 
-  it("human: persisted image on a channel the user is a member of → 200 inline + immutable cache, no X-Alook-Filename", async () => {
+  it("human: persisted image on a channel the user is a member of → 200 inline + immutable cache, no X-OneCaptain-Filename", async () => {
     mockGetAttachmentById.mockResolvedValue(persistedRow())
     mockGetMessage.mockResolvedValue({ id: "m_1", channelId: "c_real" })
     mockGetChannelType.mockResolvedValue("text")
@@ -173,7 +173,7 @@ describe("GET /api/community/channels/[id]/attachments/[attachmentId]", () => {
     expect(res.headers.get("Content-Disposition")).toBe("inline")
     expect(res.headers.get("Cache-Control")).toBeTruthy()
     // Human arm never emits the bot download header.
-    expect(res.headers.get("X-Alook-Filename")).toBeNull()
+    expect(res.headers.get("X-OneCaptain-Filename")).toBeNull()
   })
 
   it("human: non-image → attachment; Content-Disposition carries the filename", async () => {

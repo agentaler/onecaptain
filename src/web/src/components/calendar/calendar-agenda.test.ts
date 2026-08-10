@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { groupByDay } from "./calendar-agenda";
-import type { CalendarEvent } from "@alook/shared";
+import type { CalendarEvent } from "@onecaptain/shared";
 
 function mkEvent(over: Partial<CalendarEvent> & { scheduled_at: string }): CalendarEvent {
   return {

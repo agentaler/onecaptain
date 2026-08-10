@@ -6,7 +6,7 @@ const origFlag = process.env.NEXT_PUBLIC_PERF_TRACE
 const origNodeEnv = process.env.NODE_ENV
 
 interface TestWindow {
-  __ALOOK_PERF_MARKS__?: PerfSwitchMark[]
+  __ONECAPTAIN_PERF_MARKS__?: PerfSwitchMark[]
 }
 
 function withGlobals(flag: string | undefined, fn: (markSpy: () => void) => void): void {
@@ -41,20 +41,20 @@ describe("markSwitch", () => {
       markSwitch("channel", "chan-1")
       expect(markSpy).not.toHaveBeenCalled()
       const win = (globalThis as unknown as { window: TestWindow }).window
-      expect(win.__ALOOK_PERF_MARKS__).toBeUndefined()
+      expect(win.__ONECAPTAIN_PERF_MARKS__).toBeUndefined()
     })
   })
 
   it("writes a structured mark + buffer entry when the flag is on", () => {
     withGlobals("1", (markSpy) => {
       markSwitch("server", "srv-9")
-      expect(markSpy).toHaveBeenCalledWith("alook:switch:server:srv-9")
+      expect(markSpy).toHaveBeenCalledWith("onecaptain:switch:server:srv-9")
       const win = (globalThis as unknown as { window: TestWindow }).window
-      expect(win.__ALOOK_PERF_MARKS__).toHaveLength(1)
-      expect(win.__ALOOK_PERF_MARKS__![0]).toMatchObject({
+      expect(win.__ONECAPTAIN_PERF_MARKS__).toHaveLength(1)
+      expect(win.__ONECAPTAIN_PERF_MARKS__![0]).toMatchObject({
         kind: "server",
         id: "srv-9",
-        markName: "alook:switch:server:srv-9",
+        markName: "onecaptain:switch:server:srv-9",
       })
     })
   })

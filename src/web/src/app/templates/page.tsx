@@ -9,16 +9,16 @@ const description =
 export const metadata: Metadata = {
   title: "Templates",
   description,
-  alternates: { canonical: "https://alook.ai/templates" },
+  alternates: { canonical: "https://onecaptain.ai/templates" },
   openGraph: {
-    title: "AI Company Templates — Alook",
+    title: "AI Company Templates — OneCaptain",
     description,
-    url: "https://alook.ai/templates",
+    url: "https://onecaptain.ai/templates",
     images: [{ url: "/og?title=AI Company Templates", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Company Templates — Alook",
+    title: "AI Company Templates — OneCaptain",
     description,
     images: ["/og?title=AI Company Templates"],
   },
@@ -35,7 +35,7 @@ const itemListJsonLd = {
     position: index + 1,
     name: template.name,
     description: template.description,
-    url: `https://alook.ai/templates/${template.id}`,
+    url: `https://onecaptain.ai/templates/${template.id}`,
   })),
 };
 

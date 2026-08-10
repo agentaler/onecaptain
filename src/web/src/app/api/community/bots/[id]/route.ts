@@ -10,9 +10,11 @@ import {
   runtimeSupportsModel,
   formatHandle,
   createLogger,
-} from "@alook/shared"
+} from "@onecaptain/shared"
+import { encrypt } from "@onecaptain/shared/crypto"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
+import { resolveStoredProviderConfig } from "@/lib/community/bot-provider"
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers"
 import { logAudit, COMMUNITY_AUDIT_ACTIONS } from "@/lib/community/audit"
 import {
@@ -29,7 +31,8 @@ export const GET = withAuth(async (_req, ctx) => {
   const id = ctx.params?.id as string
   const bot = await queries.communityBot.getBotOwnedBy(db, id, ctx.userId)
   if (!bot) return writeError("bot not found", 404)
-  return writeJSON({ bot })
+  const { providerApiKeyEnc, ...botPublic } = bot
+  return writeJSON({ bot: { ...botPublic, hasProviderKey: Boolean(providerApiKeyEnc) } })
 })
 
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
@@ -79,6 +82,32 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   // integrity bug) we must fail WITHOUT having already written — otherwise a
   // retry sees `before === updated`, computes no change, and never pushes,
   // leaving the daemon's running system prompt permanently stale.
+  // Cloud-provider attachment: persist first (start-time config — applies on
+  // the next launch; no live push needed). The write is owner-scoped and only
+  // lands on an existing binding row; an unbound bot has nowhere to attach a
+  // provider. The key is encrypted here and never stored or echoed as
+  // plaintext.
+  let providerChanged = false
+  let effectiveProviderRow = {
+    providerKind: before.providerKind,
+    providerApiUrl: before.providerApiUrl,
+    providerApiKeyEnc: before.providerApiKeyEnc,
+  }
+  if (body.provider !== undefined) {
+    const providerRow =
+      body.provider === null
+        ? { providerKind: null, providerApiUrl: null, providerApiKeyEnc: null }
+        : {
+            providerKind: body.provider.kind,
+            providerApiUrl: body.provider.apiUrl ?? null,
+            providerApiKeyEnc: encrypt(body.provider.apiKey, ctx.env.ENCRYPTION_KEY),
+          }
+    const wrote = await queries.communityBot.updateBotProvider(db, id, ctx.userId, providerRow)
+    if (!wrote) return writeError("bot has no active runtime binding", 409)
+    effectiveProviderRow = providerRow
+    providerChanged = true
+  }
+
   const willPush = (nameChanged || descriptionChanged) && !!before.machineId
   const owner = willPush ? await queries.user.getUserPublic(db, before.ownerUserId) : null
   if (willPush && !owner) {
@@ -111,6 +140,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     const config = makeRuntimeConfig({
       runtime: targetRuntime,
       model: resolveModelConfig(targetRuntime, storedModel),
+      provider: resolveStoredProviderConfig(ctx.env, effectiveProviderRow),
       agentName: updated.name,
       agentHandle: `@${formatHandle(updated.name, updated.discriminator)}`,
     })
@@ -163,6 +193,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   if (body.image !== undefined) changedFields.push("image")
   if (runtimeChanged) changedFields.push("runtime")
   if (modelChanged) changedFields.push("model")
+  if (providerChanged) changedFields.push("provider")
   logAudit(db, {
     serverId: null,
     actorId: ctx.userId,
@@ -180,6 +211,8 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
       image: updated.image,
       runtime: targetRuntime,
       modelName: nextModel !== undefined ? nextModel : (before.modelName ?? null),
+      providerKind: effectiveProviderRow.providerKind ?? null,
+      hasProviderKey: Boolean(effectiveProviderRow.providerApiKeyEnc),
     },
     applied,
     deliveryError,

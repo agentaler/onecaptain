@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { member, user } from "../schema";
 import type { Database } from "../index";
 
@@ -58,6 +58,33 @@ export async function createMember(
     })
     .returning();
   return rows[0]!;
+}
+
+/**
+ * Change a member's role, scoped by workspace up front. The caller owns the
+ * policy (who may change whom); this only guarantees the write can't cross
+ * tenants.
+ */
+export async function updateMemberRole(
+  db: Database,
+  memberId: string,
+  workspaceId: string,
+  role: string
+) {
+  const rows = await db
+    .update(member)
+    .set({ role })
+    .where(and(eq(member.id, memberId), eq(member.workspaceId, workspaceId)))
+    .returning();
+  return rows[0] ?? null;
+}
+
+export async function countMembers(db: Database, workspaceId: string): Promise<number> {
+  const rows = await db
+    .select({ n: count(member.id) })
+    .from(member)
+    .where(eq(member.workspaceId, workspaceId));
+  return rows[0]?.n ?? 0;
 }
 
 export async function getMember(db: Database, memberId: string, workspaceId: string) {

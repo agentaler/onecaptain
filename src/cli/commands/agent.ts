@@ -21,7 +21,7 @@ export function agentCommand(): Command {
   cmd
     .command("recruit")
     .description("Recruit a new colleague agent")
-    .option("--agent_id <id>", "Agent ID (or set ALOOK_AGENT_ID env var)")
+    .option("--agent_id <id>", "Agent ID (or set ONECAPTAIN_AGENT_ID env var)")
     .option("--instructions <text>", "Instructions for the new agent (system prompt)")
     .option("--instructions-file <path>", "Read instructions from a file")
     .option("--relationship <text>", "Relationship/delegation instruction for the link")
@@ -79,8 +79,8 @@ export function agentCommand(): Command {
   cmd
     .command("link")
     .description("Set (create-or-replace) the relationship with an existing colleague agent")
-    .option("--agent_id <id>", "Calling agent ID (or set ALOOK_AGENT_ID env var)")
-    .option("--to <handleOrId>", "Target agent: email handle (coder / coder@alook.ai) or agent id (ag_...)")
+    .option("--agent_id <id>", "Calling agent ID (or set ONECAPTAIN_AGENT_ID env var)")
+    .option("--to <handleOrId>", "Target agent: email handle (coder / coder@onecaptain.ai) or agent id (ag_...)")
     .option("--relationship <text>", "Relationship/delegation instruction for the link")
     .option("--relationship-file <path>", "Read relationship from a file")
     .option("--json", "Output as JSON")

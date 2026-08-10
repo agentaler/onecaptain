@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { TEMPLATES } from "@/lib/templates";
 import { getAllPosts } from "@/lib/blog/posts";
 
-const SITE_URL = "https://alook.ai";
+const SITE_URL = "https://onecaptain.ai";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const templateEntries: MetadataRoute.Sitemap = TEMPLATES.map((t) => ({

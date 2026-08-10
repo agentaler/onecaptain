@@ -1,5 +1,5 @@
-import { queries, ROLES, WS_EVENTS } from "@alook/shared"
-import type { CommunityMemberJoin } from "@alook/shared"
+import { queries, ROLES, WS_EVENTS } from "@onecaptain/shared"
+import type { CommunityMemberJoin } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"

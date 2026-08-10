@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest"
-import { Logger } from "@alook/shared"
+import { Logger } from "@onecaptain/shared"
 import { fetchViaBindingOrDevFallback } from "./dev-binding-fetch"
 
 const originalFetch = globalThis.fetch

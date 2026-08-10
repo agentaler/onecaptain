@@ -6,13 +6,13 @@ import {
   type TestSeed,
   sqlRun,
   sqlQuery,
-} from "@alook/test-utils"
+} from "@onecaptain/test-utils"
 import { DaemonClient } from "../../../src/cli/daemon/client"
 import {
   RegisterResponseSchema,
   PollResponseSchema,
   TaskApiBaseSchema,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000"
 const client = new DaemonClient(APP_URL)

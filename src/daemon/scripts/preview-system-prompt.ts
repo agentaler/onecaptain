@@ -16,7 +16,7 @@ const mockConfig: LaunchConfig = {
     "Gus helps Gustavo keep his side projects moving — triaging inbound, drafting quick replies, and pinging him when something needs a human.",
 };
 
-const outDir = join(tmpdir(), "alook-sysprompt");
+const outDir = join(tmpdir(), "onecaptain-sysprompt");
 mkdirSync(outDir, { recursive: true });
 
 const prompt = buildCliSystemPrompt(mockConfig);

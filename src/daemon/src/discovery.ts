@@ -2,7 +2,7 @@
  * Runtime & CLI discovery — auto-detect available runtimes and the agent CLI path.
  *
  * `detectRuntimes()` probes every registered driver and reports which are available.
- * `resolveAlookCliPath()` locates the agent CLI entry the daemon injects into spawned agents.
+ * `resolveOneCaptainCliPath()` locates the agent CLI entry the daemon injects into spawned agents.
  */
 import * as path from "path";
 import * as fs from "fs";
@@ -26,10 +26,10 @@ const SELECTABLE_RUNTIMES: ReadonlySet<RuntimeId> = new Set(["claude", "codex", 
 /* ------------------------------------------------------------------ */
 
 /**
- * Locate the Alook agent CLI entry point.
+ * Locate the OneCaptain agent CLI entry point.
  *
  * This path gets symlinked (POSIX) or `.cmd`-wrapped (Windows) straight into
- * every spawned agent's PATH as `alook` (see `cliLink.ts`) — on POSIX the OS
+ * every spawned agent's PATH as `onecaptain` (see `cliLink.ts`) — on POSIX the OS
  * execs it directly, so it MUST be a self-executable entrypoint. The raw TS
  * source (`cli/index.ts`) does NOT qualify: even with a shebang, executing it
  * without `tsx` leaves Node's ESM resolver looking for literal `./*.js`
@@ -43,7 +43,7 @@ const SELECTABLE_RUNTIMES: ReadonlySet<RuntimeId> = new Set(["claude", "codex", 
  *   - running from `dist/` (built/published): the CLI entry is the sibling
  *     `dist/cli/index.js` — if it's missing, that's a real packaging bug.
  *   - running from `src/` (dev, via `tsx`): the CLI entry is the dev shim
- *     `scripts/alook-shim.mjs`, which execs the TS source through `tsx` so
+ *     `scripts/onecaptain-shim.mjs`, which execs the TS source through `tsx` so
  *     relative `.js` import specifiers resolve to their `.ts` siblings.
  *     (Deliberately never falls back to a possibly-stale prebuilt `dist/` —
  *     that would silently serve old CLI behavior after source edits.)
@@ -51,13 +51,13 @@ const SELECTABLE_RUNTIMES: ReadonlySet<RuntimeId> = new Set(["claude", "codex", 
  * Returns null if the one expected entry doesn't exist (caller should log a
  * warning) — never silently substitutes a different candidate.
  */
-export function resolveAlookCliPath(moduleDir?: string): string | null {
+export function resolveOneCaptainCliPath(moduleDir?: string): string | null {
   const thisDir = moduleDir ?? path.dirname(fileURLToPath(import.meta.url));
 
   const target =
     path.basename(thisDir) === "dist"
       ? path.resolve(thisDir, "cli", "index.js")
-      : path.resolve(thisDir, "..", "scripts", "alook-shim.mjs");
+      : path.resolve(thisDir, "..", "scripts", "onecaptain-shim.mjs");
 
   return fs.existsSync(target) ? target : null;
 }
@@ -78,7 +78,7 @@ export function deriveCliFallbackCandidates(cliPath: string): string[] {
   const globalRoot = cliPath.slice(0, idx + marker.length - 1);
   const tail = path.join("dist", "cli", "index.js");
   return [
-    path.join(globalRoot, "@alook", "daemon", tail),
+    path.join(globalRoot, "@onecaptain", "daemon", tail),
   ].filter((candidate) => candidate !== cliPath);
 }
 
@@ -86,8 +86,8 @@ export function deriveCliFallbackCandidates(cliPath: string): string[] {
  * Resolve agent CLI path with fallback self-healing.
  * If the primary path doesn't exist, try fallback candidates.
  */
-export function resolveAlookCliPathWithFallback(primary?: string | null): string | null {
-  const resolved = primary ?? resolveAlookCliPath();
+export function resolveOneCaptainCliPathWithFallback(primary?: string | null): string | null {
+  const resolved = primary ?? resolveOneCaptainCliPath();
   if (resolved && fs.existsSync(resolved)) return resolved;
 
   if (resolved) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const GITHUB_REPO = "alookai/alook";
+const GITHUB_REPO = "agentaler/onecaptain";
 const TAG_PREFIX = "v";
 const CACHE_TTL = 300;
 
@@ -34,7 +34,7 @@ export async function GET(
     {
       headers: {
         Accept: "application/vnd.github.v3+json",
-        "User-Agent": "alook-updater",
+        "User-Agent": "onecaptain-updater",
       },
       next: { revalidate: CACHE_TTL },
     },

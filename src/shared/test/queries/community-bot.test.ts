@@ -56,9 +56,9 @@ describe("community/bot exports", () => {
 })
 
 describe("communityBotSyntheticEmail", () => {
-  it("lowercases + uses bots.alook.local domain", () => {
+  it("lowercases + uses bots.onecaptain.local domain", () => {
     const email = communityBotSyntheticEmail("ABC123")
-    expect(email).toBe("bot-abc123@bots.alook.local")
+    expect(email).toBe("bot-abc123@bots.onecaptain.local")
   })
   it("is injective on userId — different ids → different emails", () => {
     expect(communityBotSyntheticEmail("a")).not.toBe(communityBotSyntheticEmail("b"))
@@ -223,6 +223,9 @@ describe("listBotsForMachine", () => {
         name: "helper",
         discriminator: "1234",
         description: "does things",
+        providerKind: null,
+        providerApiUrl: null,
+        providerApiKeyEnc: null,
         ownerName: "gustavo",
         ownerDiscriminator: "5678",
         runtime: "claude",
