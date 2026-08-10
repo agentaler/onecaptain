@@ -167,7 +167,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm vitest run --coverage --coverage.reporter=json --coverage.reporter=text
+      # Upload only when the repo has a Codecov token configured — without one
+      # (e.g. this closed-source repo until a Codecov project is set up) the
+      # coverage run itself is still the gate and the upload is skipped instead
+      # of failing the job.
       - uses: codecov/codecov-action@v7
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/coverage-final.json
