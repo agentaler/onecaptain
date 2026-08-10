@@ -21,7 +21,7 @@ import { pathToFileURL } from "node:url";
 import type { ServerApi, Cursor, Message } from "../server/contract.js";
 import { parseRef } from "../server/contract.js";
 import { proxyServerApiFromEnv } from "./proxyServerApi.js";
-import { daemonStart, daemonStop, daemonList } from "./daemonStart.js";
+import { daemonStart, daemonStop, daemonList, daemonStatus, type DaemonInfo } from "./daemonStart.js";
 import { parseInviteToken } from "@alook/shared/lib/invite-link";
 import { MAX_EMOJI_BYTES } from "@alook/shared/constants/community";
 import { nowLocalISO, toLocalISO } from "../util/localTime.js";
@@ -61,6 +61,39 @@ function printEnvelope(env: Envelope): void {
   if (env.code !== undefined && env.code !== null) out.code = env.code;
   if (env.hint !== undefined && env.hint !== null) out.hint = env.hint;
   process.stdout.write(JSON.stringify(out) + "\n");
+}
+
+/** "just now (12s)" / "3m ago" / "2h ago" — human relative time from an ms epoch. */
+function relTime(ms: number | null, nowMs: number): string {
+  if (ms == null) return "—";
+  const s = Math.max(0, Math.round((nowMs - ms) / 1000));
+  if (s < 60) return `just now (${s}s)`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.round(m / 60)}h ago`;
+}
+
+/**
+ * Render `daemon list` as a human table (C2/C3). Columns: ID (pass to `daemon
+ * stop <id>`), AGENTS (`running/total` — how many are actually working a turn
+ * vs total registered, C2), LAST ACTIVE, PID, STATE. Data is per-daemon since
+ * C0 (each row reads its own daemon's status.json), so no multi-daemon caveat.
+ * NO machine key / hash prefix (credential stays out of human view, red line 2).
+ */
+export function renderDaemonList(daemons: DaemonInfo[], nowMs: number = Date.now()): string {
+  if (daemons.length === 0) return "No daemons running on this machine.";
+  const header = ["ID", "AGENTS", "LAST ACTIVE", "PID", "STATE"];
+  const rows = daemons.map((d) => [
+    d.id,
+    // `running/total`: e.g. "2/8" = 2 working, 8 registered. "—" if no snapshot.
+    d.agents == null ? "—" : `${d.running ?? 0}/${d.agents}`,
+    relTime(d.lastActiveMs, nowMs),
+    String(d.pid),
+    d.alive ? "● running" : "○ dead",
+  ]);
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
+  const fmt = (cols: string[]) => cols.map((c, i) => c.padEnd(widths[i]!)).join("  ");
+  return [fmt(header), ...rows.map(fmt)].join("\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -104,28 +137,11 @@ export function decodeTextEscapes(s: string): string {
 /* ------------------------------------------------------------------ */
 
 const CLIENT_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const CLIENT_ALLOWED_MIME_PREFIXES: readonly string[] = [
-  "image/",
-  "video/",
-  "audio/",
-  "text/",
-  "application/pdf",
-  "application/json",
-  "application/zip",
-  "application/octet-stream",
-];
-
-function mimeAllowed(contentType: string): boolean {
-  if (!contentType) return false;
-  return CLIENT_ALLOWED_MIME_PREFIXES.some((entry) =>
-    entry.endsWith("/") ? contentType.startsWith(entry) : contentType === entry,
-  );
-}
 
 /**
  * Guess a content-type from a filename extension. Kept trivial — the server
- * re-validates with its own MIME allowlist. Falls back to
- * `application/octet-stream` so an unknown extension still uploads.
+ * stores MIME as descriptive metadata. Falls back to `application/octet-stream`
+ * for unknown extensions.
  */
 function contentTypeFromFilename(filename: string): string {
   const ext = filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
@@ -136,6 +152,7 @@ function contentTypeFromFilename(filename: string): string {
     case "webp": return "image/webp";
     case "svg": return "image/svg+xml";
     case "pdf": return "application/pdf";
+    case "html": case "htm": return "text/html";
     case "txt": case "md": case "log": return "text/plain";
     case "json": return "application/json";
     case "zip": return "application/zip";
@@ -209,7 +226,7 @@ async function cmdMessageSend(opts: Record<string, unknown>): Promise<unknown> {
   const api = getApi();
   const agent = agentId(opts);
   const channel = opts.target as string;
-  if (!channel) throw new CliError("message send: --target <ref> is required (e.g. /demo-workspace/general)");
+  if (!channel) throw new CliError("message send: --target <ref> is required (e.g. /demo-workspace#1234/general)");
 
   let text: string | undefined;
   const fileFlag = opts.file as string | undefined;
@@ -278,11 +295,85 @@ async function cmdMessageSend(opts: Record<string, unknown>): Promise<unknown> {
   return { sent: `${res.message.channel}${res.message.seq}` };
 }
 
+/**
+ * createPost with the SAME bounded same-nonce transient retry as `sendWithRetry`
+ * — createPost also carries a `nonce` the server dedupes on, so a
+ * committed-but-response-lost create is absorbed here (server returns the
+ * canonical post) instead of surfacing as an error the agent would re-run into a
+ * second post. Only transient transport errors retry; a thrown 4xx (bad forum /
+ * unauthorized / empty) passes straight through.
+ */
+async function createPostWithRetry(
+  api: ServerApi,
+  req: Parameters<ServerApi["createPost"]>[0],
+): Promise<Awaited<ReturnType<ServerApi["createPost"]>>> {
+  const MAX_ATTEMPTS = 4;
+  const BASE_DELAY_MS = 150;
+  const MAX_DELAY_MS = 2000;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      return await api.createPost(req);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientSendError(err) || attempt === MAX_ATTEMPTS - 1) throw err;
+      const cap = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** attempt);
+      await new Promise((r) => setTimeout(r, cap));
+    }
+  }
+  throw lastErr;
+}
+
+async function cmdMessagePost(opts: Record<string, unknown>): Promise<unknown> {
+  const api = getApi();
+  const agent = agentId(opts);
+  const forum = opts.target as string;
+  if (!forum) throw new CliError("message post: --target <forum-ref> is required (e.g. /demo#1234/ideas)");
+  const title = opts.title as string | undefined;
+  if (!title || title.trim().length === 0) throw new CliError("message post: --title <name> is required");
+
+  // Body: same --text/--file handling as `message send` (file = literal bytes,
+  // never escape-decode; --text decodes shell escapes).
+  let text: string | undefined;
+  const fileFlag = opts.file as string | undefined;
+  const textFlag = opts.text as string | undefined;
+  if (fileFlag) {
+    const fs = await import("fs");
+    if (!fs.existsSync(fileFlag)) throw new CliError(`message post: file not found: ${fileFlag}`);
+    text = fs.readFileSync(fileFlag, "utf8").trim();
+  } else if (typeof textFlag === "string") {
+    text = decodeTextEscapes(textFlag);
+  }
+
+  const attachmentIds = Array.isArray(opts.attachment) ? (opts.attachment as string[]) : [];
+  const hasText = typeof text === "string" && text.trim().length > 0;
+  // Opener contract: a post needs text OR at least one attachment (attachment-
+  // only is a legitimate post — same as a forum post's first message).
+  if (!hasText && attachmentIds.length === 0) {
+    throw new CliError("message post: --text <text>, --file <path>, or --attachment <id> is required");
+  }
+
+  // One idempotency nonce per logical create, reused across sendWithRetry's
+  // internal attempts (server dedupes on author+nonce) — same duplicate-guard
+  // rationale as `message send`.
+  const nonce = randomUUID();
+  const res = await createPostWithRetry(api, {
+    agentId: agent,
+    forum,
+    title: title.trim(),
+    content: { text: text ?? "" },
+    attachments: attachmentIds.length > 0 ? attachmentIds : undefined,
+    nonce,
+  });
+  // Surface the canonical /server/forum/#N thread ref, usable as `--target`.
+  return { posted: res.ref };
+}
+
 async function cmdMessageEmoji(opts: Record<string, unknown>): Promise<unknown> {
   const api = getApi();
   const target = opts.target as string;
   const emoji = opts.emoji as string;
-  if (!target) throw new CliError("message emoji: --target <ref> is required (e.g. /demo/general#42)");
+  if (!target) throw new CliError("message emoji: --target <ref> is required (e.g. /demo#1234/general#42)");
   if (!emoji) throw new CliError("message emoji: --emoji <string> is required");
 
   let parsed: ReturnType<typeof parseRef>;
@@ -305,14 +396,10 @@ async function cmdMessageEmoji(opts: Record<string, unknown>): Promise<unknown> 
   }
 
   // Rebuild the SCOPE ref (no pin-seq — that's passed separately as `seq`).
-  // A forum-post target (`/server/forum/post#N`) must keep its childChannelName
-  // so the reaction lands on the post, not its parent forum.
   const channel =
-    parsed.childChannelName !== undefined
-      ? `/${parsed.server}/${parsed.channel}/${parsed.childChannelName}`
-      : parsed.threadRootSeq !== undefined
-        ? `/${parsed.server}/${parsed.channel}/#${parsed.threadRootSeq}`
-        : `/${parsed.server}/${parsed.channel}`;
+    parsed.threadRootSeq !== undefined
+      ? `/${parsed.server}/${parsed.channel}/#${parsed.threadRootSeq}`
+      : `/${parsed.server}/${parsed.channel}`;
   const res = await api.reactAdd({ channel, seq: parsed.seq, emoji });
   return { target, emoji, duplicate: res.duplicate === true };
 }
@@ -340,9 +427,6 @@ async function cmdAttachmentUpload(opts: Record<string, unknown>): Promise<unkno
   const pathMod = await import("path");
   const filename = pathMod.basename(filePath);
   const contentType = contentTypeFromFilename(filename);
-  if (!mimeAllowed(contentType)) {
-    throw new CliError(`message attachment upload: content type not allowed: ${contentType}`);
-  }
 
   const result = await api.attachmentUpload({
     agentId: agent,
@@ -435,9 +519,22 @@ async function cmdServerMember(opts: Record<string, unknown>): Promise<unknown> 
   const api = getApi();
   const agent = agentId(opts);
   const server = opts.server as string;
-  if (!server) throw new CliError("server member: --server <name> is required");
-  const { members } = await api.listMembers({ agentId: agent, server });
-  return { members };
+  if (!server) throw new CliError("server member: --server <name#discriminator> is required");
+  let limit: number | undefined;
+  if (opts.limit !== undefined) {
+    limit = Number(opts.limit);
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw new CliError("server member: --limit must be a positive integer");
+    }
+  }
+  const cursor = opts.cursor as string | undefined;
+  const { members, cursor: nextCursor, hasMore } = await api.listMembers({
+    agentId: agent,
+    server,
+    limit,
+    cursor,
+  });
+  return { members, cursor: nextCursor, hasMore };
 }
 
 async function cmdServerJoin(opts: Record<string, unknown>): Promise<unknown> {
@@ -455,7 +552,7 @@ async function cmdChannelList(opts: Record<string, unknown>): Promise<unknown> {
   const api = getApi();
   const agent = agentId(opts);
   const server = opts.server as string;
-  if (!server) throw new CliError("channel list: --server <id-or-name> is required");
+  if (!server) throw new CliError("channel list: --server <name#discriminator> is required");
   return await api.listChannels({ agentId: agent, server });
 }
 
@@ -539,7 +636,7 @@ function buildProgram(): Command {
   message
     .command("send")
     .description("send a message to a channel, DM, or thread")
-    .option("--target <ref>", "destination (path-style ref, e.g. /demo-workspace/general)")
+    .option("--target <ref>", "destination (path-style ref, e.g. /demo-workspace#1234/general)")
     .option("--text <text>", "inline message body (short messages)")
     .option("--file <path>", "read message body from a file (long messages)")
     .option(
@@ -559,9 +656,31 @@ function buildProgram(): Command {
     });
 
   message
+    .command("post")
+    .description("create a new forum post in a forum")
+    .option("--target <forum-ref>", "the forum to post in (path-style ref, e.g. /demo#1234/ideas)")
+    .option("--title <name>", "the post title (its slug becomes the post's address)")
+    .option("--text <text>", "inline post body (short)")
+    .option("--file <path>", "read post body from a file (long)")
+    .option(
+      "-a, --attachment <id>",
+      "attach an uploaded file by id (repeatable — order = body order)",
+      (v, prev: string[] = []) => [...prev, v],
+      [] as string[],
+    )
+    .exitOverride()
+    .configureOutput({ writeOut: () => {}, writeErr: () => {} })
+    .action(async function (this: Command) {
+      const localOpts = this.opts();
+      const globalOpts = program.opts();
+      const result = await cmdMessagePost({ ...globalOpts, ...localOpts });
+      printEnvelope({ success: result });
+    });
+
+  message
     .command("emoji")
     .description("react to a message with a single emoji")
-    .requiredOption("--target <ref>", "message ref (path-style, e.g. /demo/general#42 or /.dm/peer#7)")
+    .requiredOption("--target <ref>", "message ref (path-style, e.g. /demo#1234/general#42 or /.dm/peer#0007#42)")
     .requiredOption("--emoji <string>", "single emoji character")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
@@ -637,8 +756,10 @@ function buildProgram(): Command {
 
   server
     .command("member")
-    .description("list members of a server")
-    .option("--server <id-or-name>", "server id or name (from `server list`)")
+    .description("list members of a server (paginated; each member carries online + status)")
+    .option("--server <handle>", "server name#discriminator handle (from `server list`)")
+    .option("--limit <n>", "max members per page")
+    .option("--cursor <cursor>", "opaque cursor from a prior page's response (omit for the first page)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(async function (this: Command) {
@@ -667,7 +788,7 @@ function buildProgram(): Command {
   channel
     .command("list")
     .description("list top-level channels visible to this agent in one server")
-    .option("--server <id-or-name>", "server id or name (from `server list`)")
+    .option("--server <handle>", "server name#discriminator handle (from `server list`)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
     .action(async function (this: Command) {
@@ -773,15 +894,15 @@ function buildProgram(): Command {
 
   daemon
     .command("stop")
-    .description("stop the daemon for a specific machine key")
-    .requiredOption("--machine-key <key>", "machine key identifying which daemon to stop")
+    .argument("<id>", "daemon id from `alook daemon list` (the ID column)")
+    .description("stop a daemon by its id (from `alook daemon list`)")
     .option("--base-dir <path>", "data directory (or ALOOK_DATA_DIR env)")
     .exitOverride()
     .configureOutput({ writeOut: () => {}, writeErr: () => {} })
-    .action(async function (this: Command) {
+    .action(async function (this: Command, id: string) {
       const localOpts = this.opts();
       await daemonStop({
-        machineKey: localOpts.machineKey as string,
+        id,
         baseDir: localOpts.baseDir as string | undefined,
       });
     });
@@ -795,7 +916,35 @@ function buildProgram(): Command {
     .action(function (this: Command) {
       const localOpts = this.opts();
       const daemons = daemonList({ baseDir: localOpts.baseDir as string | undefined });
-      printEnvelope({ success: { daemons } });
+      // `daemon list` is for a HUMAN operator — print a table, not JSON (the
+      // agent-facing commands keep their JSON envelope). The ID column is what
+      // you pass to `daemon stop <id>`.
+      process.stdout.write(renderDaemonList(daemons) + "\n");
+    });
+
+  daemon
+    .command("status")
+    .argument("[id]", "daemon id from `alook daemon list` (omit if only one daemon)")
+    .description("dump each agent's current FSM state from a daemon's status snapshot")
+    .option("--base-dir <path>", "data directory (or ALOOK_DATA_DIR env)")
+    .exitOverride()
+    .configureOutput({ writeOut: () => {}, writeErr: () => {} })
+    .action(function (this: Command, id: string | undefined) {
+      const localOpts = this.opts();
+      const status = daemonStatus({ id, baseDir: localOpts.baseDir as string | undefined });
+      // Multiple daemons + no id → ambiguous: tell the reader which id to pass
+      // (status is per-daemon since C0, so it can't guess which one).
+      if (status.ambiguous) {
+        printEnvelope({
+          error: "multiple daemons on this machine — pass an id: `alook daemon status <id>`",
+          hint: `available ids: ${(status.availableIds ?? []).join(", ")} (see \`alook daemon list\`)`,
+        });
+        return;
+      }
+      // ALWAYS surface freshness — a stale snapshot must never read as live
+      // truth (the "state unsynced" blind spot this feature kills). The reader
+      // gets the raw fields + an explicit freshness verdict + snapshot age.
+      printEnvelope({ success: { status } });
     });
 
   return program;
@@ -812,9 +961,12 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   } catch (err) {
     if (err instanceof CommanderError) {
       if (err.code === "commander.helpDisplayed" || err.code === "commander.help") {
-        // Help requested — find the relevant command and output its help text
-        const helpText = getHelpText(program, argv);
-        printEnvelope({ success: { usage: helpText } });
+        // `-h`/`--help` is a HUMAN reading usage in a terminal — print the plain
+        // commander usage text, NOT the agent JSON envelope. Help is the one
+        // path that's human-facing; every other outcome (success results,
+        // errors, unknownCommand) stays a one-JSON-line envelope for agents to
+        // consume. (Gus 架构#473: -h wrongly returned `{"success":{"usage":…}}`.)
+        process.stdout.write(getHelpText(program, argv) + "\n");
       } else if (err.code === "commander.unknownCommand") {
         printEnvelope({ error: `unknown command: ${argv.join(" ") || "(none)"}. Run \`alook help\`.` });
       } else {

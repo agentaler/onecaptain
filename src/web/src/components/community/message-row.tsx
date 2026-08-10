@@ -25,9 +25,12 @@ export interface MessageRowProps {
   onReactId?: (id: string, emoji: string) => void
   onReplyId?: (id: string) => void
   onPinId?: (id: string) => void
+  onMarkId?: (id: string) => void
   onCreateThreadId?: (id: string) => void
   onCopyId?: (id: string) => void
+  onEditId?: (id: string) => void
   onRetryId?: (id: string) => void
+  onDismissId?: (id: string) => void
   onJumpToId?: (id: string) => void
   onPreviewImage?: (name: string) => void
   onDownloadFile?: (name: string) => void
@@ -48,8 +51,8 @@ export interface MessageRowProps {
 function MessageRowImpl(props: MessageRowProps) {
   const {
     m, pinned, highlighted, onOpenThread, onOpenProfile,
-    onToggleReactionId, onReactId, onReplyId, onPinId, onCreateThreadId,
-    onCopyId, onRetryId, onJumpToId, onPreviewImage, onDownloadFile,
+    onToggleReactionId, onReactId, onReplyId, onPinId, onMarkId, onCreateThreadId,
+    onCopyId, onEditId, onRetryId, onDismissId, onJumpToId, onPreviewImage, onDownloadFile,
     resolveUserName, onImageLoad,
     selectMode, selected, onToggleSelectId, onEnterSelectId, onShareSingleId,
   } = props
@@ -66,9 +69,12 @@ function MessageRowImpl(props: MessageRowProps) {
   const onReact = useCallback((emoji: string) => onReactId?.(id, emoji), [onReactId, id])
   const onReply = useCallback(() => onReplyId?.(id), [onReplyId, id])
   const onPin = useCallback(() => onPinId?.(id), [onPinId, id])
+  const onMark = useCallback(() => onMarkId?.(id), [onMarkId, id])
   const onCreateThread = useCallback(() => onCreateThreadId?.(id), [onCreateThreadId, id])
   const onCopy = useCallback(() => onCopyId?.(id), [onCopyId, id])
+  const onEdit = useCallback(() => onEditId?.(id), [onEditId, id])
   const onRetry = useCallback(() => onRetryId?.(id), [onRetryId, id])
+  const onDismiss = useCallback(() => onDismissId?.(id), [onDismissId, id])
   const onJumpReply = useCallback(() => { if (replyToId) onJumpToId?.(replyToId) }, [onJumpToId, replyToId])
   const onToggleSelect = useCallback(() => onToggleSelectId?.(id), [onToggleSelectId, id])
   const onEnterSelect = useCallback(() => onEnterSelectId?.(id), [onEnterSelectId, id])
@@ -91,9 +97,12 @@ function MessageRowImpl(props: MessageRowProps) {
       onReact={onReactId ? onReact : undefined}
       onReply={onReplyId ? onReply : undefined}
       onPin={onPinId ? onPin : undefined}
+      onMark={onMarkId ? onMark : undefined}
       onCreateThread={onCreateThreadId ? onCreateThread : undefined}
       onCopy={onCopyId ? onCopy : undefined}
+      onEdit={onEditId ? onEdit : undefined}
       onRetry={onRetryId ? onRetry : undefined}
+      onDismiss={onDismissId ? onDismiss : undefined}
       onPreviewImage={onPreviewImage}
       onDownloadFile={onDownloadFile}
       resolveUserName={resolveUserName}

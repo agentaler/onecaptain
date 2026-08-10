@@ -1,6 +1,12 @@
 import { dateKey, formatDateLabel } from "./format-time"
 import type { Msg, RenderMsg } from "./_types"
 
+function messageDisplayKey(message: Msg): string {
+  const nonce = message.clientNonce
+  if (!message.authorId || !nonce || nonce.startsWith("srv:")) return `msg:id:${message.id}`
+  return `msg:client:${JSON.stringify([message.authorId, nonce])}`
+}
+
 // Pure list-prep logic for the virtualized `MessageList` — split out of
 // `message-list.tsx` (a "use client" component) into its own module with no
 // React/JSX so `use-scroll-anchor.ts` can import `FlatItem`/`estimateRowHeight`
@@ -81,7 +87,7 @@ export function flattenMessageItems(
     const isPendingWindowFirst = !seenFirstMessage && hasMoreOlder && m.type === "chat"
     const grouped = isPendingWindowFirst || !!(prev && m.type === "chat" && !m.replyTo && !showDateDivider && prev.authorName === m.authorName
       && prev.createdAt && m.createdAt && (new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime()) < MESSAGE_GROUP_WINDOW_MS)
-    items.push({ kind: "message", m: { ...m, grouped }, key: `msg:${m.id}` })
+    items.push({ kind: "message", m: { ...m, grouped }, key: messageDisplayKey(m) })
     seenFirstMessage = true
     prev = m
   }
@@ -98,14 +104,13 @@ const MESSAGE_BASE_ESTIMATE_PX = 24
 const CHARS_PER_LINE_ESTIMATE = 55
 const LINE_HEIGHT_ESTIMATE_PX = 20
 const MAX_TEXT_ESTIMATE_PX = 400
-// Attachment images render inside a max-width box (see message.tsx's
-// `max-w-[320px]`) — an aspect-ratio estimate is clamped against that width
-// so a very tall/narrow image doesn't produce an absurd height guess.
-const ATTACHMENT_MAX_WIDTH_PX = 320
 const ATTACHMENT_FALLBACK_ESTIMATE_PX = 200
+const ATTACHMENT_MAX_HEIGHT_ESTIMATE_PX = 300
+const ATTACHMENT_TYPICAL_WIDTH_ESTIMATE_PX = 320
 const EMBED_ESTIMATE_PX = 120
 const REACTIONS_ESTIMATE_PX = 32
 const THREAD_PREVIEW_ESTIMATE_PX = 36
+const REPLY_HEADER_ESTIMATE_PX = 28
 
 function estimateTextHeight(content: string | undefined): number {
   if (!content) return 0
@@ -118,11 +123,12 @@ function estimateAttachmentsHeight(m: Msg): number {
   let total = 0
   for (const a of m.attachments) {
     if (a.kind !== "image") continue
-    if (a.width && a.height) {
-      total += Math.round((ATTACHMENT_MAX_WIDTH_PX * a.height) / a.width)
-    } else {
-      total += ATTACHMENT_FALLBACK_ESTIMATE_PX
-    }
+    total += a.width && a.height
+      ? Math.min(
+          ATTACHMENT_MAX_HEIGHT_ESTIMATE_PX,
+          Math.round((ATTACHMENT_TYPICAL_WIDTH_ESTIMATE_PX * a.height) / a.width),
+        )
+      : ATTACHMENT_FALLBACK_ESTIMATE_PX
   }
   return total
 }
@@ -133,6 +139,7 @@ export function estimateRowHeight(item: FlatItem): number {
   if (item.kind === "new-divider") return item.dateLabel ? DATE_DIVIDER_ESTIMATE_PX : NEW_DIVIDER_ESTIMATE_PX
   const m = item.m
   let height = MESSAGE_BASE_ESTIMATE_PX + estimateTextHeight(m.content) + estimateAttachmentsHeight(m)
+  if (m.replyTo) height += REPLY_HEADER_ESTIMATE_PX
   if (m.embeds?.length) height += EMBED_ESTIMATE_PX * m.embeds.length
   if (m.reactions?.length) height += REACTIONS_ESTIMATE_PX
   if (m.thread) height += THREAD_PREVIEW_ESTIMATE_PX

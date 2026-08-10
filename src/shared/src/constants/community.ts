@@ -29,13 +29,6 @@ export const MAX_EMOJI_BYTES = 32
 export const MAX_ATTACHMENTS_PER_MESSAGE = 10
 export const MAX_ATTACHMENT_SIZE_BYTES = 25 * 1024 * 1024 // 25 MB
 export const MAX_SERVER_ICON_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
-export const ALLOWED_ATTACHMENT_MIME_PREFIXES = [
-  "image/",
-  "video/",
-  "audio/",
-  "application/pdf",
-  "text/",
-] as const
 export const ALLOWED_ICON_MIME_TYPES = [
   "image/png",
   "image/jpeg",
@@ -76,6 +69,22 @@ export const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__"
 
 // Previews
 export const MESSAGE_PREVIEW_LENGTH = 120
+
+export function truncateMessagePreview(text: string): string {
+  if (text.length <= MESSAGE_PREVIEW_LENGTH) return text
+  let end = MESSAGE_PREVIEW_LENGTH - 1
+  const lastIncluded = text.charCodeAt(end - 1)
+  const firstExcluded = text.charCodeAt(end)
+  if (
+    lastIncluded >= 0xd800
+    && lastIncluded <= 0xdbff
+    && firstExcluded >= 0xdc00
+    && firstExcluded <= 0xdfff
+  ) {
+    end -= 1
+  }
+  return `${text.slice(0, end)}…`
+}
 
 // Inbox / unreads
 export const DEFAULT_INBOX_PAGE_SIZE = 100
@@ -154,8 +163,8 @@ export function normalizeNotifLevel(input: string): NotificationLevelValue {
   return "all"
 }
 
-// Participant `source` — how a user joined a thread/forum-post's participant
-// (notify) set: an `@`-mention, having spoken in it, or explicitly added.
+// Participant `source` — how a user joined a child thread's notify set: an
+// `@`-mention, having spoken in it, or explicitly added.
 // Anchors `community_channel_member.source` / thread-participant `source`.
 // Single value source for the literals; `ThreadParticipantSource`
 // (queries/community/thread.ts) derives from this via const-assert so the two

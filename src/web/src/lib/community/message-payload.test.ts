@@ -11,6 +11,7 @@ const baseRow: MessageRow = {
   mentionType: null,
   replyToId: null,
   embeds: null,
+  seq: 42,
   createdAt: "2026-07-03T12:00:00.000Z",
 }
 
@@ -70,11 +71,14 @@ describe("mapMessageForApi", () => {
     expect(out.replyTo).toEqual({ id: "m-gone", authorName: "Unknown", text: "", deleted: true })
   })
 
-  it("truncates reply preview text to MESSAGE_PREVIEW_LENGTH", () => {
+  it("gives API and WS projections the same ellipsized reply preview", () => {
     const long = "x".repeat(500)
     const replyMap = new Map([["m0", { id: "m0", authorName: "Bob", content: long }]])
-    const out = mapMessageForApi({ ...baseRow, replyToId: "m0" }, { ...emptyApiCtx, replyMap })
-    expect(out.replyTo?.text.length).toBeLessThan(500)
+    const apiOut = mapMessageForApi({ ...baseRow, replyToId: "m0" }, { ...emptyApiCtx, replyMap })
+    const wsOut = mapMessageForWs({ ...baseRow, replyToId: "m0" }, { ...emptyWsCtx, replyMap })
+    const expected = `${"x".repeat(119)}…`
+    expect(apiOut.replyTo?.text).toBe(expected)
+    expect(wsOut.replyTo?.text).toBe(expected)
   })
 
   it("omits attachments/reactions when there are none", () => {
@@ -105,9 +109,22 @@ describe("mapMessageForApi", () => {
     const withoutThread = mapMessageForApi(baseRow, emptyApiCtx)
     expect(withoutThread.thread).toBeUndefined()
   })
+
+  it("returns client-provided nonces and filters srv fallbacks", () => {
+    expect(mapMessageForApi({ ...baseRow, clientNonce: "client-1" }, emptyApiCtx).clientNonce)
+      .toBe("client-1")
+    expect(mapMessageForApi({ ...baseRow, clientNonce: "srv:fallback" }, emptyApiCtx).clientNonce)
+      .toBeUndefined()
+    expect(mapMessageForApi({ ...baseRow, clientNonce: null }, emptyApiCtx).clientNonce)
+      .toBeUndefined()
+  })
 })
 
 describe("mapMessageForWs", () => {
+  it("preserves the required server seq", () => {
+    expect(mapMessageForWs(baseRow, emptyWsCtx).seq).toBe(42)
+  })
+
   it("maps ordinary rows to type: \"chat\" (was \"default\" before #12's exhaustive discriminator)", () => {
     expect(mapMessageForWs({ ...baseRow, type: null }, emptyWsCtx).type).toBe("chat")
     expect(mapMessageForWs({ ...baseRow, type: "default" }, emptyWsCtx).type).toBe("chat")

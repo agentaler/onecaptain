@@ -30,7 +30,7 @@ export type BotActivityEventInput = {
   botId: string;
   sessionId?: string | null;
   launchId?: string | null;
-  kind: "cli_invocation" | "tool_call" | "thinking" | "wake_trigger" | "session_reset" | "nap" | "model_changed" | "error";
+  kind: "cli_invocation" | "tool_call" | "thinking" | "wake_trigger" | "session_reset" | "nap" | "model_changed" | "provider_changed" | "error";
   payload: string;
 };
 
@@ -58,8 +58,8 @@ export async function insertBotActivityEventAndPrune(
   data: BotActivityEventInput,
   /**
    * Extra Drizzle statements to run in the SAME atomic batch as the insert +
-   * prune — lets a caller fold a companion write (e.g. the per-message
-   * `handledMessageCount` bump on a wake_trigger) into this one round-trip
+   * prune — lets a caller fold a companion write (e.g. the per-day
+   * `handled` activity-rollup bump on a wake_trigger) into this one round-trip
    * instead of issuing a separate hot-path write. They share the batch's
    * all-or-nothing fate. Appended AFTER insert+prune so `results[0]` is still
    * the insert.
@@ -201,8 +201,9 @@ export async function insertBotAuditWakeTrigger(
   /**
    * Extra Drizzle statements to fold into the SAME atomic batch as the
    * wake_trigger insert + prune (see `insertBotActivityEventAndPrune`). The
-   * wake path uses this to bump `handledMessageCount` in the one round-trip
-   * that already writes the audit row, rather than a separate hot-path write.
+   * wake path uses this to bump the per-day `handled` activity rollup in the
+   * one round-trip that already writes the audit row, rather than a separate
+   * hot-path write.
    */
   extraStatements: unknown[] = []
 ): Promise<{ id: string; createdAt: string } | null> {
@@ -229,55 +230,67 @@ export async function insertBotAuditWakeTrigger(
  */
 export async function insertBotAuditSessionReset(
   db: Database,
-  data: { botId: string; actorId: string }
+  data: { botId: string; launchId: string; trigger: "single" | "reset_all" }
 ): Promise<{ id: string; createdAt: string } | null> {
   return insertBotActivityEventAndPrune(db, {
     botId: data.botId,
     sessionId: null,
-    launchId: null,
+    launchId: data.launchId,
     kind: "session_reset",
-    payload: JSON.stringify({}),
+    payload: JSON.stringify({ trigger: data.trigger }),
   });
 }
 
 /**
  * Nap audit write — the agent reset ITS OWN session via `alook nap`. Actor is
- * the bot itself (self-initiated), so no `actorId`. Payload is intentionally
- * empty — the fact of the nap is the signal; the handoff lives in the rewake
- * prompt, never persisted. Written ONLY after the daemon confirmed delivery of
- * the `agent:nap` frame (`sent > 0`) — an undelivered nap writes no row,
- * mirroring reset/model-switch audit-on-delivery.
+ * the bot itself (self-initiated), so no `actorId`; `trigger` is the constant
+ * `"nap"` so my-bots reads "slept" vs a "was reset". Written when the reborn
+ * agent's `agent_session` lands (completion), NOT at dispatch — so a nap that
+ * dispatches but whose cold-start fails writes no row (the DO evicts the
+ * pending map entry on the failure frame instead). See
+ * plans/reset-nap-completion-rehome.md.
  */
 export async function insertBotAuditNap(
   db: Database,
-  data: { botId: string }
+  data: { botId: string; launchId: string }
 ): Promise<{ id: string; createdAt: string } | null> {
   return insertBotActivityEventAndPrune(db, {
     botId: data.botId,
     sessionId: null,
-    launchId: null,
+    launchId: data.launchId,
     kind: "nap",
-    payload: JSON.stringify({}),
+    payload: JSON.stringify({ trigger: "nap" }),
   });
 }
 
 /**
  * Model-changed audit write — the owner switched a bot's LLM model in
- * `/c/me/bots`. Actor is the owner (owner-scoped by construction on the API
- * route). Payload carries the full stored ids (`null` = the runtime's
- * default). Written ONLY after the daemon confirmed delivery of the
- * `agent:model_switch` frame (see plan decision #7) — an undelivered switch
- * (offline bot, transport error) leaves D1 authoritative but writes no row.
+ * `/c/me/bots`. Payload carries the full stored ids (`null` = the runtime's
+ * default). Written when the switched launch's `agent_session` lands; an
+ * undelivered or failed launch writes no row.
  */
 export async function insertBotAuditModelChanged(
   db: Database,
-  data: { botId: string; actorId: string; from: string | null; to: string | null }
+  data: { botId: string; launchId: string; from: string | null; to: string | null }
 ): Promise<{ id: string; createdAt: string } | null> {
   return insertBotActivityEventAndPrune(db, {
     botId: data.botId,
     sessionId: null,
-    launchId: null,
+    launchId: data.launchId,
     kind: "model_changed",
+    payload: JSON.stringify({ from: data.from, to: data.to }),
+  });
+}
+
+export async function insertBotAuditProviderChanged(
+  db: Database,
+  data: { botId: string; launchId: string; from: string; to: string }
+): Promise<{ id: string; createdAt: string } | null> {
+  return insertBotActivityEventAndPrune(db, {
+    botId: data.botId,
+    sessionId: null,
+    launchId: data.launchId,
+    kind: "provider_changed",
     payload: JSON.stringify({ from: data.from, to: data.to }),
   });
 }

@@ -11,6 +11,12 @@ import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import type { Msg } from "@/components/community/_types"
 import { flushPendingReads } from "@/hooks/community/mutations/messages"
+import {
+  materializeMessageStream,
+  type CanonicalMessage,
+  type MessageScope,
+} from "@/lib/community/message-stream"
+import { useMessageOverlay, useMessageStreamStore } from "@/stores/community/message-stream"
 
 /**
  * Fetches paginated messages for a community channel.
@@ -54,8 +60,9 @@ export type MessagesPageParam =
   | { mode: "older"; cursor: string }
   | { mode: "newer"; cursor: string }
 
-function buildMessagesUrl(base: string, pageParam: MessagesPageParam): string {
+function buildMessagesUrl(base: string, pageParam: MessagesPageParam, tag?: string | null): string {
   const params = new URLSearchParams()
+  if (tag) params.set("tag", tag)
   switch (pageParam.mode) {
     case "newest":
       break
@@ -77,10 +84,10 @@ function buildMessagesUrl(base: string, pageParam: MessagesPageParam): string {
 }
 
 export const channelMessagesQueryFn =
-  (channelId: string) =>
+  (channelId: string, tag?: string | null) =>
   async ({ pageParam }: { pageParam: MessagesPageParam }): Promise<MessagesPage> => {
     return apiFetch<MessagesPage>(
-      buildMessagesUrl(`/api/community/channels/${channelId}/messages`, pageParam),
+      buildMessagesUrl(`/api/community/channels/${channelId}/messages`, pageParam, tag),
     )
   }
 
@@ -88,9 +95,13 @@ export const dmMessagesQueryFn =
   (dmId: string) =>
   async ({ pageParam }: { pageParam: MessagesPageParam }): Promise<MessagesPage> => {
     return apiFetch<MessagesPage>(
-      buildMessagesUrl(`/api/community/dm/${dmId}/messages`, pageParam),
+      buildMessagesUrl(`/api/community/channels/${dmId}/messages`, pageParam),
     )
   }
+
+export function messageMatchesTag(message: Msg, tag?: string | null): boolean {
+  return !tag || message.thread?.tags?.includes(tag) === true
+}
 
 /**
  * Merge all pages into a single chronological ASC list, deduping by id.
@@ -125,14 +136,28 @@ export function mergeMessagesPages(pages: MessagesPage[]): Msg[] {
   return out
 }
 
-// Fix 4 window: how stale a hydrated cache may be before a mount fires an
-// invalidate. Short enough that a returning tab picks up fresh data on the
-// first paint, long enough that rapid channel switching within a single
-// session doesn't churn the network — the reconnect handler in
-// `useCommunityWs` covers longer offline gaps on its own.
-const STALE_HYDRATED_CACHE_MS = 30_000
+// Anchor-drift repair uses age only to decide whether a fetched anchor page
+// should merge into a trustworthy same-session window or replace an older
+// hydrated window. General mount freshness is owned by the query's
+// `staleTime: 0` contract below, not by this threshold.
+const ANCHOR_CACHE_FRESHNESS_MS = 30_000
 
 type PageCache = InfiniteData<MessagesPage, MessagesPageParam>
+
+function cachedWindowNeedsAnchor(
+  pages: MessagesPage[] | undefined,
+  anchorId: string | null,
+): boolean {
+  if (!anchorId || !pages || pages.length === 0) return false
+  let hasMessages = false
+  for (const page of pages) {
+    for (const message of page.messages) {
+      hasMessages = true
+      if (message.id === anchorId) return false
+    }
+  }
+  return hasMessages
+}
 
 type MessagesReturn = Omit<UseInfiniteQueryResult<PageCache, Error>, "isLoading"> & {
   messages: Msg[]
@@ -144,6 +169,7 @@ type MessagesReturn = Omit<UseInfiniteQueryResult<PageCache, Error>, "isLoading"
   fetchOlder: () => void
   fetchNewer: () => void
   jumpToPresent: () => void
+  presentVersion: number
   // Legacy alias — mirrors `hasMoreOlder`. Kept so consumers not yet migrated
   // off the older-only API still compile until every call site is updated.
   hasMore: boolean
@@ -155,6 +181,8 @@ type MessagesReturn = Omit<UseInfiniteQueryResult<PageCache, Error>, "isLoading"
 }
 
 type MessagesOpts = {
+  /** Server-side message-tag filter. Null/undefined means the complete set. */
+  tag?: string | null
   /**
    * Anchor for the initial fetch. Undefined = read-state not resolved yet;
    * the hook stays disabled until this becomes a value or `null`. `null`
@@ -170,14 +198,16 @@ type MessagesOpts = {
    * read snapshot resolves must NOT leave the query disabled.
    */
   anchorMessageId?: string | null
-  /**
-   * When true, the initial page is trusted from a pre-seeded cache (the channel
-   * bootstrap wrote `channelMessages(id)` before this hook mounted), so the
-   * hook must NOT refetch page 0 on mount — otherwise the de-serialization win
-   * is lost (bootstrap + a redundant messages fetch). Pagination (older/newer)
-   * still refetches normally. Only affects the initial window.
-   */
-  trustSeededInitialPage?: boolean
+}
+
+type ChannelMessagesOpts = MessagesOpts & {
+  serverId: string
+}
+
+type PresentOverride = {
+  attemptId: number
+  phase: "requested" | "present"
+  viewKey: string
 }
 
 // Shared pagination + reducer used by both channel and DM hooks. Kept inline
@@ -201,11 +231,19 @@ function useMessagesInner(
   // Jump target wins over the read pointer for the initial anchor window.
   const anchorId = opts?.anchorMessageId ?? opts?.lastReadMessageId ?? null
   const enabled = !!scopeId && anchorResolved
-
-  // Force-newest override — flipped by `jumpToPresent`. Held in state so
-  // React re-renders with the new options before the reset fires (see the
-  // useEffect below). Cleared once the first newest page arrives.
-  const [forceNewest, setForceNewest] = useState(false)
+  const viewKey = useMemo(
+    () => JSON.stringify([queryKey, opts?.anchorMessageId ?? null]),
+    [queryKey, opts?.anchorMessageId],
+  )
+  const attemptIdRef = useRef(0)
+  const snapshotRef = useRef<{
+    attemptId: number
+    data: PageCache | undefined
+    viewKey: string
+  } | null>(null)
+  const [presentOverride, setPresentOverride] = useState<PresentOverride | null>(null)
+  const forceNewest = presentOverride?.viewKey === viewKey
+  const jumpPending = forceNewest && presentOverride?.phase === "requested"
 
   const initialPageParam = useMemo<MessagesPageParam>(() => {
     if (forceNewest) return { mode: "newest" }
@@ -245,15 +283,17 @@ function useMessagesInner(
       return { mode: "newer", cursor }
     },
     enabled,
-    // Trust a bootstrap-seeded initial window: treat it as fresh so the hook
-    // doesn't refetch page 0 on mount (otherwise the de-serialization win is
-    // lost — bootstrap + a redundant messages fetch). Pagination still fetches
-    // older/newer via getNext/PreviousPageParam. Without a seed these fall to
-    // the library defaults (staleTime 0, refetchOnMount true), so the
-    // non-bootstrap paths (DM, jump, forum) are unchanged.
-    ...(opts?.trustSeededInitialPage
-      ? { staleTime: Infinity, refetchOnMount: false as const }
-      : {}),
+    // Message bases are persisted, while accepted/session rows live in an
+    // in-memory overlay. Treat each ordinary active message query as stale so
+    // disabled→enabled activation revalidates even inside the global 5-second
+    // freshness window. TanStack keeps cached pages painted during the fetch.
+    // A nonempty window missing the resolved anchor is the one exception: Fix
+    // 3 below owns that repair and must fetch the NEW anchor page before any
+    // persisted pageParam can replace or discard the existing history.
+    staleTime: (cachedQuery) => cachedWindowNeedsAnchor(
+      (cachedQuery.state.data as PageCache | undefined)?.pages,
+      forceNewest ? null : anchorId,
+    ) ? Infinity : 0,
   })
 
   // Flush any pending mark-read on scope switch / unmount so the 500ms
@@ -266,25 +306,47 @@ function useMessagesInner(
     }
   }, [scopeId])
 
-  // Two-phase reset: setForceNewest triggers a render that updates
-  // `initialPageParam` to newest. THIS effect fires on that render and
-  // actually clears the query, so the refetch reads the newest-mode options
-  // rather than the pre-flip anchor options.
   useEffect(() => {
-    if (!forceNewest) return
-    void queryClient.resetQueries({ queryKey })
-  }, [forceNewest, queryClient, queryKey])
+    setPresentOverride((current) => current?.viewKey === viewKey ? current : null)
+  }, [viewKey])
 
-  // Clear the flag once a newest-shape page lands — anchor pages carry
-  // `hasMoreOlder`/`hasMoreNewer`; legacy newest carries `hasMore`. If the
-  // first cached page reads as legacy, the jump succeeded.
   useEffect(() => {
-    if (!forceNewest) return
+    if (!jumpPending || !presentOverride) return
+    snapshotRef.current = {
+      attemptId: presentOverride.attemptId,
+      data: queryClient.getQueryData<PageCache>(queryKey),
+      viewKey,
+    }
+    void queryClient.resetQueries({ queryKey, exact: true })
+  }, [jumpPending, presentOverride, queryClient, queryKey, viewKey])
+
+  useEffect(() => {
+    if (!jumpPending || !presentOverride) return
     const first = query.data?.pages[0]
     if (!first) return
     const isNewestShape = first.hasMore !== undefined && first.hasMoreOlder === undefined
-    if (isNewestShape) setForceNewest(false)
-  }, [forceNewest, query.data])
+    if (!isNewestShape) return
+    snapshotRef.current = null
+    setPresentOverride((current) =>
+      current?.attemptId === presentOverride.attemptId
+        ? { ...current, phase: "present" }
+        : current)
+  }, [jumpPending, presentOverride, query.data])
+
+  useEffect(() => {
+    if (!jumpPending || !presentOverride || !query.isError) return
+    const snapshot = snapshotRef.current
+    if (
+      snapshot?.attemptId === presentOverride.attemptId
+      && snapshot.viewKey === viewKey
+      && snapshot.data
+    ) {
+      queryClient.setQueryData<PageCache>(queryKey, snapshot.data)
+    }
+    snapshotRef.current = null
+    setPresentOverride((current) =>
+      current?.attemptId === presentOverride.attemptId ? null : current)
+  }, [jumpPending, presentOverride, query.isError, queryClient, queryKey, viewKey])
 
   // Fix 3 — anchor re-validation.
   //
@@ -314,32 +376,17 @@ function useMessagesInner(
   const anchorResetKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (!enabled) return
+    if (forceNewest) return
     if (!anchorId) return
     if (query.isFetching) return
     if (query.isPending) return
-    const pages = query.data?.pages
-    if (!pages || pages.length === 0) return
-    let messageCount = 0
-    let anchorFound = false
-    for (const p of pages) {
-      messageCount += p.messages.length
-      if (!anchorFound) {
-        for (const m of p.messages) {
-          if (m.id === anchorId) {
-            anchorFound = true
-            break
-          }
-        }
-      }
-    }
-    if (messageCount === 0) return
-    if (anchorFound) return
+    if (!cachedWindowNeedsAnchor(query.data?.pages, anchorId)) return
     const resetKey = `${scopeId ?? ""}::${anchorId}`
     if (anchorResetKeyRef.current === resetKey) return
     anchorResetKeyRef.current = resetKey
 
     const updatedAt = query.dataUpdatedAt
-    const isFresh = !!updatedAt && Date.now() - updatedAt < STALE_HYDRATED_CACHE_MS
+    const isFresh = !!updatedAt && Date.now() - updatedAt < ANCHOR_CACHE_FRESHNESS_MS
 
     // Both branches fetch a fresh anchor-centered page out of band and swap
     // it in via `setQueryData` — NEITHER uses `resetQueries`. `resetQueries`
@@ -402,6 +449,7 @@ function useMessagesInner(
       })
   }, [
     enabled,
+    forceNewest,
     anchorId,
     scopeId,
     query.data,
@@ -411,49 +459,6 @@ function useMessagesInner(
     queryClient,
     queryKey,
     queryFn,
-  ])
-
-  // Fix 4 — staleness invalidate on mount / scope switch ONLY.
-  //
-  // When the cache is hydrated from IDB, `dataUpdatedAt` reflects the last
-  // fetch of the previous session. TanStack won't refetch on mount for
-  // infinite queries by default, so the client keeps rendering the stale
-  // window even though `latestSeq` on the server may have advanced. On
-  // mount, if the hydrated window is older than the freshness window, kick
-  // off an invalidation — TanStack re-runs every persisted `pageParam` and
-  // the fresh `latestSeq` in the server response drives `unreadCount` and
-  // `hasMoreNewer` to the truth without any client bookkeeping.
-  //
-  // Fires EXACTLY ONCE per scope (channelId / dmId), gated by a scopeId ref.
-  // Previously the effect had `query.dataUpdatedAt` in its dep list, which
-  // re-evaluated on every fetch complete — including AFTER an optimistic
-  // send stayed in-place past 30s of stillness. Any such re-eval could
-  // invalidate the cache, refetch server pages, and drop the just-sent
-  // (already reconciled) row visually before the WS broadcast caught up.
-  // Locking to "one shot per scope" preserves the mount-time invariant
-  // (hydrated-and-stale gets refreshed) without ever firing again for the
-  // same open scope. WS reconnect + user-initiated navigation cover any
-  // subsequent freshness needs.
-  const staleCacheCheckedScopeRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!enabled) return
-    if (!scopeId) return
-    if (staleCacheCheckedScopeRef.current === scopeId) return
-    if (query.isFetching) return
-    if (query.isPending) return
-    const updatedAt = query.dataUpdatedAt
-    if (!updatedAt) return
-    staleCacheCheckedScopeRef.current = scopeId
-    if (Date.now() - updatedAt < STALE_HYDRATED_CACHE_MS) return
-    void queryClient.invalidateQueries({ queryKey })
-  }, [
-    enabled,
-    scopeId,
-    query.dataUpdatedAt,
-    query.isFetching,
-    query.isPending,
-    queryClient,
-    queryKey,
   ])
 
   const messages = useMemo<Msg[]>(() => {
@@ -493,15 +498,21 @@ function useMessagesInner(
   }, [query])
 
   const jumpToPresent = useCallback(() => {
-    setForceNewest(true)
-  }, [])
+    if (!enabled || forceNewest) return
+    attemptIdRef.current += 1
+    setPresentOverride({
+      attemptId: attemptIdRef.current,
+      phase: "requested",
+      viewKey,
+    })
+  }, [enabled, forceNewest, viewKey])
 
   return {
     ...query,
     // Instant channel switch: a warm channel already has its newest-tail
     // hydrated into `messages` (from the persisted `channelMessages` cache)
     // before the read anchor resolves. Those rows must paint immediately rather
-    // than wait on the bootstrap/read-snapshot round-trip — switching must not
+    // than wait on the read-snapshot round-trip — switching must not
     // happen on a network timescale. So only report loading when there is
     // genuinely nothing to show yet.
     //
@@ -522,10 +533,13 @@ function useMessagesInner(
     hasMoreOlder,
     hasMoreNewer,
     isFetchingOlder: query.isFetchingNextPage,
-    isFetchingNewer: query.isFetchingPreviousPage,
+    isFetchingNewer: query.isFetchingPreviousPage || jumpPending,
     fetchOlder,
     fetchNewer,
     jumpToPresent,
+    presentVersion: forceNewest && presentOverride?.phase === "present"
+      ? presentOverride.attemptId
+      : 0,
     hasMore: hasMoreOlder,
   }
 }
@@ -538,15 +552,47 @@ function useMessagesInner(
  */
 export function useMessages(
   channelId: string | null,
-  opts?: MessagesOpts,
+  opts: ChannelMessagesOpts,
 ): MessagesReturn {
-  const queryKey = communityKeys.channelMessages(channelId ?? "__none__")
-  return useMessagesInner(
+  const queryKey = useMemo(() => {
+    const baseKey = communityKeys.channelMessages(channelId ?? "__none__")
+    return opts.tag ? [...baseKey, "tag", opts.tag] as const : baseKey
+  }, [channelId, opts.tag])
+  const queryFn = useMemo(
+    () => channelMessagesQueryFn(channelId ?? "__none__", opts.tag),
+    [channelId, opts.tag],
+  )
+  const base = useMessagesInner(
     channelId,
     queryKey,
-    channelMessagesQueryFn(channelId ?? "__none__"),
+    queryFn,
     opts,
   )
+  const scope = useMemo<MessageScope>(() => ({
+    kind: "channel",
+    id: channelId ?? "__none__",
+    serverId: opts.serverId,
+  }), [channelId, opts.serverId])
+  const overlay = useMessageOverlay(scope)
+  const canonicalBase = useMemo(
+    () => base.messages.filter(
+      (message): message is CanonicalMessage => typeof message.seq === "number",
+    ),
+    [base.messages],
+  )
+  useEffect(() => {
+    if (!channelId) return
+    useMessageStreamStore.getState().dispatch(scope, {
+      type: "baseChanged",
+      messages: canonicalBase,
+    })
+  }, [canonicalBase, channelId, scope])
+  const messages = useMemo(
+    () => materializeMessageStream(canonicalBase, overlay).filter((message) =>
+      messageMatchesTag(message, opts.tag)),
+    [canonicalBase, opts.tag, overlay],
+  )
+  return { ...base, messages }
 }
 
 /**
@@ -556,11 +602,41 @@ export function useDmMessages(
   dmId: string | null,
   opts?: MessagesOpts,
 ): MessagesReturn {
-  const queryKey = communityKeys.dmMessages(dmId ?? "__none__")
-  return useMessagesInner(
+  const queryKey = useMemo(
+    () => communityKeys.dmMessages(dmId ?? "__none__"),
+    [dmId],
+  )
+  const queryFn = useMemo(
+    () => dmMessagesQueryFn(dmId ?? "__none__"),
+    [dmId],
+  )
+  const base = useMessagesInner(
     dmId,
     queryKey,
-    dmMessagesQueryFn(dmId ?? "__none__"),
+    queryFn,
     opts,
   )
+  const scope = useMemo<MessageScope>(() => ({
+    kind: "dm",
+    id: dmId ?? "__none__",
+  }), [dmId])
+  const overlay = useMessageOverlay(scope)
+  const canonicalBase = useMemo(
+    () => base.messages.filter(
+      (message): message is CanonicalMessage => typeof message.seq === "number",
+    ),
+    [base.messages],
+  )
+  useEffect(() => {
+    if (!dmId) return
+    useMessageStreamStore.getState().dispatch(scope, {
+      type: "baseChanged",
+      messages: canonicalBase,
+    })
+  }, [canonicalBase, dmId, scope])
+  const messages = useMemo(
+    () => materializeMessageStream(canonicalBase, overlay),
+    [canonicalBase, overlay],
+  )
+  return { ...base, messages }
 }

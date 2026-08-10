@@ -442,6 +442,183 @@ describe("reduceManager — tick: suspected-deaf detection (batch A)", () => {
   });
 });
 
+// Batch D (plans/daemon-fsm-desync.md): the reset-stuck reconcile. The reset
+// window (`resetting`) closes only via `enterStable` at a stable running/idle
+// state; if the converging event never arrives the agent wedges in `starting`
+// with `resetting` stuck true — invisible to the three running-keyed onTick
+// predicates. This watchdog is the ONLY thing that catches it.
+describe("reduceManager — tick: reset-stuck reconcile (batch D)", () => {
+  // Build a reset that respawned but never reached `running`: begin_reset →
+  // queued rewake → exit (onExit respawns into `starting`, resetting STAYS true
+  // per batch C) → no `spawned` ever arrives. resettingSince is the begin_reset
+  // stamp; the respawn is still inside the same never-closed window.
+  function toResetStuckOrphan(resetStuckMs = 100) {
+    let s = createInitialManagerState(100_000, 100_000, resetStuckMs);
+    s = register(s, "a", PERSISTENT_GATED);
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m1" }, nowMs: 0 }).state;
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 0 }).state; // running
+    s = reduceManager(s, { type: "begin_reset", agentId: "a", nowMs: 10 }).state; // resetting, resettingSince=10
+    s = reduceManager(s, { type: "rewake_after_reset", agentId: "a", message: { text: "rewake" } }).state;
+    s = reduceManager(s, { type: "exit", agentId: "a" }).state; // onExit → respawn, status=starting, resetting stays
+    return s;
+  }
+
+  it("escalates a reset that never converged (resetting stuck in starting past the threshold)", () => {
+    const s = toResetStuckOrphan();
+    expect(s.agents.a.status).toBe("starting");
+    expect(s.agents.a.resetting).toBe(true);
+    expect(s.agents.a.resettingSince).toBe(10);
+
+    // now - resettingSince = 200 - 10 = 190 >= 100 → escalate.
+    const r = reduceManager(s, { type: "tick", nowMs: 200 });
+    expect(r.effects).toEqual([{ type: "terminate_stalled", agentId: "a" }]);
+    expect(r.state.agents.a.status).toBe("stopping");
+  });
+
+  it("does NOT escalate before the reset-stuck threshold elapses", () => {
+    const s = toResetStuckOrphan();
+    // now - resettingSince = 100 - 10 = 90 < 100 → not yet.
+    expect(reduceManager(s, { type: "tick", nowMs: 100 }).effects).toEqual([]);
+  });
+
+  it("does NOT re-escalate every tick while the forced exit is in flight (stopping guard)", () => {
+    let s = toResetStuckOrphan();
+    s = reduceManager(s, { type: "tick", nowMs: 200 }).state; // → stopping + terminate
+    expect(s.agents.a.status).toBe("stopping");
+    // Next tick before the exit lands: resetting still true, but status is
+    // stopping → guard blocks a second terminate_stalled (no storm).
+    expect(reduceManager(s, { type: "tick", nowMs: 210 }).effects).toEqual([]);
+  });
+
+  it("stops firing once the reset converges (enterStable clears resetting)", () => {
+    let s = toResetStuckOrphan();
+    // The respawn finally reaches running → spawned → enterStable clears the
+    // reset window. The reconcile must go quiet.
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 150 }).state;
+    expect(s.agents.a.resetting).toBe(false);
+    expect(s.agents.a.resettingSince).toBeNull();
+    expect(reduceManager(s, { type: "tick", nowMs: 10_000 }).effects).toEqual([]);
+  });
+
+  it("re-escalates on a later tick if the forced exit's respawn wedges again", () => {
+    let s = toResetStuckOrphan();
+    s = reduceManager(s, { type: "tick", nowMs: 200 }).state; // → stopping + terminate
+    // A new wake arrives during the still-open reset window — gated to inbox
+    // (onWake's reset gate), NOT delivered. So the forced exit's onExit has
+    // queued work → respawns into `starting` again, resetting still true (the
+    // reset STILL hasn't converged). Without the new wake the first onExit would
+    // have drained the sole rewake and settled idle = converged (correct); the
+    // re-wedge only exists when there's fresh queued work each cycle.
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m2" }, nowMs: 210 }).state;
+    s = reduceManager(s, { type: "exit", agentId: "a" }).state;
+    expect(s.agents.a.status).toBe("starting");
+    expect(s.agents.a.resetting).toBe(true);
+    // A later tick past the (unchanged, begin_reset-stamped) window fires anew.
+    const r = reduceManager(s, { type: "tick", nowMs: 400 });
+    expect(r.effects).toEqual([{ type: "terminate_stalled", agentId: "a" }]);
+  });
+
+  it("does NOT escalate a normal (converged) agent with resetting false", () => {
+    let s = createInitialManagerState(100_000, 100_000, 100);
+    s = register(s, "a", PERSISTENT_GATED);
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m1" }, nowMs: 0 }).state;
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 0 }).state; // running, resetting=false
+    expect(reduceManager(s, { type: "tick", nowMs: 10_000 }).effects).toEqual([]);
+  });
+});
+
+// Batch L3 (plans/daemon-fsm-desync.md): the stopping-wedge black hole. A
+// stop/terminate set status=stopping expecting an `exit` that never arrived
+// (no-op stop / kill didn't take). No other predicate keys on `stopping`, and
+// onWake only queues there → permanent wedge (observed live: Olivia 2026-07-31,
+// stuck 12min+, inbox climbing, process still alive). This branch forces it out
+// via `force_exit` (runtime handler kills any tracked proc + synthetic exit).
+describe("reduceManager — tick: stopping-stuck escalation (batch L3)", () => {
+  // Drive an agent into `stopping` via idle-timeout, then WITHHOLD the exit —
+  // exactly the wedge. staleThreshold huge so nothing else fires; idleTimeout
+  // small to enter stopping; stoppingStuck = the arg under test (4th).
+  function toStoppingStuck(stoppingStuckMs = 100) {
+    let s = createInitialManagerState(1_000_000, 50, 1_000_000, stoppingStuckMs);
+    s = register(s, "a", PERSISTENT_GATED);
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m1" }, nowMs: 0 }).state;
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 0 }).state;
+    s = reduceManager(s, { type: "turn_end", agentId: "a", nowMs: 0 }).state; // idleSince=0
+    // Idle-timeout tick (past idleTimeout=50) → status=stopping, stoppingSince stamped.
+    s = reduceManager(s, { type: "tick", nowMs: 100 }).state;
+    return s;
+  }
+
+  it("stamps stoppingSince and issues stop when entering stopping", () => {
+    let s = createInitialManagerState(1_000_000, 50, 1_000_000, 100);
+    s = register(s, "a", PERSISTENT_GATED);
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m1" }, nowMs: 0 }).state;
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 0 }).state;
+    s = reduceManager(s, { type: "turn_end", agentId: "a", nowMs: 0 }).state;
+    const r = reduceManager(s, { type: "tick", nowMs: 100 });
+    expect(r.effects).toEqual([{ type: "stop", agentId: "a", reason: "idle_timeout" }]);
+    expect(r.state.agents.a.status).toBe("stopping");
+    expect(r.state.agents.a.stoppingSince).toBe(100);
+  });
+
+  it("force_exits an agent wedged in stopping past the threshold (the black-hole escape)", () => {
+    const s = toStoppingStuck();
+    expect(s.agents.a.status).toBe("stopping");
+    expect(s.agents.a.stoppingSince).toBe(100);
+    // No exit ever came. nowMs - stoppingSince = 250 - 100 = 150 >= 100 → escape.
+    const r = reduceManager(s, { type: "tick", nowMs: 250 });
+    expect(r.effects).toEqual([{ type: "force_exit", agentId: "a", reason: "stopping_stuck" }]);
+    // Still stopping this tick (the effect drives the transition out via onExit).
+    expect(r.state.agents.a.status).toBe("stopping");
+  });
+
+  it("does NOT force_exit before the stopping-stuck threshold elapses", () => {
+    const s = toStoppingStuck();
+    // nowMs - stoppingSince = 150 - 100 = 50 < 100 → not yet.
+    expect(reduceManager(s, { type: "tick", nowMs: 150 }).effects).toEqual([]);
+  });
+
+  it("clears stoppingSince on the synthetic exit (onExit) so it can't re-fire for the same episode", () => {
+    let s = toStoppingStuck();
+    s = reduceManager(s, { type: "tick", nowMs: 250 }).state; // force_exit emitted
+    // The synthetic exit lands: onExit → settle idle (empty inbox) → stoppingSince cleared.
+    s = reduceManager(s, { type: "exit", agentId: "a" }).state;
+    expect(s.agents.a.stoppingSince).toBeNull();
+    expect(s.agents.a.status).toBe("idle");
+    // No more force_exit — the episode is over.
+    expect(reduceManager(s, { type: "tick", nowMs: 10_000 }).effects).toEqual([]);
+  });
+
+  it("re-escalates if a respawn wedges in stopping AGAIN (fresh stoppingSince restarts the clock)", () => {
+    let s = toStoppingStuck();
+    // A wake queued during stopping so onExit respawns rather than settling idle.
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m2" }, nowMs: 200 }).state;
+    s = reduceManager(s, { type: "tick", nowMs: 250 }).state; // force_exit
+    s = reduceManager(s, { type: "exit", agentId: "a" }).state; // onExit → respawn (inbox>0) → starting
+    expect(s.agents.a.status).toBe("starting");
+    expect(s.agents.a.stoppingSince).toBeNull(); // cleared by onExit
+    // The respawn never reaches running and gets stopped again (simulate another
+    // idle-timeout path isn't reachable in starting; instead drive it via a
+    // fresh stopping through the reset-stuck-like route is out of scope here).
+    // Minimal: confirm a NEW stopping stamps a fresh clock.
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 300 }).state; // running
+    s = reduceManager(s, { type: "turn_end", agentId: "a", nowMs: 300 }).state; // idle
+    s = reduceManager(s, { type: "tick", nowMs: 400 }).state; // idle-timeout → stopping again
+    expect(s.agents.a.status).toBe("stopping");
+    expect(s.agents.a.stoppingSince).toBe(400); // fresh clock, not the old 100
+    const r = reduceManager(s, { type: "tick", nowMs: 550 }); // 550-400=150>=100
+    expect(r.effects).toEqual([{ type: "force_exit", agentId: "a", reason: "stopping_stuck" }]);
+  });
+
+  it("does NOT force_exit a healthy running agent (stoppingSince null)", () => {
+    let s = createInitialManagerState(1_000_000, 1_000_000, 1_000_000, 100);
+    s = register(s, "a", PERSISTENT_GATED);
+    s = reduceManager(s, { type: "wake", agentId: "a", message: { text: "m1" }, nowMs: 0 }).state;
+    s = reduceManager(s, { type: "spawned", agentId: "a", nowMs: 0 }).state;
+    expect(s.agents.a.stoppingSince).toBeNull();
+    expect(reduceManager(s, { type: "tick", nowMs: 10_000 }).effects).toEqual([]);
+  });
+});
+
 describe("reduceManager — reset_session", () => {
   it("nulls sessionId on a known agent without changing status/turnActive", () => {
     let s = createInitialManagerState();

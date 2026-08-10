@@ -20,6 +20,7 @@ vi.mock("@/hooks/community/use-bots", () => ({
   useBots: () => useBotsMock(),
   useDeleteBot: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useResetBotSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useResetMachineAgents: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 vi.mock("@/hooks/community/mutations", () => ({
   useCreateOrGetDm: () => ({ mutateAsync: vi.fn() }),
@@ -44,6 +45,14 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuItem: passthrough("dmi"),
   DropdownMenuTrigger: passthrough("dmt"),
 }))
+// The heatmap's real Tooltip needs `window` (floating-ui) — mock to passthroughs
+// so the node renderer can mount the card. The model-segment assertions don't
+// touch the heatmap.
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: passthrough("tt"),
+  TooltipTrigger: ({ render }: { render: React.ReactElement }) => render,
+  TooltipContent: passthrough("ttc"),
+}))
 vi.mock("@/components/ui/alert-dialog", () => ({
   AlertDialog: passthrough("ad"),
   AlertDialogAction: passthrough("ada"),
@@ -66,6 +75,8 @@ function bot(over: Partial<BotSummary>): BotSummary {
     machineId: "mac1",
     runtime: "claude",
     modelName: null,
+    lastRefreshContextAt: null,
+    dailyActivity: [],
     ...over,
   }
 }
@@ -101,6 +112,21 @@ describe("BotList — card model segment", () => {
   it("shows a `local default` hint when modelName is null", () => {
     useBotsMock.mockReturnValue({ bots: [bot({ modelName: null })], isLoading: false })
     const renderer = render()
+    expect(modelSegments(renderer)).toEqual(["local default"])
+  })
+
+  it("folds and reopens a machine category from its header", () => {
+    useBotsMock.mockReturnValue({ bots: [bot({ modelName: null })], isLoading: false })
+    const renderer = render()
+    const collapse = renderer.root.findByProps({ "aria-label": "Collapse Mac" })
+
+    act(() => collapse.props.onClick())
+    expect(renderer.root.findAll((node) => node.props.hidden === true)).toHaveLength(1)
+    const expand = renderer.root.findByProps({ "aria-label": "Expand Mac" })
+    expect(expand.props["aria-expanded"]).toBe(false)
+
+    act(() => expand.props.onClick())
+    expect(renderer.root.findAll((node) => node.props.hidden === true)).toHaveLength(0)
     expect(modelSegments(renderer)).toEqual(["local default"])
   })
 })

@@ -13,11 +13,8 @@
  *      (Bearer `cmk_`) → per-agent runner key (`crk_`).
  *   3. credential proxy (http): validates agent vouchers, swaps in runner
  *      keys, stamps X-Agent-Id, and forwards to the server's data plane.
- *      All agent traffic flows through here. The agent-facing catalog is
- *      `/api/{inboxPull,ack,send,read,resolve,listServers,listChannels,
- *      listMembers,channelMember,joinServer,reactAdd,attachmentUpload,
- *      attachmentDownload,friendRequest,listFriends}` (rewritten to
- *      `/api/community/agent/*` — see `rewriteAgentPath` in credentialProxy.ts).
+ *      All agent traffic flows through canonical `/api/community/*` REST
+ *      doors; the deleted flat `/api/<verb>` catalog is rejected by the proxy.
  *
  * It is agnostic on both axes:
  *   - whether the server is a real Alook server or a local `wrangler dev`
@@ -26,6 +23,10 @@
  *     — the `driverFor` is INJECTED by the caller.
  */
 import { homedir } from "os";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { createRotatingFileSink } from "../util/rotatingFileSink.js";
+import { createTraceSampler } from "../util/traceSampler.js";
+import { writeStatusFile } from "../util/statusFile.js";
 import { WsControlChannel } from "../server/wsControlChannel.js";
 import { CredentialBroker, startCredentialProxy } from "../credentials/index.js";
 import { AgentProcessManager, AgentRouter, createTypingScopeTracker } from "../manager/index.js";
@@ -43,31 +44,155 @@ import { formatHandle } from "@alook/shared/lib/discriminator";
 // Cold-start warmup backoff schedule (ms).
 const WARMUP_BACKOFF_MS = [250, 500, 1000, 2000, 4000] as const;
 const WARMUP_CEILING_MS = 30_000;
+/**
+ * Per-file cap for the DEFAULT-ON bounded FSM trace (batch E1). The rotating
+ * sink keeps the active file + one rotated generation, so total on-disk ≈
+ * 2×this ≈ 16MB. RAW row rate at N≈8 agents is ~74% unchanged-state tick noise
+ * → only ~2h of history unsampled; the T4 heartbeat sampler (createTraceSampler)
+ * folds that noise so TRANSITION rows survive ≥12h @ N=8 in the same budget.
+ * (≥12h is @ N=8 — write rate scales with agent count, so a much larger fleet
+ * warrants revisiting this cap.) The `ALOOK_FSM_TRACE` override is unbounded and
+ * unsampled (full-fidelity deep dives).
+ */
+const FSM_TRACE_MAX_BYTES = 8 * 1024 * 1024;
+const RUNTIME_RAW_TRACE_MAX_BYTES = 8 * 1024 * 1024;
+export const RUNTIME_RAW_TRACE_AGENT_IDS_ENV = "ALOOK_RUNTIME_RAW_TRACE_AGENT_IDS";
+/** How often the daemon rewrites the `daemon status` snapshot file (batch E2). */
+const STATUS_WRITE_INTERVAL_MS = 5_000;
+
+export function parseRuntimeRawTraceAgentIds(value: string | undefined): ReadonlySet<string> {
+  return new Set(
+    (value ?? "")
+      .split(",")
+      .map((agentId) => agentId.trim())
+      .filter((agentId) => agentId.length > 0 && agentId !== "*"),
+  );
+}
+
+export function createRuntimeRawLineTap(args: {
+  traceDir?: string;
+  enabledAgentIds: ReadonlySet<string>;
+  logger: Pick<Logger, "warn">;
+  maxBytes?: number;
+}): ((agentId: string, line: string) => void) | undefined {
+  if (!args.traceDir || args.enabledAgentIds.size === 0) return undefined;
+  const traceDir = args.traceDir;
+  const maxBytes = args.maxBytes ?? RUNTIME_RAW_TRACE_MAX_BYTES;
+  const sinks = new Map<string, ReturnType<typeof createRotatingFileSink>>();
+  const warned = new Set<string>();
+  const warnOnce = (agentId: string, path: string, operation: string, error: unknown): void => {
+    if (warned.has(agentId)) return;
+    warned.add(agentId);
+    args.logger.warn("runtime raw trace sink failed", {
+      agentId,
+      path,
+      operation,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  };
+
+  return (agentId, line) => {
+    if (!args.enabledAgentIds.has(agentId)) return;
+    const encodedAgentId = encodeURIComponent(agentId).replace(/\./g, "%2E");
+    const path = `${traceDir}/runtime-raw-events-${encodedAgentId}.jsonl`;
+    const serializedBytes = Buffer.byteLength(line, "utf8") + 1;
+    if (serializedBytes > maxBytes) {
+      warnOnce(
+        agentId,
+        path,
+        "oversize",
+        new Error(`raw line is ${serializedBytes} bytes; max is ${maxBytes}`),
+      );
+      return;
+    }
+    let sink = sinks.get(agentId);
+    if (!sink) {
+      try {
+        mkdirSync(traceDir, { recursive: true });
+      } catch (error) {
+        warnOnce(agentId, path, "mkdir", error);
+      }
+      sink = createRotatingFileSink(path, maxBytes, {
+        mode: 0o600,
+        hardMaxBytes: true,
+        onError: ({ operation, error }) => warnOnce(agentId, path, operation, error),
+      });
+      sinks.set(agentId, sink);
+    }
+    sink.write(line);
+  };
+}
 
 /**
  * Derive the audit-log `cli_invocation` subcommand from a proxy request
- * pathname. The credential proxy rewrites the CLI's bare `/api/*` calls onto
- * `/api/community/agent/*` (see `rewriteAgentPath` in credentialProxy.ts) —
- * but the sighting fires BEFORE that rewrite runs (against the inbound
- * pathname), so we may see either shape here.
+ * pathname. The CLI calls canonical `/api/community/*` REST doors directly;
+ * the proxy preserves that pathname unchanged.
  *
- * `/api/ack` is a paired sibling of `inboxPull` with no user intent, so it's
- * dropped (returns `null`). Anything else outside the `/api/*` prefix returns
- * `null` too — the proxy is generic and could carry non-audit traffic in the
- * future.
+ * Canonical `users/me/inbox/ack` is the advance sibling of `inboxPull` with no
+ * user intent, so it is dropped (returns `null`). Anything outside recognized
+ * canonical shapes returns `null` too — the proxy is generic and could carry
+ * non-audit traffic in the future.
  */
-export function deriveAuditLogSubcommand(pathname: string): string | null {
-  // Normalize both the pre-rewrite client path (`/api/<verb>`) and the
-  // post-rewrite upstream path (`/api/community/<verb>`, plans/22 §9 — the old
-  // `/api/community/agent/` tree is gone) down to `/api/<verb>` before slicing.
-  const stripped = pathname
-    .replace(/^\/api\/community\/agent\//, "/api/")
-    .replace(/^\/api\/community\//, "/api/");
-  if (!stripped.startsWith("/api/")) return null;
-  const sub = stripped.slice("/api/".length).split("/")[0]?.split("?")[0] ?? "";
-  if (!sub) return null;
-  if (sub === "ack") return null;
-  return sub;
+export function deriveAuditLogSubcommand(pathname: string, method?: string): string | null {
+  // Route/disc retarget: several flat verbs now hit the canonical id-in-path
+  // door (`channels/{id}/messages`, `messages/{id}/reactions/…`) instead of
+  // `/api/<verb>`. Slicing the first segment of those would log the DOOR name
+  // (`channels`/`messages`) instead of the logical verb the bot invoked, so the
+  // `cli_invocation` audit row would lose which action ran. Map the canonical
+  // SHAPES back to their verb FIRST, on the canonical `/api/community/…`
+  // shape. The messages door is dual-verb — GET is `read`, POST is `send` — so
+  // it needs the method; the others are single-verb.
+  const canonical = pathname.split("?")[0] ?? pathname;
+  if (/^\/api\/community\/messages\/[^/]+\/reactions\//.test(canonical)) return "reactAdd";
+  if (/^\/api\/community\/channels\/[^/]+\/messages\/seq\//.test(canonical)) return "resolve";
+  if (/^\/api\/community\/channels\/[^/]+\/messages(\/|$)/.test(canonical)) {
+    return method === "GET" ? "read" : "send";
+  }
+  if (/^\/api\/community\/channels\/[^/]+\/members(\/|$)/.test(canonical)) return "channelMember";
+  // Attachments door (attachments fold): the flat `attachmentUpload` /
+  // `attachmentDownload` verbs fold onto channels/{id}/attachments (POST upload)
+  // + channels/{id}/attachments/{attachmentId} (GET download). Map both back so
+  // the audit row keeps the logical verb, not the `channels` door segment. The
+  // download shape (has the `{attachmentId}` sub-segment) is tested FIRST so the
+  // bare-upload shape doesn't swallow it.
+  if (/^\/api\/community\/channels\/[^/]+\/attachments\/[^/]+/.test(canonical)) return "attachmentDownload";
+  if (/^\/api\/community\/channels\/[^/]+\/attachments(\/|$)/.test(canonical)) return "attachmentUpload";
+  // Single-message hydrate door GET messages/{id} = the folded `resolve` verb.
+  // AFTER the reactions pattern so that specific sub-path wins.
+  if (/^\/api\/community\/messages\/[^/]+$/.test(canonical)) return "resolve";
+  // Server-scoped list doors (轴3 fold): GET servers/{id}/members = the folded
+  // `listMembers` verb; GET servers/{id}/channels and GET servers/channels (the
+  // all-servers collection read) = the folded `listChannels` verb. Map back so
+  // the audit row keeps the logical verb, not the `servers` door segment.
+  if (/^\/api\/community\/servers\/[^/]+\/members(\/|$)/.test(canonical)) return "listMembers";
+  if (/^\/api\/community\/servers\/[^/]+\/channels(\/|$)/.test(canonical)) return "listChannels";
+  if (/^\/api\/community\/servers\/channels(\/|$)/.test(canonical)) return "listChannels";
+  // Friends bucket doors (轴3 fold): the bot's `listFriends` fans out to
+  // GET friends/accepted + GET friends/pending. Map both back to the logical
+  // verb so the audit row stays `listFriends`, not the `friends` segment.
+  // (/friends/blocked is bot-403 → never reached by a bot, so it needs no map.)
+  if (/^\/api\/community\/friends\/(accepted|pending)(\/|$|\?)/.test(canonical)) return "listFriends";
+  // friend-request door (friendRequest fold): the bot verb folded onto POST
+  // friends/request (dual-actor). Map back to `friendRequest` so the audit row
+  // stays the logical verb, not the `friends` segment. (Audit derivation is
+  // daemon/proxy-only = bot path; the human arm's own logAudit is untouched.)
+  if (/^\/api\/community\/friends\/request(\/|$|\?)/.test(canonical)) return "friendRequest";
+  // Inbox trinity doors (轴3 fold): the caller's own inbox pull/snapshot/ack fold
+  // into users/me/inbox/{pull,snapshot,ack}. Map back to the logical verb so the
+  // audit row stays inboxPull/inboxSnapshot/ack, not the `users` segment. (ack is
+  // the advance operation of the fetch↔advance trinity — snapshot=peek /
+  // pull=fetch / ack=advance; route/disc Gener #215 乙, relocated with the inbox
+  // family, NOT to channels/{id}/read.)
+  if (/^\/api\/community\/users\/me\/inbox\/pull(\/|$|\?)/.test(canonical)) return "inboxPull";
+  if (/^\/api\/community\/users\/me\/inbox\/snapshot(\/|$|\?)/.test(canonical)) return "inboxSnapshot";
+  if (/^\/api\/community\/users\/me\/inbox\/ack(\/|$|\?)/.test(canonical)) return null; // ack writes no audit row here (re-homed to daemon reborn-ready signal)
+
+  // Bot-self lifecycle door (bots/me/*, Blondie #527): nap relocated from the flat
+  // /nap to bots/me/nap. Map back to the logical `nap` verb so the audit stays
+  // `nap`, not the `bots` segment.
+  if (/^\/api\/community\/bots\/me\/nap(\/|$|\?)/.test(canonical)) return "nap";
+
+  return null;
 }
 
 /**
@@ -129,6 +254,21 @@ export interface CreateDaemonOptions {
   /** Working directory base for agent launch contexts. */
   workingDirectoryBase?: string;
   /**
+   * Directory for the DEFAULT-ON bounded FSM transition trace
+   * (`<fsmTraceDir>/fsm-trace.jsonl`, size-capped/rotating — batch E1). When
+   * omitted the default trace is off (test stubs). `ALOOK_FSM_TRACE=<path>`
+   * overrides BOTH: it takes precedence and uses an unbounded single-file
+   * append (deep-investigation mode). See plans/daemon-fsm-desync.md batch E.
+   */
+  fsmTraceDir?: string;
+  /**
+   * Absolute path for the periodic `daemon status` snapshot file (batch E2).
+   * The running daemon writes a slim per-agent FSM projection here (atomic
+   * tmp→rename) on a timer; the `daemon status` CLI reads it. Omit for test
+   * stubs → no snapshot writing. See plans/daemon-fsm-desync.md batch E2.
+   */
+  statusFilePath?: string;
+  /**
    * Absolute path to the host's agent CLI entrypoint. Real deployments point this
    * at the shim/binary the agent subprocess invokes (via a symlink in PATH).
    * Omit for test stubs that don't invoke the CLI.
@@ -185,6 +325,11 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
 
   // Self-healing: resolve CLI path with fallback if primary is missing
   const resolvedCliPath = resolveAlookCliPathWithFallback(opts.agentCliPath);
+  const onRuntimeRawLine = createRuntimeRawLineTap({
+    traceDir: opts.fsmTraceDir,
+    enabledAgentIds: parseRuntimeRawTraceAgentIds(process.env[RUNTIME_RAW_TRACE_AGENT_IDS_ENV]),
+    logger: log,
+  });
 
   const timeline = createTimelineRecorder({
     timelineDirFor: (agentId) => `${workdirFor(agentId)}/.context_timeline`,
@@ -233,8 +378,8 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
     onInboxPullResponse: (agentId, messages) => timeline.appendEntryForAgent(agentId, messages),
     // Bot audit log — Producer B (authoritative for `alook <sub>`). Fires
     // ONLY on `verdict.ok === true`, before the upstream request is written.
-    onProxyRequest: (agentId, _method, pathname) => {
-      const subcommand = deriveAuditLogSubcommand(pathname);
+    onProxyRequest: (agentId, method, pathname) => {
+      const subcommand = deriveAuditLogSubcommand(pathname, method);
       if (!subcommand) return;
       // Producer B: read the same audit context Producer A does so
       // cli_invocation rows carry launchId (and sessionId once the runtime
@@ -429,14 +574,22 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
         headers: { "content-type": "application/json", authorization: `Bearer ${opts.machineKey}` },
         body: JSON.stringify({ agentId }),
       });
-      const json = (await res.json()) as { runnerKey?: string; error?: string };
+      const text = await res.text();
+      let json: { runnerKey?: string; error?: string } = {};
+      if (text) {
+        try {
+          json = JSON.parse(text) as { runnerKey?: string; error?: string };
+        } catch {
+          json = {};
+        }
+      }
       if (!res.ok || !json.runnerKey) {
         if (res.status === 404) {
           throw new UnknownBotError(agentId);
         }
         throw new BotEnrollFailedError(
           agentId,
-          new Error(json.error ?? `enroll failed (${res.status})`),
+          new Error(json.error ?? `enroll failed (${res.status})${text ? `: ${text.slice(0, 512)}` : ""}`),
         );
       }
       enrolledKeys.set(agentId, json.runnerKey);
@@ -586,16 +739,78 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
     // `ready` frame's `runningAgents` reflects what's actually live and the
     // server's reconciler safety net can flip stale pills to idle.
     onAgentLocallyStopped: (info) => router?.markLocallyStopped(info.agentId),
+    onRuntimeRawLine,
+    // FSM transition trace → file. One JSON line per reduce so a wedge that
+    // logs nothing else is reconstructable from its FSM history (the "no log
+    // when it breaks" fix, plans/daemon-fsm-desync.md). Two modes:
+    //   - DEFAULT ON (batch E1): a bounded, size-capped/rotating sink at
+    //     `<fsmTraceDir>/fsm-trace.jsonl` — so we're never blind to the last
+    //     wedge without pre-setting an env, and it can't fill the disk.
+    //   - `ALOOK_FSM_TRACE=<path>` OVERRIDE: unbounded single-file append at
+    //     that path (deep-investigation mode; takes precedence over the
+    //     default). Content is FSM metadata only (no PII) — safe to default on.
+    ...(() => {
+      const overridePath = process.env.ALOOK_FSM_TRACE;
+      if (overridePath) {
+        return {
+          onFsmTransition: (rec: Record<string, unknown>) => {
+            try {
+              appendFileSync(overridePath, JSON.stringify(rec) + "\n");
+            } catch {
+              /* never let tracing break the daemon */
+            }
+          },
+        };
+      }
+      if (opts.fsmTraceDir) {
+        try {
+          mkdirSync(opts.fsmTraceDir, { recursive: true });
+        } catch {
+          /* best-effort: if the dir can't be made, sink writes just no-op */
+        }
+        const sink = createRotatingFileSink(
+          `${opts.fsmTraceDir}/fsm-trace.jsonl`,
+          FSM_TRACE_MAX_BYTES,
+        );
+        // Heartbeat sampler between the manager and the sink (batch T4): folds
+        // redundant unchanged-state ticks + progress/runtime_signal noise so the
+        // bounded file retains transition rows ≥12h (@ N=8) instead of ~2h.
+        // Transitions and watchdog-fired (effects-carrying) frames are never
+        // dropped. The ALOOK_FSM_TRACE override above is unbounded → unsampled,
+        // for full-fidelity deep dives.
+        const sampler = createTraceSampler((rec) => sink.write(JSON.stringify(rec)));
+        return {
+          onFsmTransition: (rec: Record<string, unknown>) => sampler.offer(rec),
+        };
+      }
+      return {};
+    })(),
     // Only the "pi" runtime declares `Driver.createSession` today (in-process
     // SDK, no child process) — this is only ever consulted for that case.
     sdkDriverDepsFor: (ctx) => createPiSdkDriverDeps(ctx),
     timeline,
-    wakePromptFooter: "Use `alook inbox pull` to read your messages, then reply with `alook message send`.",
+    wakePromptFooter: "Use `alook inbox pull` to read your messages.",
     stampWakePromptTime: true,
     logger: log.child("manager"),
   });
   managerRef = manager;
   manager.start();
+
+  // Periodic `daemon status` snapshot (batch E2): the daemon has no IPC, so it
+  // writes a slim per-agent FSM projection to a file that the out-of-band
+  // `daemon status` CLI reads. Best-effort + atomic (inside writeStatusFile).
+  // Interval a bit slower than the tick — this is for human/agent diagnosis,
+  // not a hot path; staleness is bounded by this interval and the reader always
+  // flags the snapshot's age via `writtenAt`.
+  let statusTimer: ReturnType<typeof setInterval> | null = null;
+  if (opts.statusFilePath) {
+    const statusPath = opts.statusFilePath;
+    const writeStatus = () =>
+      writeStatusFile(statusPath, { writtenAt: Date.now(), agents: manager.statusProjection(Date.now()) });
+    writeStatus(); // one immediately so `daemon status` works right after boot
+    statusTimer = setInterval(writeStatus, STATUS_WRITE_INTERVAL_MS);
+    statusTimer.unref?.();
+  }
 
   router = new AgentRouter({
     manager,
@@ -675,6 +890,7 @@ export async function createDaemon(opts: CreateDaemonOptions): Promise<RunningDa
       for (const agentId of [...typingHeartbeats.keys()]) {
         emitTypingStopsAndClear(agentId);
       }
+      if (statusTimer) clearInterval(statusTimer);
       channel.close();
       await proxy.close();
       await manager.stopAll();

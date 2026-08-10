@@ -25,8 +25,11 @@ export function messageMenuItems(handlers: {
   onReply?: () => void
   onPin?: () => void
   pinned?: boolean
+  onMark?: () => void
+  marked?: boolean
   onCreateThread?: () => void
   onCopy?: () => void
+  onEdit?: () => void
   onShare?: () => void
 }): Item[] {
   const items: Item[] = []
@@ -38,7 +41,14 @@ export function messageMenuItems(handlers: {
   if (handlers.onPin) items.push(handlers.pinned
     ? { label: "Unpin Message", onClick: handlers.onPin }
     : { label: "Pin Message", onClick: handlers.onPin })
+  // Text-only like Pin. `marked` may still be resolving when the menu opens
+  // (lazy single-row read) — it defaults to false, so the label reads "Mark"
+  // and silently flips to "Unmark" once the read lands (no spinner, per Alli).
+  if (handlers.onMark) items.push(handlers.marked
+    ? { label: "Unmark", onClick: handlers.onMark }
+    : { label: "Mark", onClick: handlers.onMark })
   if (handlers.onCopy) items.push({ label: "Copy Text", onClick: handlers.onCopy })
+  if (handlers.onEdit) items.push({ label: "Edit Message", onClick: handlers.onEdit })
   if (handlers.onShare) items.push({ label: "Share as Image", icon: Share, onClick: handlers.onShare })
   return items
 }

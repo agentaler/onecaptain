@@ -54,10 +54,10 @@ export function CommunityPanelSheet({
   threadsLoading?: boolean
   onOpenThread: (id: string) => void
   onOpenProfile?: OpenProfile
-  onSetRole?: (name: string, role: Role) => void
+  onSetRole?: (memberId: string, role: Role) => void
   onKickMember?: (memberId: string) => Promise<unknown> | void
   myRole?: Role
-  onJumpToMessage?: (id: string) => void
+  onJumpToMessage?: (seq: number) => void
   onSearch?: (query: string) => void
 }) {
   const { width, onPointerDown, onPointerMove, onPointerUp } = useSheetResize({

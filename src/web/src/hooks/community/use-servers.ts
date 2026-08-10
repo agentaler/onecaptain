@@ -4,8 +4,8 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import { avatarInitial } from "@/lib/community/avatar"
-import { isServerOwner } from "@alook/shared"
-import type { Server, Category } from "@/components/community/_types"
+import { isServerOwner, UNCATEGORIZED_CATEGORY_ID } from "@alook/shared"
+import type { Server, Category, Channel } from "@/components/community/_types"
 
 /**
  * Fetches the sidebar list of servers the current user is in.
@@ -19,9 +19,12 @@ import type { Server, Category } from "@/components/community/_types"
 type RawServerRow = {
   id: string
   name: string
+  discriminator: string
   icon: string | null
   role?: string
   mentions?: number
+  description?: string | null
+  ownerId: string
 }
 
 export type ServersResponse = { servers: Server[] }
@@ -36,6 +39,7 @@ export const serversQueryFn = async (): Promise<ServersResponse> => {
   const servers: Server[] = data.servers.map((s) => ({
     id: s.id,
     name: s.name,
+    discriminator: s.discriminator,
     initial: avatarInitial(s.name),
     active: false,
     // Defensive fallback: the API always projects `mentions` now, but during
@@ -81,10 +85,77 @@ export type ServerDetail = {
   icon: string | null
   ownerId: string
   categories: Category[]
+  /** Canonical unread ownership for participating children of forum channels. */
+  forumUnreadState?: ForumUnreadState
 }
 
-export const serverQueryFn = (serverId: string) => () =>
-  apiFetch<ServerDetail>(`/api/community/servers/${serverId}`)
+type ForumUnreadState = Record<string, {
+  /** The forum channel's own unread contribution, excluding child posts. */
+  baseUnread: boolean
+  /** Every canonically unread participating child, loaded in the sidebar or not. */
+  childIds: string[]
+}>
+
+type RawChannel = Channel & { categoryId: string | null }
+type UnreadResponse = {
+  stale?: boolean
+  channelIds: string[]
+  childChannels?: Array<{ id: string; parentChannelId: string }>
+}
+
+export const serverQueryFn = (serverId: string) => async (): Promise<ServerDetail> => {
+  const [serverData, categoryData, channelData, unreadData] = await Promise.all([
+    apiFetch<{ servers: RawServerRow[] }>("/api/community/servers"),
+    apiFetch<{ categories: Array<Omit<Category, "channels"> & { serverId?: string }> }>(`/api/community/servers/${serverId}/categories`),
+    apiFetch<{ channels: RawChannel[] }>(`/api/community/servers/${serverId}/channels`),
+    apiFetch<UnreadResponse>(`/api/community/servers/${serverId}/unreads`),
+  ])
+  if (unreadData.stale) throw new Error("stale D1 read")
+  const server = serverData.servers.find((row) => row.id === serverId)
+  if (!server) throw new Error("server not found")
+  const unreadIds = new Set(unreadData.channelIds)
+  const forumParentIds = new Set(
+    channelData.channels.filter((channel) => channel.type === "forum").map((channel) => channel.id),
+  )
+  const forumUnreadState: ForumUnreadState = Object.fromEntries(
+    [...forumParentIds].map((parentChannelId) => [parentChannelId, {
+      baseUnread: unreadIds.has(parentChannelId),
+      childIds: (unreadData.childChannels ?? [])
+        .filter((child) => child.parentChannelId === parentChannelId)
+        .map((child) => child.id),
+    }]),
+  )
+  const channels = channelData.channels.map((channel) => {
+    const forumUnread = forumUnreadState[channel.id]
+    return {
+      ...channel,
+      active: false,
+      // Until the sidebar projection arrives, every canonical unread child is
+      // necessarily hidden. Its parent owns the cold-boot fallback dot; the
+      // sidebar hook migrates loaded children to their own rows immediately.
+      unread: forumUnread
+        ? forumUnread.baseUnread || forumUnread.childIds.length > 0
+        : unreadIds.has(channel.id),
+    }
+  })
+  const categories: Category[] = categoryData.categories.map((category) => ({
+    ...category,
+    channels: channels.filter((channel) => channel.categoryId === category.id),
+  }))
+  const uncategorized = channels.filter((channel) => !channel.categoryId)
+  if (uncategorized.length > 0) {
+    categories.push({ id: UNCATEGORIZED_CATEGORY_ID, name: "", private: 0, channels: uncategorized })
+  }
+  return {
+    id: server.id,
+    name: server.name,
+    description: server.description ?? "",
+    icon: server.icon,
+    ownerId: server.ownerId,
+    categories,
+    forumUnreadState,
+  }
+}
 
 /**
  * Fetches the detail (categories + channels) for one server. Pass `null` for

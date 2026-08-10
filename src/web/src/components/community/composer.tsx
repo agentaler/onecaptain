@@ -13,7 +13,7 @@ import { readComposerDraft, writeComposerDraft, clearComposerDraft } from "@/lib
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useFileAttachments, type PendingFile } from "@/hooks/use-file-attachments"
-import { ALLOWED_ATTACHMENT_MIME_PREFIXES, MAX_ATTACHMENT_SIZE_BYTES } from "@alook/shared"
+import { MAX_ATTACHMENT_SIZE_BYTES } from "@alook/shared"
 import { tid } from "@/lib/community/testids"
 import { Avatar } from "./avatar"
 import { ChannelIcon } from "./channel-icon"
@@ -38,17 +38,39 @@ import {
   type ChannelRefPopupState,
 } from "@/lib/community/channel-ref-extension"
 
-export type SendAttachment = { file: File; width?: number; height?: number }
+export type SendAttachment = { file: File; previewObjectUrl?: string; width?: number; height?: number }
 
 // Pure mapping from `useFileAttachments`'s pending-file state to `onSend`'s
 // attachments argument. Extracted so the width/height threading through
 // `Composer.send()` is unit-testable without mounting the tiptap editor.
 export function pendingFilesToSendAttachments(pendingFiles: PendingFile[]): SendAttachment[] | undefined {
   if (pendingFiles.length === 0) return undefined
-  return pendingFiles.map((pf) => ({ file: pf.file, width: pf.width, height: pf.height }))
+  return pendingFiles.map((pf) => ({
+    file: pf.file,
+    previewObjectUrl: pf.thumbnailUrl ?? undefined,
+    width: pf.width,
+    height: pf.height,
+  }))
 }
 
-type ComposerMode = "chat" | "forumPostBody"
+// Pure extraction of the paste → File[] collection used by `handlePaste`:
+// keep only clipboard items whose `kind === "file"` (a pasted image, or any
+// dragged-in-then-copied file) and unwrap each via `getAsFile()`, dropping the
+// occasional null the API returns. Extracted (like `pendingFilesToSendAttachments`)
+// so the filtering is unit-testable without mounting the tiptap editor.
+export function clipboardFiles(items: DataTransferItemList | undefined): File[] {
+  if (!items) return []
+  const files: File[] = []
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].kind === "file") {
+      const f = items[i].getAsFile()
+      if (f) files.push(f)
+    }
+  }
+  return files
+}
+
+type ComposerMode = "chat" | "forumThreadBody"
 
 export type ComposerHandle = {
   focusEditor: () => void
@@ -60,7 +82,7 @@ export type ComposerHandle = {
   openFilePicker: () => void
 }
 
-export type ComposerProps = {
+type ComposerBaseProps = {
   channel: string
   context: MentionContext
   members: Member[]
@@ -74,7 +96,6 @@ export type ComposerProps = {
   // for DM composers. Always provided by the caller — empty array is fine,
   // the popup just shows nothing on `/`.
   channelRefCandidates?: ChannelRefCandidate[]
-  onSend?: (markdown: string, attachments?: SendAttachment[], mentionType?: MentionType) => void
   onTyping?: () => void
   // when set, shows a "Replying to X" bar above the input
   replyingTo?: string
@@ -83,35 +104,51 @@ export type ComposerProps = {
   // callers pass `bp !== "mobile"` to avoid unexpected soft-keyboard pop-up.
   autoFocus?: boolean
   // `"chat"` (default) — Enter sends, Shift+Enter newline, `send()` clears.
-  // `"forumPostBody"` — inverted: Enter newline, Shift+Enter submits; `send()`
+  // `"forumThreadBody"` — inverted: Enter newline, Shift+Enter submits; `send()`
   // does NOT clear so the parent can await mutation success before resetting.
   mode?: ComposerMode
-  // Placeholder override — used by `forumPostBody` to swap the chat-composer
+  // Placeholder override — used by `forumThreadBody` to swap the chat-composer
   // relic string. Falls back to the mode-derived default when absent.
   placeholder?: string
   // Hide the composer's built-in emoji-picker button (bottom-right). Used by
-  // the forum-post composer, where emoji is dropped from the compose surface.
+  // the create-post composer, where emoji is dropped from the compose surface.
   hideEmoji?: boolean
   // Hide the composer's built-in attach button (bottom-left). Used by the
-  // forum-post composer, which renders its own attach button in the footer
+  // create-post composer, which renders its own attach button in the footer
   // row and drives it through `ComposerHandle.openFilePicker()`.
   hideAttach?: boolean
   // Fires only on emptiness-state transitions (`hasContent` flips), not every
-  // keystroke. Used by the forum-post orchestrator to drive the footer button's
+  // keystroke. Used by the create-post orchestrator to drive the footer button's
   // `disabled` state without mirroring editor content in parent React state.
   onDirty?: (hasContent: boolean) => void
   // When set, the composer persists its unsent text under this localStorage
   // scope (per channel/DM) and restores it on mount — the view remounts on
   // every channel switch (keyed by id), so this is what survives navigation.
-  // Text only; attachments/replies are not cached. Omitted for forumPostBody
+  // Text only; attachments/replies are not cached. Omitted for forumThreadBody
   // (the parent owns that draft lifecycle).
   draftKey?: string
 }
 
+type ComposerAcceptedSend = {
+  sendContract: "accepted"
+  mode?: "chat"
+  onAcceptSend: (markdown: string, attachments?: SendAttachment[], mentionType?: MentionType) => boolean
+  onDeferredSubmit?: never
+}
+
+type ComposerDeferredSend = {
+  sendContract: "deferred"
+  mode: "forumThreadBody"
+  onDeferredSubmit: (markdown: string, attachments?: SendAttachment[], mentionType?: MentionType) => void | Promise<void>
+  onAcceptSend?: never
+}
+
+export type ComposerProps = ComposerBaseProps & (ComposerAcceptedSend | ComposerDeferredSend)
+
 // Composer — plain-text TipTap editor with a chat-style @-mention popover.
 // Users type raw markdown which MessageBody/Streamdown renders on display.
 // In `mode="chat"` (default) Enter sends, Shift+Enter adds a newline. In
-// `mode="forumPostBody"` the mapping is inverted (Enter = newline,
+// `mode="forumThreadBody"` the mapping is inverted (Enter = newline,
 // Shift+Enter = submit) to match /w's issue-sheet convention. While the
 // mention popover is open Enter/Tab/Arrow keys drive selection instead.
 // @everyone is a virtual candidate in channel + thread contexts
@@ -122,7 +159,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   members,
   onSearchMembers,
   channelRefCandidates = [],
-  onSend,
+  sendContract,
+  onAcceptSend,
+  onDeferredSubmit,
   onTyping,
   replyingTo,
   onCancelReply,
@@ -134,10 +173,12 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   onDirty,
   draftKey,
 }, ref) {
-  const isForumPostBody = mode === "forumPostBody"
+  const isForumThreadBody = mode === "forumThreadBody"
   const {
     pendingFiles,
     setPendingFiles,
+    transferPendingFiles,
+    addPendingFiles,
     fileInputRef,
     handleFileSelect,
     removePendingFile,
@@ -147,13 +188,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     handleDragOver,
     handleDrop: handleDropRaw,
   } = useFileAttachments({
-    // Community server enforces both. Passing them here rejects oversized /
-    // wrong-mime files at the drag-drop OR file-picker boundary so users
-    // see a scoped toast instead of a generic 400 on send.
     maxFileSize: MAX_ATTACHMENT_SIZE_BYTES,
-    allowedMimePrefixes: ALLOWED_ATTACHMENT_MIME_PREFIXES,
   })
   const typingTimer = useRef<NodeJS.Timeout | null>(null)
+  const sendRef = useRef<() => void>(() => {})
 
   // Draft cache key, held in a ref so the editor's `onUpdate` closure (captured
   // once at build) always persists under the current scope. Restore is
@@ -279,7 +317,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     editorProps: {
       attributes: {
         class: "outline-none",
-        enterkeyhint: isForumPostBody ? "enter" : "send",
+        enterkeyhint: isForumThreadBody ? "enter" : "send",
       },
       handleKeyDown: (_view, event) => {
         // editorProps.handleKeyDown runs BEFORE the suggestion plugin's keymap,
@@ -293,10 +331,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           channelRefPopupRef.current.items.length > 0 && channelRefPopupRef.current.command !== null
         if (mentionOpen || channelRefOpen) return false
 
-        if (isForumPostBody) {
+        if (isForumThreadBody) {
           if (event.key === "Enter" && event.shiftKey && !event.isComposing) {
             event.preventDefault()
-            send()
+            sendRef.current()
             return true
           }
           return false
@@ -304,7 +342,22 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
         if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
           event.preventDefault()
-          send()
+          sendRef.current()
+          return true
+        }
+        return false
+      },
+      // Paste an image (or any file) from the clipboard → same pipeline as the
+      // file picker / drag-drop: `addPendingFiles` (25MB + MIME + thumbnail).
+      // Consume the event (`preventDefault` + `return true`) once files are
+      // found so ProseMirror doesn't ALSO paste the image as text/HTML. Text-
+      // only pastes return false and fall through to `clipboardTextParser`
+      // below, which preserves both newline levels.
+      handlePaste: (_view, event) => {
+        const files = clipboardFiles(event.clipboardData?.items)
+        if (files.length > 0) {
+          event.preventDefault()
+          addPendingFiles(files)
           return true
         }
         return false
@@ -330,7 +383,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       fireTyping()
       emitDirtyTransition()
       const key = draftKeyRef.current
-      if (key && !isForumPostBody) {
+      if (key && !isForumThreadBody) {
         // Persist the ProseMirror doc (JSON), not plain text — so @mention /
         // channel-ref pill nodes survive the round-trip and restore as pills,
         // not inert `@label` text.
@@ -345,7 +398,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // change. Uses the paste pipeline so paragraph/hard-break structure round-
   // trips exactly like `getText({blockSeparator:"\n\n"})` serialized it.
   useEffect(() => {
-    if (!editor || isForumPostBody || !draftKey) return
+    if (!editor || isForumThreadBody || !draftKey) return
     const doc = readComposerDraft(draftKey)
     if (!doc) return
     restoringDraftRef.current = true
@@ -398,17 +451,26 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     // the compose → send → render round-trip preserves both newline levels.
     const markdown = editor.isEmpty ? "" : editor.getText({ blockSeparator: "\n\n" }).trim()
     const mentionType = detectMentionType(markdown)
-    onSend?.(markdown, pendingFilesToSendAttachments(pendingFiles), mentionType)
-    // In forumPostBody mode the parent needs to await mutation success before
+    const attachments = pendingFilesToSendAttachments(pendingFiles)
+    if (sendContract === "accepted") {
+      if (!onAcceptSend?.(markdown, attachments, mentionType)) return
+    } else {
+      void onDeferredSubmit?.(markdown, attachments, mentionType)
+    }
+    // In forumThreadBody mode the parent needs to await mutation success before
     // clearing — otherwise a failed create wipes the user's typed content.
     // Reset is delegated to the parent via `resetAfterSubmit()` on the ref.
-    if (isForumPostBody) return
+    if (isForumThreadBody) return
     editor.commands.clearContent()
     if (draftKeyRef.current) clearComposerDraft(draftKeyRef.current)
-    setPendingFiles([])
+    transferPendingFiles()
     setMentionPopup(EMPTY_MENTION_STATE)
     setChannelRefPopup(EMPTY_CHANNEL_REF_STATE)
   }
+
+  useEffect(() => {
+    sendRef.current = send
+  })
 
   useImperativeHandle(ref, () => ({
     focusEditor: () => { editor?.commands.focus("end") },
@@ -430,12 +492,12 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   // Auto-focus on mount + on channel switch. `<Composer>` is not remounted
   // per channel (only `<MessageList>` is keyed by channelId), so keying this
   // effect on `channel` is what refocuses when the user navigates channels.
-  // Skipped in forumPostBody mode — the parent controls focus (starts on the
+  // Skipped in forumThreadBody mode — the parent controls focus (starts on the
   // title, jumps to the body on Enter).
   useEffect(() => {
-    if (!autoFocus || !editor || isForumPostBody) return
+    if (!autoFocus || !editor || isForumThreadBody) return
     editor.commands.focus("end")
-  }, [autoFocus, editor, channel, isForumPostBody])
+  }, [autoFocus, editor, channel, isForumThreadBody])
 
   // Focus the editor when a reply is initiated. Clicking "reply" on a message
   // sets `replyingTo` on the parent but doesn't touch the composer, so without
@@ -448,8 +510,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   useEffect(() => {
     const opened = !prevReplyingToRef.current && !!replyingTo
     prevReplyingToRef.current = replyingTo
-    if (opened && editor && !isForumPostBody) editor.commands.focus("end")
-  }, [replyingTo, editor, isForumPostBody])
+    if (opened && editor && !isForumThreadBody) editor.commands.focus("end")
+  }, [replyingTo, editor, isForumThreadBody])
 
   // Refocus editor after a drop so the user can start typing without
   // clicking. The drop landed on the composer container — the intent is
@@ -461,7 +523,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   return (
     <div
-      className={isForumPostBody ? "relative" : "relative px-3 pb-3 pt-0"}
+      className={isForumThreadBody ? "relative" : "relative px-3 pb-3 pt-0"}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -502,7 +564,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         </div>
       )}
 
-      <div className={`relative ${isForumPostBody ? "bg-transparent ring-0" : "bg-muted shadow-(--e1) ring-1 ring-border/40 transition-shadow focus-within:ring-2 focus-within:ring-ring/60"} ${replyingTo || pendingFiles.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
+      <div className={`relative ${isForumThreadBody ? "bg-transparent ring-0" : "bg-muted shadow-(--e1) ring-1 ring-border/40 transition-shadow focus-within:ring-2 focus-within:ring-ring/60"} ${replyingTo || pendingFiles.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
         {dragging && (
           <div
             className={`pointer-events-none absolute inset-0 z-10 grid place-items-center border-2 border-dashed border-ring bg-background/80 ${replyingTo || pendingFiles.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}
@@ -514,18 +576,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           ref={fileInputRef}
           type="file"
           multiple
-          // Mirror `ALLOWED_ATTACHMENT_MIME_PREFIXES` — the server-side
-          // allowlist. Keep this list a superset of what the server takes:
-          // browsers filter aggressively by extension, so `text/*` alone
-          // won't offer `.md`/`.log`/`.json` in the picker. The MIME check
-          // in `useFileAttachments` is authoritative; `accept` just biases
-          // the picker.
-          accept="image/*,video/*,audio/*,application/pdf,text/*,.md,.log,.json,.csv,.yaml,.yml,.ts,.tsx,.js,.jsx"
           onChange={handleFileSelect}
           className="hidden"
         />
-        <div className={`chat-composer relative py-3 ${isForumPostBody ? "px-2" : "px-12"}`} data-testid={tid.composerInput}>
-          <EditorContent editor={editor} className={`${isForumPostBody ? "max-h-60" : "max-h-40"} overflow-y-auto thin-scrollbar text-base chat-input-line-height outline-none`} />
+        <div className={`chat-composer relative py-3 ${isForumThreadBody ? "px-2" : "px-12"}`} data-testid={tid.composerInput}>
+          <EditorContent editor={editor} className={`${isForumThreadBody ? "max-h-60" : "max-h-40"} overflow-y-auto thin-scrollbar text-base chat-input-line-height outline-none`} />
         </div>
         {/* Attach button — fixed bottom-left */}
         {!hideAttach && (
@@ -606,8 +661,35 @@ function scrollSelectedRowIntoView(list: HTMLDivElement | null): void {
   )
 }
 
-// Portal-rendered popup. Anchored above the caret via clientRect() from
-// @tiptap/suggestion. Highlighted row syncs to hover so keyboard + pointer agree.
+// Shared positioning for both suggestion popups (@-mention + /-ref). Both are
+// fixed portals anchored to the caret rect. Horizontal: clamp so the 256px
+// popup never runs off the right edge. Vertical: prefer above the caret (the
+// default), but FLIP to below when there isn't room above — otherwise a caret
+// near the top of the viewport (e.g. the create-post form) lifts the popup off
+// the top edge. `POPUP_MAX_HEIGHT` mirrors the list's `max-h-60` (240px).
+const POPUP_WIDTH = 256
+const POPUP_MAX_HEIGHT = 240
+const VIEWPORT_MARGIN = 8
+
+export function popoverStyle(rect: DOMRect, viewportW: number, viewportH: number): React.CSSProperties {
+  const maxLeft = Math.max(VIEWPORT_MARGIN, viewportW - POPUP_WIDTH - VIEWPORT_MARGIN)
+  const left = Math.min(rect.left, maxLeft)
+
+  const spaceAbove = rect.top
+  const flipBelow = spaceAbove < POPUP_MAX_HEIGHT + VIEWPORT_MARGIN && rect.bottom + POPUP_MAX_HEIGHT + VIEWPORT_MARGIN <= viewportH
+  return flipBelow
+    ? { top: rect.bottom + 4, left }
+    : { top: rect.top - 4, left, transform: "translateY(-100%)" }
+}
+
+function viewportSize(): { w: number; h: number } {
+  if (typeof window === "undefined") return { w: POPUP_WIDTH, h: POPUP_MAX_HEIGHT }
+  return { w: window.innerWidth, h: window.innerHeight }
+}
+
+// Portal-rendered popup. Anchored to the caret via clientRect() from
+// @tiptap/suggestion (above by default, flips below near the viewport top —
+// see `popoverStyle`). Highlighted row syncs to hover so keyboard + pointer agree.
 function CommunityMentionList({ state }: { state: MentionPopupState }) {
   const listRef = useRef<HTMLDivElement>(null)
   const { items, selectedIndex, command, rect } = state
@@ -618,23 +700,18 @@ function CommunityMentionList({ state }: { state: MentionPopupState }) {
 
   if (!rect || items.length === 0 || !command) return null
 
-  const POPUP_WIDTH = 256
-  const VIEWPORT_MARGIN = 8
-  const maxLeft = typeof window !== "undefined"
-    ? Math.max(VIEWPORT_MARGIN, window.innerWidth - POPUP_WIDTH - VIEWPORT_MARGIN)
-    : rect.left
-  const clampedLeft = Math.min(rect.left, maxLeft)
-
   // Whether to show a "MEMBERS" section header above the first member row —
   // only when virtual (everyone/here) rows precede members.
   const firstMemberIdx = items.findIndex((it) => it.kind === "member")
   const hasVirtual = items.some((it) => it.kind !== "member")
   const showMembersHeader = hasVirtual && firstMemberIdx > 0
 
+  const vp = viewportSize()
+
   return createPortal(
     <div
       className="fixed z-100 w-64 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-(--e2)"
-      style={{ top: rect.top - 4, left: clampedLeft, transform: "translateY(-100%)" }}
+      style={popoverStyle(rect, vp.w, vp.h)}
     >
       <div ref={listRef} className="relative max-h-60 overflow-x-hidden overflow-y-auto thin-scrollbar">
         {items.map((item, i) => {
@@ -678,22 +755,17 @@ function ChannelRefList({ state }: { state: ChannelRefPopupState }) {
 
   if (!rect || items.length === 0 || !command) return null
 
-  const POPUP_WIDTH = 256
-  const VIEWPORT_MARGIN = 8
-  const maxLeft = typeof window !== "undefined"
-    ? Math.max(VIEWPORT_MARGIN, window.innerWidth - POPUP_WIDTH - VIEWPORT_MARGIN)
-    : rect.left
-  const clampedLeft = Math.min(rect.left, maxLeft)
-
   // The list spans multiple servers (the DM case) when any two candidates
   // differ on serverId — only then does each row show its "serverName /"
   // prefix, so same-server lists stay clean.
   const spansMultipleServers = items.some((it) => it.serverId !== items[0]?.serverId)
 
+  const vp = viewportSize()
+
   return createPortal(
     <div
       className="fixed z-100 w-64 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-(--e2)"
-      style={{ top: rect.top - 4, left: clampedLeft, transform: "translateY(-100%)" }}
+      style={popoverStyle(rect, vp.w, vp.h)}
     >
       <div ref={listRef} className="relative max-h-60 overflow-x-hidden overflow-y-auto thin-scrollbar">
         {items.map((item, i) => (

@@ -2,24 +2,27 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   MAX_ATTACHMENT_SIZE_BYTES,
   MAX_SERVER_ICON_SIZE_BYTES,
-  ALLOWED_ATTACHMENT_MIME_PREFIXES,
   ALLOWED_ICON_MIME_TYPES,
+  queries,
+  createLogger,
 } from "@alook/shared"
-import type { Database } from "@alook/shared"
+import { requireMessageBearingSurface, requireChildSurface } from "./channel-write-guard"
+import { isThread } from "@alook/shared"
+import { requireMessageSurfaceAccess } from "./permissions"
 import { writeError, writeJSON } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
 import type { AuthContext } from "@/lib/middleware/auth"
-import type { Result } from "./permissions"
 import {
   buildMediaKey,
   buildServerIconKey,
   buildUserAvatarKey,
   buildBotAvatarKey,
-  mediaUrlFromKey,
+  serverIconUrl,
   userAvatarUrl,
   botAvatarUrl,
 } from "./storage"
-import { isChannelTarget, isDmTarget } from "./message-handler"
+
+const log = createLogger({ service: "community-attachment-upload" })
 
 type UploadOk = {
   ok: true
@@ -46,6 +49,11 @@ type AttachmentUploadOk = {
   filename: string
   contentType: string
   size: number
+  // Client-computed image dimensions carried on the upload body (thumbnail at
+  // file-pick). undefined for non-images and bot uploads. Written onto the
+  // pending row at upload — the single source of an attachment's dimensions.
+  width?: number
+  height?: number
 }
 export type AttachmentUploadResult = AttachmentUploadOk | UploadErr
 
@@ -68,7 +76,24 @@ function mimeAllowed(contentType: string, allowed: readonly string[]): boolean {
   )
 }
 
-async function readFile(req: NextRequest): Promise<File | UploadErr> {
+/**
+ * Parsed upload form: the `file` plus optional client-computed image
+ * dimensions. `width`/`height` are computed browser-side (thumbnail) at
+ * file-pick time and ride the SAME multipart body as the file — a `FormData`
+ * body can only be read once, so they're extracted here alongside the file.
+ * Absent/non-numeric → undefined (a bot upload never sends them; a non-image
+ * has none). This is the SINGLE source of an attachment's dimensions: they are
+ * written onto the pending row at upload time and never re-supplied on send.
+ */
+type ParsedUpload = { file: File; width?: number; height?: number }
+
+function parseDimension(raw: FormDataEntryValue | null): number | undefined {
+  if (typeof raw !== "string") return undefined
+  const n = Number(raw)
+  return Number.isInteger(n) && n >= 0 ? n : undefined
+}
+
+async function readFile(req: NextRequest): Promise<ParsedUpload | UploadErr> {
   let formData: FormData
   try {
     formData = await req.formData()
@@ -77,20 +102,26 @@ async function readFile(req: NextRequest): Promise<File | UploadErr> {
   }
   const file = formData.get("file") as File | null
   if (!file) return { ok: false, response: writeError("no file provided", 400) }
-  return file
+  return {
+    file,
+    width: parseDimension(formData.get("width")),
+    height: parseDimension(formData.get("height")),
+  }
 }
 
 /**
  * Validate + upload an attachment for a channel / DM / thread.
  *
  * Enforces `MAX_ATTACHMENT_SIZE_BYTES` and `ALLOWED_ATTACHMENT_MIME_PREFIXES`.
- * Returns the R2 key + a `/api/community/media/<key>` URL that the auth-gated
- * media route can serve.
+ * Returns the stored R2 key + parsed metadata (filename, content-type, size,
+ * and any client-supplied image dimensions). The caller persists a pending
+ * attachment row keyed by that r2Key; reads then serve it through the canonical
+ * `channels/{id}/attachments/{attachmentId}` door (there is no `/media/` route).
  *
  * R2 requires stream bodies to have a known length. Passing the `File` itself
  * preserves that length for the Workers runtime while avoiding an explicit
  * `arrayBuffer()` copy in application code. Size and content-type are
- * validated against the `File` object before the put.
+ * read from the `File` object before the put.
  */
 export async function handleAttachmentUpload(
   req: NextRequest,
@@ -99,9 +130,9 @@ export async function handleAttachmentUpload(
   targetId: string,
   uploaderTag: UploaderTag,
 ): Promise<AttachmentUploadResult> {
-  const fileOrErr = await readFile(req)
-  if ("ok" in fileOrErr && fileOrErr.ok === false) return fileOrErr
-  const file = fileOrErr as File
+  const parsed = await readFile(req)
+  if ("ok" in parsed && parsed.ok === false) return parsed
+  const { file, width, height } = parsed as ParsedUpload
 
   if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
     return {
@@ -112,15 +143,13 @@ export async function handleAttachmentUpload(
       ),
     }
   }
-  if (!mimeAllowed(file.type, ALLOWED_ATTACHMENT_MIME_PREFIXES as readonly string[])) {
-    return { ok: false, response: writeError("file type not allowed", 400) }
-  }
+  const contentType = file.type || "application/octet-stream"
 
   const fileId = crypto.randomUUID()
   const key = buildMediaKey(kind, targetId, fileId, file.name)
 
   await env.COMMUNITY_MEDIA.put(key, file, {
-    httpMetadata: { contentType: file.type },
+    httpMetadata: { contentType },
     customMetadata: {
       uploader: uploaderTag.uploader,
       bot_user_id: uploaderTag.uploader === "bot" ? uploaderTag.uploaderUserId : "",
@@ -131,8 +160,10 @@ export async function handleAttachmentUpload(
     ok: true,
     r2Key: key,
     filename: file.name,
-    contentType: file.type,
+    contentType,
     size: file.size,
+    width,
+    height,
   }
 }
 
@@ -145,9 +176,9 @@ export async function handleServerIconUpload(
   env: Env,
   serverId: string,
 ): Promise<UploadResult> {
-  const fileOrErr = await readFile(req)
-  if ("ok" in fileOrErr && fileOrErr.ok === false) return fileOrErr
-  const file = fileOrErr as File
+  const parsed = await readFile(req)
+  if ("ok" in parsed && parsed.ok === false) return parsed
+  const { file } = parsed as ParsedUpload
 
   if (file.size > MAX_SERVER_ICON_SIZE_BYTES) {
     return {
@@ -173,7 +204,12 @@ export async function handleServerIconUpload(
     ok: true,
     id: fileId,
     key,
-    url: `/api/community/media/${key}`,
+    // Canonical icon serve route (the media/[...key] catch-all is deleted in the
+    // route/disc media-delete step). The icon POST route reads `.key` and builds
+    // its own `serverIconUrl` for the response, so this `url` isn't consumed
+    // today — but keep it pointed at the real route so no future caller picks up
+    // a dead `/media/` path.
+    url: serverIconUrl({ id: serverId, icon: key }) ?? "",
     filename: file.name,
     contentType: file.type,
     size: file.size,
@@ -194,9 +230,9 @@ async function handleAvatarUpload(
   key: string,
   url: string,
 ): Promise<UploadResult> {
-  const fileOrErr = await readFile(req)
-  if ("ok" in fileOrErr && fileOrErr.ok === false) return fileOrErr
-  const file = fileOrErr as File
+  const parsed = await readFile(req)
+  if ("ok" in parsed && parsed.ok === false) return parsed
+  const { file } = parsed as ParsedUpload
 
   if (file.size > MAX_SERVER_ICON_SIZE_BYTES) {
     return {
@@ -219,9 +255,7 @@ async function handleAvatarUpload(
     ok: true,
     id: ownerId,
     key,
-    // Not `/api/community/media/${key}` — that catch-all route only recognizes
-    // channel/thread/dm/server-icon kinds and would 404. `url` is the real
-    // routable dedicated avatar route (`userAvatarUrl`/`botAvatarUrl`).
+    // Avatar uploads return their dedicated routable URL.
     url,
     filename: file.name,
     contentType: file.type,
@@ -246,42 +280,116 @@ export function handleBotAvatarUpload(
 }
 
 /**
- * Route body shared by the three attachment-upload endpoints
- * (`channels/[id]/upload`, `dm/[id]/upload`, `threads/[id]/upload`). Parses
- * the `id` param, runs the caller-supplied permission check, then hands off
- * to `handleAttachmentUpload`. Keeping the three route files thin also keeps
- * their URLs distinct — we deliberately did not collapse to a single route.
+ * Shared body for the unified attachment-upload trunk. One `id`, dispatched by
+ * the channel's surface — the three old per-type routes
+ * (`channels/[id]/upload`, `dm/[id]/upload`, `threads/[id]/upload`) have
+ * collapsed onto this one; the DM/thread routes are now deleted and the web
+ * client uploads through `channels/[id]/upload` for every surface.
+ *
+ * Access + surface come from `requireMessageSurfaceAccess` (the same dispatch
+ * the read/read-state routes use), so a DM id runs `requireDMAccess` (block
+ * gate) — closing the incidental P0 the trunk covers.
+ *
+ * `kind` (which feeds `buildMediaKey` → the R2 key path, so its VALUE is
+ * load-bearing, not just its guard) is DERIVED from `(surface, channel.type)`
+ * consumed from the dispatch's return — NOT re-queried via a second
+ * `getChannelType` (that would be a mini re-derive + extra hop; the dispatch
+ * already fetched the row). `surface` alone is lossy (thread and text both
+ * present as `surface="channel"`), so the channel arm splits on `channel.type`:
+ *   - dm                                  → kind "dm"      (a DM is a legitimate
+ *                                            attachment target — no bearing guard)
+ *   - channel + thread                    → kind "thread"  (requireChildSurface)
+ *   - channel + text/forum(-top)          → kind "channel" (requireMessageBearingSurface)
+ * These map byte-for-byte to what the three routes passed before, so new
+ * uploads land under the same R2 key prefix (existing attachments read from the
+ * stored `r2_key` column and are unaffected — the derivation is write-only).
  */
 export async function runAttachmentUpload(
   req: NextRequest,
   ctx: AuthContext & { params?: Record<string, string> },
-  kind: AttachmentKind,
-  permissionCheck: (db: Database, id: string, userId: string) => Promise<Result<unknown>>,
 ): Promise<NextResponse> {
   const id = ctx.params?.id
-  if (!id) {
-    const label =
-      isChannelTarget(kind) ? "channel id" : isDmTarget(kind) ? "dm id" : "id"
-    return writeError(`missing ${label}`, 400)
-  }
+  if (!id) return writeError("missing channel id", 400)
 
   const db = getDb(ctx.env.DB)
-  const auth = await permissionCheck(db, id, ctx.userId)
+  const auth = await requireMessageSurfaceAccess(db, id, ctx.userId)
   if (!auth.ok) return writeError(auth.error, auth.status)
 
-  const result = await handleAttachmentUpload(req, ctx.env, kind, id, {
-    uploader: "user",
-    uploaderUserId: ctx.userId,
-  })
-  if (!result.ok) return result.response
+  // Derive kind + apply the per-surface guard from the dispatch's return — no
+  // re-query. The DM arm needs no surface guard (a DM is a valid target).
+  let kind: AttachmentKind
+  if (auth.value.surface === "dm") {
+    kind = "dm"
+  } else {
+    const channelType = auth.value.channel.type
+    if (isThread(channelType)) {
+      const child = requireChildSurface(channelType)
+      if (!child.ok) return writeError(child.error, child.status)
+      kind = "thread"
+    } else {
+      const surface = requireMessageBearingSurface(channelType)
+      if (!surface.ok) return writeError(surface.error, surface.status)
+      kind = "channel"
+    }
+  }
 
-  // Human web client tracks attachments in-memory until send, so no id is
-  // returned here — parity with the pre-refactor shape. `url` is derived
-  // from the stored key via the shared helper.
-  return writeJSON({
-    url: mediaUrlFromKey(result.r2Key),
-    filename: result.filename,
-    contentType: result.contentType,
-    size: result.size,
-  })
+  // Track any R2 blob written before the D1 insert throws so the catch can
+  // best-effort delete it (mirrors the bot upload route's orphan-cleanup).
+  let r2KeyToCleanUp: string | null = null
+  try {
+    const result = await handleAttachmentUpload(req, ctx.env, kind, id, {
+      uploader: "user",
+      uploaderUserId: ctx.userId,
+    })
+    if (!result.ok) return result.response
+    r2KeyToCleanUp = result.r2Key
+
+    // Reserve-by-id (route/disc step 2b): the human composer now mirrors the
+    // bot flow — the upload creates a PENDING row (messageId = NULL) and returns
+    // its stable id. The composer holds the id in-memory and passes it to `send`,
+    // where `reserveAttachmentsForMessage` links it. `uploaderId` is the
+    // credential user (self-scope, never from the body); `send` re-verifies the
+    // id against (uploader, target) before reserving, so a stolen id can't be
+    // attached to another user's message. Image dimensions are written HERE (the
+    // single source — they never ride the send body) so the pending row is a
+    // self-contained, complete entity at upload time; `reserve` only links it.
+    const row = await queries.communityAttachment.createPendingAttachment(db, {
+      uploaderId: ctx.userId,
+      targetId: id,
+      r2Key: result.r2Key,
+      filename: result.filename,
+      contentType: result.contentType,
+      size: result.size,
+      width: result.width,
+      height: result.height,
+    })
+
+    return writeJSON({
+      id: row.id,
+      filename: row.filename,
+      contentType: result.contentType,
+      size: result.size,
+      ...(result.width !== undefined ? { width: result.width } : {}),
+      ...(result.height !== undefined ? { height: result.height } : {}),
+    })
+  } catch (err) {
+    if (r2KeyToCleanUp !== null) {
+      try {
+        await ctx.env.COMMUNITY_MEDIA.delete(r2KeyToCleanUp)
+      } catch (cleanupErr) {
+        log.error("attachment_upload_r2_cleanup_failed", {
+          route: "channels/[id]/attachments",
+          userId: ctx.userId,
+          r2Key: r2KeyToCleanUp,
+          cleanupErr: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+        })
+      }
+    }
+    log.error("attachment_upload_failure", {
+      route: "channels/[id]/attachments",
+      userId: ctx.userId,
+      cause: err instanceof Error ? err.stack ?? err.message : String(err),
+    })
+    return writeError("internal error", 500)
+  }
 }

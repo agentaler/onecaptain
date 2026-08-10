@@ -9,13 +9,15 @@ import {
   MENTION_KIND,
   createLogger,
   isUniqueConstraintError,
+  withD1Retry,
+  reachIsParticipantSet,
 } from "@alook/shared"
 import type { MentionType } from "@alook/shared"
 import type { Database } from "@alook/shared"
-import { fanOutToChannel, resolveChannelRecipients } from "./fanout"
+import { broadcastToUserSafe, fanOutToChannel, resolveChannelRecipients } from "./fanout"
 import { dispatchMessageNotify } from "./notify"
 import { mapMessageForWs } from "./message-payload"
-import { mediaUrlFromKey } from "./storage"
+import { attachmentUrl } from "./storage"
 import { logAudit, COMMUNITY_AUDIT_ACTIONS } from "./audit"
 
 const log = createLogger({ service: "community-message-handler" })
@@ -28,13 +30,17 @@ export type MessageTarget =
     parentChannelId: string
     serverId: string
   }
-  | {
-    kind: "forum_post"
-    channelId: string
-    parentChannelId: string
-    serverId: string
-  }
   | { kind: "dm"; channelId: string; otherUserId: string }
+  // A top-level `forum`-type channel (parentChannelId is null — it's still
+  // the addressed channel itself, not a child under it; peer to "channel",
+  // not to "thread" which carries a parent). Split out from the generic
+  // "channel" kind so the SEND layer can dispatch "does this send open a
+  // thread" off the target's own structural kind — the same channel.type the
+  // door already resolved — instead of an ad-hoc body field. A body field's
+  // presence is a client choice, decoupled from the channel's actual type;
+  // branching on the target's own kind here means there is only ever one
+  // axis deciding this, not two that can drift apart.
+  | { kind: "forum"; channelId: string; serverId: string }
 
 export function isDmTarget<T extends { kind: string }>(target: T): target is Extract<T, { kind: "dm" }>
 export function isDmTarget(kind: string): boolean
@@ -54,43 +60,19 @@ export function isChannelTarget(target: { kind: string } | string): boolean {
   return (typeof target === "string" ? target : target.kind) === "channel"
 }
 
-// A thread and a forum_post share the same notify + parent-tick behavior: both
-// enroll participants (spoke/mention) and both fire the parent CHILD_CHANNEL_UPDATE
-// via their `parentChannelId`. This narrows to the two variants that carry one.
+// A thread enrolls participants (spoke/mention) and fires the parent
+// CHILD_CHANNEL_UPDATE via its `parentChannelId`. This narrows to the one
+// variant that carries one.
 function hasParentChannel(
   target: MessageTarget,
-): target is Extract<MessageTarget, { kind: "thread" | "forum_post" }> {
-  return target.kind === "thread" || target.kind === "forum_post"
-}
-
-type IncomingAttachment = {
-  /**
-   * Full routable URL as returned by the human upload response
-   * (`/api/community/media/<key>`). The handler strips the `MEDIA_URL_PREFIX`
-   * to derive the stored `r2Key`. Kept on the wire (rather than switching
-   * clients to a raw key) so the human-composer POST shape stays unchanged.
-   */
-  url: string
-  filename: string
-  contentType: string
-  size: number
-  width?: number
-  height?: number
-}
-
-const MEDIA_URL_PREFIX = "/api/community/media/"
-
-function r2KeyFromUrl(url: string): string | null {
-  if (!url.startsWith(MEDIA_URL_PREFIX)) return null
-  const rest = url.slice(MEDIA_URL_PREFIX.length)
-  return rest.length > 0 ? rest : null
+): target is Extract<MessageTarget, { kind: "thread" }> {
+  return target.kind === "thread"
 }
 
 export type IncomingMessageBody = {
   content?: unknown
   replyToId?: unknown
   mentionType?: unknown
-  attachments?: unknown
 }
 
 type CreatedAttachment = {
@@ -103,8 +85,37 @@ type CreatedAttachment = {
   height?: number | null
 }
 
-function attachmentTargetId(target: MessageTarget): string {
-  return target.channelId
+async function hydrateStoredAttachments(db: Database, messageId: string): Promise<CreatedAttachment[]> {
+  const rows = await queries.communityAttachment.listByMessageIds(db, [messageId])
+  return rows.map((row) => ({
+    id: row.id,
+    filename: row.filename,
+    url: attachmentUrl(row.targetId, row.id),
+    contentType: row.contentType,
+    size: row.size,
+    width: row.width,
+    height: row.height,
+  }))
+}
+
+export async function getCommunityMessageReplay(params: {
+  db: Database
+  authorId: string
+  channelId: string
+  clientNonce?: string
+}): Promise<CreateMessageOk | null> {
+  if (params.clientNonce === undefined) return null
+  const existing = await withD1Retry(
+    () => queries.communityMessage.getMessageByAuthorAndNonce(params.db, params.authorId, params.clientNonce!),
+    { route: "message-handler:nonce-precheck" },
+  )
+  if (!existing || existing.channelId !== params.channelId) return null
+  return {
+    ok: true,
+    row: existing,
+    attachments: await hydrateStoredAttachments(params.db, existing.id),
+    deduped: true,
+  }
 }
 
 type FullMessageRow = NonNullable<
@@ -189,13 +200,12 @@ export async function createCommunityMessage(params: {
    */
   includeAuthorInFanout?: boolean
   /**
-   * Agent-attachment path: pending attachment ids the caller has already
-   * validated against (uploader, kind, target). When present, the handler
-   * pre-mints the message id, reserves the pending rows in a single
-   * atomic UPDATE, then inserts the message — compensating unreserves on
-   * every failure path so no message row is ever committed with a partial
-   * attachment set. Mutually exclusive with `body.attachments`, which is the
-   * human-composer path.
+   * Reserve-by-id attachment path (the ONLY attachment path — human web and bot
+   * both use it, route/disc step 2b). Pending attachment ids the caller has
+   * already validated against (uploader, target). When present, the handler
+   * pre-mints the message id, reserves the pending rows in a single atomic
+   * UPDATE, then inserts the message — compensating unreserves on every failure
+   * path so no message row is ever committed with a partial attachment set.
    */
   attachmentIds?: string[]
   /**
@@ -207,13 +217,34 @@ export async function createCommunityMessage(params: {
    */
   deferBroadcast?: boolean
   /**
+   * Migration-backfill mode: DROP every WS side effect entirely (MESSAGE_CREATE
+   * fan-out, notify push, bot wake, CHILD_CHANNEL_UPDATE) — historical backfill
+   * must not ping anyone or push M×N real-time frames. UNLIKE `deferBroadcast`,
+   * which hands the caller a thunk to fire later, this simply never runs the
+   * broadcast at all.
+   *
+   * CRITICAL (Aigneis #133 / Melly #135 / message-handler decouple at
+   * `skipChildChannelUpdate`): this closes ONLY the real-time DELIVERY shell.
+   * The STRUCTURAL core — the message row, thread open, and the notify-set
+   * ENROLL (`addThreadParticipants`, the reach-axis participant write) + mention
+   * ROW writes — all run inline ABOVE the broadcast block and are NOT gated by
+   * this flag. Do NOT reach for `skipMentions` to silence a backfill: that flag
+   * ALSO closes enroll + mention rows (`!skipMentions` at the enroll gate), which
+   * would silently drop the migrated thread's participant set. Keep this flag
+   * about DELIVERY only, so a migrated post's participants (opener + each reply's
+   * author/mention) are identical to the new-build path.
+   *
+   * Built for the forum carrier-swap migration entry (route/disc trunk); no
+   * real-time caller passes it, so real-time create behavior is unchanged.
+   */
+  suppressBroadcast?: boolean
+  /**
    * Suppress ONLY the parent `CHILD_CHANNEL_UPDATE` WS emission — participant
-   * enroll (the notify-set write) still runs per `kind`. The forum-post CREATE
-   * path opts in: it routes the post's first message as `kind:"forum_post"` so
-   * mentioned users enroll as participants, but must not fire
-   * CHILD_CHANNEL_UPDATE because it already emits its own CHILD_CHANNEL_CREATE
-   * for the new post (the two would collide). Decouples enroll from the WS tick
-   * so dodging the collision no longer silently skips enrollment.
+   * enroll (the notify-set write) still runs per `kind`. A thread-open's
+   * first message opts in when the caller already emits its own
+   * CHILD_CHANNEL_CREATE for the new thread (the two would otherwise
+   * collide). Decouples enroll from the WS tick so dodging the collision no
+   * longer silently skips enrollment.
    */
   skipChildChannelUpdate?: boolean
   /**
@@ -223,6 +254,15 @@ export async function createCommunityMessage(params: {
    * and fires no side effects. Absent = today's behavior (no dedup lookup).
    */
   clientNonce?: string
+  /**
+   * Extra Drizzle statements to commit in the SAME batch as the message insert
+   * (zero new round-trip). Threaded straight into `createMessage`. The bot-send
+   * routes use this to bump the per-day sent-activity heatmap rollup; human
+   * sends pass nothing. Runs only if the row is written (shares the batch's
+   * all-or-nothing fate; a lost CAS seq claim skips it). This handler stays
+   * identity-agnostic — the bot-only caller supplies the statement.
+   */
+  extraStatements?: unknown[]
 }): Promise<CreateMessageResult> {
   const {
     db,
@@ -236,9 +276,11 @@ export async function createCommunityMessage(params: {
     skipWake,
     includeAuthorInFanout,
     deferBroadcast,
+    suppressBroadcast,
     attachmentIds,
     skipChildChannelUpdate,
     clientNonce,
+    extraStatements,
   } = params
 
   const content = typeof body.content === "string" ? body.content : ""
@@ -250,13 +292,13 @@ export async function createCommunityMessage(params: {
     }
   }
 
-  const incomingAttachments = Array.isArray(body.attachments)
-    ? (body.attachments as IncomingAttachment[])
-    : undefined
-  if (
-    incomingAttachments &&
-    incomingAttachments.length > MAX_ATTACHMENTS_PER_MESSAGE
-  ) {
+  // Reserve-by-id is the SINGLE attachment path (route/disc step 2b unified the
+  // human composer onto the bot flow): every caller — human web AND bot — passes
+  // pre-uploaded pending-row ids via `attachmentIds`; the route already validated
+  // them against (uploader, target). There is no longer a url-carried inline
+  // attachment path.
+  const attachmentIdCount = Array.isArray(attachmentIds) ? attachmentIds.length : 0
+  if (attachmentIdCount > MAX_ATTACHMENTS_PER_MESSAGE) {
     return {
       ok: false,
       status: 400,
@@ -267,12 +309,8 @@ export async function createCommunityMessage(params: {
   // A message needs either text content OR at least one attachment. Empty
   // both means the client wired something wrong — but a bare
   // attachments-only send is a legitimate flow (drop an image, hit Enter).
-  // Agent-attachment path uses `attachmentIds` (pending rows reserved by
-  // reservation-first flow), NOT `body.attachments`; both count as
-  // "attachment present" for this guard.
-  const hasAgentAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0
-  const hasHumanAttachments = !!incomingAttachments && incomingAttachments.length > 0
-  if (content.trim().length === 0 && !hasHumanAttachments && !hasAgentAttachments) {
+  const hasAttachments = attachmentIdCount > 0
+  if (content.trim().length === 0 && !hasAttachments) {
     return { ok: false, status: 400, error: "content or attachments required" }
   }
 
@@ -283,14 +321,8 @@ export async function createCommunityMessage(params: {
   // race where two concurrent first-sends both pass this check is caught at
   // insert time by the partial-unique-index handler below.
   if (clientNonce !== undefined) {
-    const existing = await queries.communityMessage.getMessageByAuthorAndNonce(
-      db,
-      authorId,
-      clientNonce,
-    )
-    if (existing) {
-      return { ok: true, row: existing, attachments: [], deduped: true }
-    }
+    const replay = await getCommunityMessageReplay({ db, authorId, channelId: target.channelId, clientNonce })
+    if (replay) return replay
   }
 
   // A client-supplied `replyToId` must reference a message IN THE TARGET
@@ -315,9 +347,10 @@ export async function createCommunityMessage(params: {
     | Awaited<ReturnType<typeof queries.communityMessage.getMessageInScope>>
     | null = null
   if (rawReplyToId !== undefined) {
-    resolvedReplyMsg = await queries.communityMessage.getMessageInScope(db, rawReplyToId, {
-      channelId: target.channelId,
-    })
+    resolvedReplyMsg = await withD1Retry(
+      () => queries.communityMessage.getMessageInScope(db, rawReplyToId, { channelId: target.channelId }),
+      { route: "message-handler:reply-scope" },
+    )
     if (!resolvedReplyMsg) {
       log.warn("reply_to_out_of_scope_dropped", {
         authorId,
@@ -341,6 +374,7 @@ export async function createCommunityMessage(params: {
     mentionType: MentionType | undefined;
     type?: string;
     clientNonce?: string;
+    extraStatements?: unknown[];
   } = {
     authorId,
     content,
@@ -349,6 +383,7 @@ export async function createCommunityMessage(params: {
     mentionType,
     ...(messageType !== undefined ? { type: messageType } : {}),
     ...(clientNonce !== undefined ? { clientNonce } : {}),
+    ...(extraStatements !== undefined ? { extraStatements } : {}),
   }
 
   // Insert first so `reserveAttachmentsForMessage`'s UPDATE can key off
@@ -381,13 +416,18 @@ export async function createCommunityMessage(params: {
     // with no nonce) finds no matching row, so we rethrow the original error
     // untouched. Only enter this branch when a nonce was actually supplied.
     if (clientNonce !== undefined && isUniqueConstraintError(err)) {
-      const existing = await queries.communityMessage.getMessageByAuthorAndNonce(
-        db,
-        authorId,
-        clientNonce,
+      const existing = await withD1Retry(
+        () => queries.communityMessage.getMessageByAuthorAndNonce(db, authorId, clientNonce),
+        { route: "message-handler:nonce-insert-race" },
       )
       if (existing) {
-        return { ok: true, row: existing, attachments: [], deduped: true }
+        if (existing.channelId !== target.channelId) throw err
+        return {
+          ok: true,
+          row: existing,
+          attachments: await hydrateStoredAttachments(db, existing.id),
+          deduped: true,
+        }
       }
     }
     throw err
@@ -461,55 +501,29 @@ export async function createCommunityMessage(params: {
     }
   }
 
-  // Human-composer path: insert attachment rows now that the message exists.
-  // Agent path: rows were already reserved and pointed at `created.id` via
-  // the pre-minted id, so no additional INSERT is needed here.
+  // Reserve-by-id path (human web AND bot): the pending rows were reserved and
+  // pointed at `created.id` above via `reserveAttachmentsForMessage`, so no
+  // INSERT is needed here — just project the linked rows for the response. The
+  // row already carries its dimensions (written at upload time, the single
+  // source), so the display URL is derived id-addressed via `attachmentUrl`.
   let attachments: CreatedAttachment[] = []
   if (reserveIds) {
     const rows = await queries.communityAttachment.listByMessageIds(db, [created.id])
     attachments = rows.map((r) => ({
       id: r.id,
       filename: r.filename,
-      url: mediaUrlFromKey(r.r2Key),
+      url: attachmentUrl(r.targetId, r.id),
       contentType: r.contentType,
       size: r.size,
       width: r.width,
       height: r.height,
     }))
-  } else if (incomingAttachments?.length) {
-    const targetId = attachmentTargetId(target)
-    attachments = await Promise.all(
-      incomingAttachments.map(async (att, idx) => {
-        const r2Key = r2KeyFromUrl(att.url)
-        if (!r2Key) {
-          throw new Error(`attachment url outside /api/community/media/: ${att.url}`)
-        }
-        const row = await queries.communityAttachment.createAttachment(db, {
-          messageId: created.id,
-          uploaderId: authorId,
-          targetId,
-          r2Key,
-          filename: att.filename,
-          position: idx,
-          contentType: att.contentType,
-          size: att.size,
-          width: att.width,
-          height: att.height,
-        })
-        return {
-          id: row.id,
-          filename: row.filename,
-          url: mediaUrlFromKey(row.r2Key),
-          contentType: row.contentType,
-          size: row.size,
-          width: row.width,
-          height: row.height,
-        }
-      }),
-    )
   }
 
-  const row = await queries.communityMessage.getMessage(db, created.id)
+  const row = await withD1Retry(
+    () => queries.communityMessage.getMessage(db, created.id),
+    { route: "message-handler:read-back" },
+  )
   if (!row) {
     // createMessage just inserted this row; getMessage returning null means
     // the DB is gone — surface that to the caller instead of inventing data.
@@ -523,7 +537,10 @@ export async function createCommunityMessage(params: {
   // the repo; this mirrors the check the daemon route did before its own
   // `logAudit` call was removed. Fire-and-forget — `logAudit` already
   // swallows its own errors.
-  const author = await queries.user.getUserInternal(db, authorId)
+  const author = await withD1Retry(
+    () => queries.user.getUserInternal(db, authorId),
+    { route: "message-handler:author-lookup" },
+  )
   if (author?.isBot === true) {
     logAudit(db, {
       serverId: isDmTarget(target) ? null : target.serverId,
@@ -588,14 +605,25 @@ export async function createCommunityMessage(params: {
     // each climb `parentChannelId` for a thread — two parent lookups per message
     // on the send path. Cheap (indexed id lookups) and not merged to keep both
     // helpers single-purpose; revisit only if the send path shows up hot.
-    const isPrivate = await queries.communityChannel.isChannelPrivate(db, target.channelId)
+    const isPrivate = await withD1Retry(
+      () => queries.communityChannel.isChannelPrivate(db, target.channelId),
+      { route: "message-handler:is-private" },
+    )
     const audienceIds = isPrivate
-      ? new Set(await queries.communityChannel.getPrivateChannelAudienceUserIds(db, target.channelId))
+      ? new Set(
+          await withD1Retry(
+            () => queries.communityChannel.getPrivateChannelAudienceUserIds(db, target.channelId),
+            { route: "message-handler:private-audience" },
+          ),
+        )
       : null
 
     const hasAtMention = typeof row.content === "string" && row.content.includes("@")
     if (hasAtMention) {
-      const allMembers = await queries.communityMember.listMembers(db, target.serverId)
+      const allMembers = await withD1Retry(
+        () => queries.communityMember.listMembers(db, target.serverId),
+        { route: "message-handler:list-members" },
+      )
       // Scope candidates to the audience when private.
       const members = audienceIds
         ? allMembers.filter((m) => audienceIds.has(m.userId))
@@ -617,7 +645,10 @@ export async function createCommunityMessage(params: {
     } else if (mentionType === "everyone") {
       const userIds = audienceIds
         ? [...audienceIds]
-        : await queries.communityMember.listMemberUserIds(db, target.serverId)
+        : await withD1Retry(
+            () => queries.communityMember.listMemberUserIds(db, target.serverId),
+            { route: "message-handler:list-member-ids" },
+          )
       for (const uid of userIds) {
         if (uid !== authorId) mentionTargets.add(uid)
       }
@@ -641,16 +672,27 @@ export async function createCommunityMessage(params: {
   // Mention beats reply — never double-count the same user.
   for (const id of mentionTargets) replyTargets.delete(id)
 
-  // Thread / forum_post participation (notification dimension). Both units'
-  // NOTIFY set is their participant rows — join by:
+  // Thread participation (notification dimension). A thread's NOTIFY set is
+  // its participant rows — join by:
   //   - speaking: the author becomes a participant (source "spoke").
   //   - @mention: an explicitly mentioned/replied audience member becomes a
   //     participant (source "mention"). `mentionTargets`/`replyTargets` are
   //     already scoped to the unit's audience by the block above.
   // Admins are NOT auto-added — only real participation joins the set. System /
-  // card messages (`skipMentions`) don't add the author. A forum post is
-  // enrolled exactly like a thread so it notifies only its participants.
-  if (hasParentChannel(target) && !skipMentions) {
+  // card messages (`skipMentions`) don't add the author.
+  // Enroll gate = the REACH axis (B2): a message enrolls participants iff its
+  // channel's reach is `participant-set`. This is the WRITE side of red-line ③ —
+  // it keys on the SAME reach value that the fan-out recipient set and the
+  // agent-inbox deliverable narrowing (the READ side, who's-participant) key on,
+  // so who-enrolls and who's-read can never drift (the class of bug the agent
+  // thread-inbox deadlock was). `target.kind` is the channel's stored type here
+  // (channel/thread/forum/dm). NOT folded with `hasParentChannel` below: that
+  // is a distinct STRUCTURAL fact ("has a parent channel" → railChannelId /
+  // parent CHILD_CHANNEL_UPDATE tick), which merely coincides with participant-set
+  // for today's types — a future type could have a parent but server reach, or
+  // participant reach without a parent, so the two rules stay separate.
+  let joinedParticipantUserIds: string[] = []
+  if (reachIsParticipantSet(target.kind) && !skipMentions) {
     const rows: { userId: string; source: typeof PARTICIPANT_SOURCE.SPOKE | typeof PARTICIPANT_SOURCE.MENTION }[] = [
       { userId: authorId, source: PARTICIPANT_SOURCE.SPOKE },
     ]
@@ -663,7 +705,8 @@ export async function createCommunityMessage(params: {
       if (id !== authorId) rows.push({ userId: id, source: PARTICIPANT_SOURCE.MENTION })
     }
     // One bulk insert (author + mentioned) instead of N+1 sequential inserts.
-    await queries.communityThread.addThreadParticipants(db, target.channelId, rows)
+    joinedParticipantUserIds =
+      await queries.communityThread.addThreadParticipants(db, target.channelId, rows) ?? []
   }
 
   // Mention/reply ROW writes are persistence, not broadcast — they run inline
@@ -688,6 +731,12 @@ export async function createCommunityMessage(params: {
 
   const messagePayload = mapMessageForWs(row, {
     replyMap,
+    // Raw client nonce (NOT `effectiveNonce`): echoed so the sender's optimistic
+    // row reconciles in place. `undefined` when the client sent none — in which
+    // case `effectiveNonce` is the `srv:` fallback, which must not reach the wire
+    // (content fingerprint; no client optimistic row to match). `mapMessageForWs`
+    // also prefix-guards `srv:` defensively.
+    clientNonce,
     attachments: attachments.map((a) => ({
       id: a.id,
       filename: a.filename,
@@ -732,11 +781,30 @@ export async function createCommunityMessage(params: {
     // self-contained, defaulting to `all`).
     const recipients = await resolveChannelRecipients(db, target.channelId)
 
+    // Normal message fan-out excludes the author because their optimistic row
+    // is reconciled from the POST response. If this send newly enrolled them
+    // in a thread's notify set, send a membership event directly so their own
+    // open Members drawer and sidebar participation state also refresh.
+    if (joinedParticipantUserIds.includes(authorId) && !isDmTarget(target)) {
+      void broadcastToUserSafe(authorId, {
+        type: WS_EVENTS.CHANNEL_MEMBER_ADD,
+        serverId: target.serverId,
+        channelId: target.channelId,
+        userId: authorId,
+      })
+    }
+
     fanOutToChannel(
       target.channelId,
       {
         type: WS_EVENTS.MESSAGE_CREATE,
         channelId: target.channelId,
+        ...(isDmTarget(target)
+          ? {}
+          : {
+              serverId: target.serverId,
+              ...(hasParentChannel(target) ? { parentChannelId: target.parentChannelId } : {}),
+            }),
         message: messagePayload,
       },
       {
@@ -759,8 +827,8 @@ export async function createCommunityMessage(params: {
       {
         mentionedUserIds: [...liveMentions, ...liveReplies],
         // serverId + railChannelId ride the UNREAD_BUMP so the client patches
-        // the right server tree + (parent, for threads) sidebar row without a
-        // query — straight off the resolved `target` (DM has neither). See
+        // the right server tree + a parent fallback for unlisted child threads
+        // without a query — straight off the resolved `target` (DM has neither). See
         // inbox-dot-ws-driven plan.
         ...(isDmTarget(target)
           ? {}
@@ -775,9 +843,9 @@ export async function createCommunityMessage(params: {
 
     if (!isDmTarget(target)) {
       if (hasParentChannel(target) && !skipChildChannelUpdate) {
-        const updated = await queries.communityChannel.getChannel(
-          db,
-          target.channelId,
+        const updated = await withD1Retry(
+          () => queries.communityChannel.getChannel(db, target.channelId),
+          { route: "message-handler:child-channel-read" },
         )
         fanOutToChannel(
           target.parentChannelId,
@@ -797,6 +865,12 @@ export async function createCommunityMessage(params: {
     }
   }
 
+  // Migration-backfill mode drops the real-time delivery shell entirely — the
+  // structural core (row + thread + enroll + mention rows) already committed
+  // inline above; `doBroadcast` is never run and no thunk is handed back.
+  if (suppressBroadcast) {
+    return { ok: true, row, attachments }
+  }
   if (deferBroadcast) {
     return { ok: true, row, attachments, broadcast: doBroadcast }
   }

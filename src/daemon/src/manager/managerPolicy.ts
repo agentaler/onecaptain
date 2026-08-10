@@ -74,6 +74,21 @@ export interface AgentState {
   /** ms timestamp since which the agent has been idle (running, no turn, empty inbox); null if not idle. */
   idleSince: number | null;
   /**
+   * ms timestamp at which the agent entered `stopping`; null whenever it is not
+   * `stopping`. A `stop`/`terminate_stalled` effect expects the process to emit
+   * `exit` shortly after, which drives `onExit` → respawn/idle. If that `exit`
+   * never arrives (the stop was a no-op because the session handle was already
+   * gone, or the kill didn't take), the agent is wedged in `stopping` FOREVER:
+   * no onTick predicate keys on `stopping` (stalled/suspectedDeaf/idle need
+   * `running`, resetStuck needs `resetting` and even guards `!== "stopping"`),
+   * and `onWake` only queues in `stopping`. This clock is the ONLY escape: a
+   * tick that finds `stopping` older than `stoppingStuckThresholdMs` forces the
+   * agent out (see `onTick`'s stopping-stuck branch). SET at every transition
+   * into `stopping`; CLEARED by `enterStable` (→ running/idle) and `onExit`.
+   * See plans/daemon-fsm-desync.md batch L3 (stopping-wedge black hole).
+   */
+  stoppingSince: number | null;
+  /**
    * True during an owner-triggered reset window. Gates every inbound wake to
    * inbox-only (no `spawn`, no `send`, no `gated_hold`) EXCEPT when the
    * agent is currently `idle` — the orchestrator's idle branch relies on
@@ -126,6 +141,18 @@ export interface ManagerState {
    * Its sessionId is preserved so the next wake resumes. 0/∞ disables.
    */
   idleTimeoutMs: number;
+  /**
+   * Reset-window convergence threshold: `resetting` stuck true past this long
+   * (measured from `resettingSince`) ⇒ the reconcile watchdog escalates. See
+   * `DEFAULT_RESET_STUCK_THRESHOLD_MS`.
+   */
+  resetStuckThresholdMs: number;
+  /**
+   * Stopping-stuck escalation threshold: `status === "stopping"` for longer than
+   * this (from `stoppingSince`) ⇒ the process's `exit` never arrived, so force
+   * the agent out of the black hole. See `DEFAULT_STOPPING_STUCK_THRESHOLD_MS`.
+   */
+  stoppingStuckThresholdMs: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,8 +165,71 @@ export type ManagerEvent =
   | { type: "spawned"; agentId: string; nowMs: number }
   | { type: "session"; agentId: string; sessionId: string }
   | { type: "progress"; agentId: string; nowMs: number }
-  | { type: "turn_end"; agentId: string; nowMs: number }
-  | { type: "exit"; agentId: string }
+  /**
+   * `endReason:"errored"` is set when a turn ended NON-cleanly — either a
+   * mid-turn runtime `error` OR a `terminate_stalled` kill (managerRuntime
+   * buffers the cause, stamps it here on the trailing turn_end). Absent = clean
+   * turn-end. STRICTLY BINARY (single literal, not a union) so the rewake gate
+   * keyed on `=== "errored"` can't be silently widened — red line 1. The CAUSE
+   * rides on the separate `terminationCause` field (for B2 policy branching:
+   * `killed_stalled` gets a tighter rewake bound than `runtime_error` since an
+   * input-caused hang recurs deterministically); `errorDetail` is free-text.
+   * B1 only RECORDS these (trace); the rewake policy that consumes them is B2.
+   * See plans/daemon-runtime-error-rewake.md.
+   */
+  | {
+      type: "turn_end";
+      agentId: string;
+      nowMs: number;
+      endReason?: "errored";
+      terminationCause?: "runtime_error" | "killed_stalled";
+      errorDetail?: string;
+    }
+  /**
+   * `exitCode`/`exitSignal`/`abnormal` are the RAW PHYSICAL termination fact of
+   * the process, recorded for fsm-trace forensics (T1,
+   * plans/daemon-trace-completeness-charter.md) — how the process died, for
+   * EVERY exit path, so a hard exit (segfault/OOM/external SIGKILL, which
+   * bypasses the normalizer and emits no turn_end) is distinguishable from a
+   * clean exit in the trace. OBSERVABILITY ONLY: `onExit` must NOT branch its
+   * respawn-vs-idle decision on these (red line — kept read-only). What the exit
+   * MEANS in FSM terms (deliberate kill vs crash) is a separate semantic layer
+   * left to T3, which may only LAYER fields on top, never overwrite these.
+   */
+  | {
+      type: "exit";
+      agentId: string;
+      exitCode?: number | null;
+      exitSignal?: string | null;
+      abnormal?: boolean;
+      /**
+       * Present when this exit followed a LAUNCH failure (never established):
+       * the reason string reportSpawnFailure recorded — the SAME value the web
+       * audit gets (ENOENT / handshake_timeout / pre_handshake_exit /
+       * spawn_threw / a Node error code). T2 (audit↔trace two-skins closure,
+       * plans/daemon-trace-completeness-charter.md): without it, a
+       * failed-to-start exit is a bare exit in the trace, indistinguishable from
+       * a clean one. Orthogonal to exitCode/exitSignal (a launch failure often
+       * has no real code/signal) — consumers detect "was it a launch failure" by
+       * this field's presence, not by guessing code/signal combos. Observability
+       * only; `onExit` must not branch on it.
+       */
+      spawnFailureReason?: string | null;
+      /**
+       * The FSM-level SEMANTIC of this exit, LAYERED on the physical fact above
+       * (T3, plans/daemon-trace-completeness-charter.md): `killed_stalled` (stall
+       * watchdog SIGKILL — same word as B1's turn_end-path `terminationCause`,
+       * one concept one token), `idle_stop` (voluntary idle-timeout hibernation),
+       * `force_exit` (stopping-stuck black-hole escape). Distinguishes a
+       * stall-kill-via-exit from a clean idle-stop (physically identical:
+       * reason=requested, signal set, abnormal=false) and labels the synthetic
+       * force_exit. FORENSICS ONLY: DELIBERATELY SEPARATE from `terminationCause`
+       * (which is turn_end-only and read by B2's rewake gate) so NO policy ever
+       * reads this — it can never leak into a rewake decision. Never overwrites
+       * the physical exit fields.
+       */
+      terminationSemantics?: string | null;
+    }
   | { type: "tick"; nowMs: number }
   /**
    * Owner-triggered "reset session". Nulls `AgentState.sessionId` so the next
@@ -175,6 +265,17 @@ export type ManagerEffect =
   | { type: "stop"; agentId: string; reason: string }
   | { type: "terminate_stalled"; agentId: string }
   /**
+   * Stopping-stuck escalation (batch L3): the agent has sat in `stopping` past
+   * `stoppingStuckThresholdMs` — the `exit` a prior stop/terminate expected never
+   * arrived, so the agent is wedged in the one state no other watchdog can reach.
+   * The runtime handler force-kills any still-tracked process (best effort; warns
+   * if none is available — a possible orphan) and dispatches a SYNTHETIC `exit`
+   * so the FSM traverses the normal `onExit` → respawn/idle recovery. Universal
+   * backstop: covers both a no-op stop (session handle already gone) and a stop
+   * that ran but produced no exit. See plans/daemon-fsm-desync.md batch L3.
+   */
+  | { type: "force_exit"; agentId: string; reason: string }
+  /**
    * Pure observability: a gated agent has a non-empty inbox but nothing was
    * actually sent — either a mid-turn wake was held, or a boundary flush
    * attempt was still blocked. Never emitted for `direct`/`none` drivers.
@@ -184,6 +285,27 @@ export type ManagerEffect =
 /** Default thresholds (ms). */
 export const DEFAULT_STALE_THRESHOLD_MS = 120_000;
 export const DEFAULT_IDLE_TIMEOUT_MS = 300_000;
+/**
+ * Reset-window convergence threshold: how long after a reset was initiated
+ * (`begin_reset` stamps `resettingSince`) the agent may stay non-stable
+ * (`resetting` still true, never reached `running`/`idle` via `enterStable`)
+ * before the reconcile watchdog forces it out. Deliberately a SEPARATE constant
+ * from `staleThresholdMs` — that one measures "a running turn made no progress",
+ * this one measures "a restart never converged". Different physical processes,
+ * independently tunable; sharing a constant would couple two unrelated timeouts.
+ * See plans/daemon-fsm-desync.md batch D.
+ */
+export const DEFAULT_RESET_STUCK_THRESHOLD_MS = 120_000;
+/**
+ * Stopping-stuck escalation threshold (ms): how long an agent may sit in
+ * `stopping` — waiting for a `stop`/`terminate_stalled`'s expected `exit` — before
+ * the tick concludes the exit will never come and forces the agent out (force-kill
+ * the orphaned process if any + a synthetic `exit` to drive onExit→respawn). MUST
+ * be comfortably larger than `SESSION_STOP_GRACE_MS` (the legitimate SIGTERM→SIGKILL
+ * grace, 2s) so it never races an in-flight stop that's about to succeed — this is
+ * a black-hole safety net, not a fast path. See plans/daemon-fsm-desync.md batch L3.
+ */
+export const DEFAULT_STOPPING_STUCK_THRESHOLD_MS = 30_000;
 
 export interface ReduceResult {
   state: ManagerState;
@@ -193,8 +315,10 @@ export interface ReduceResult {
 export function createInitialManagerState(
   staleThresholdMs = DEFAULT_STALE_THRESHOLD_MS,
   idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
+  resetStuckThresholdMs = DEFAULT_RESET_STUCK_THRESHOLD_MS,
+  stoppingStuckThresholdMs = DEFAULT_STOPPING_STUCK_THRESHOLD_MS,
 ): ManagerState {
-  return { agents: {}, staleThresholdMs, idleTimeoutMs };
+  return { agents: {}, staleThresholdMs, idleTimeoutMs, resetStuckThresholdMs, stoppingStuckThresholdMs };
 }
 
 /* ------------------------------------------------------------------ */
@@ -482,6 +606,12 @@ function onExit(state: ManagerState, agentId: string): ReduceResult {
   if (!existing) return { state, effects: [] };
   const agent = clone(existing);
   agent.turnActive = false;
+  // The process is gone, so `stopping` no longer applies — clear the
+  // stopping-stuck clock here (covers BOTH onExit branches: the respawn path
+  // sets status="starting" directly, not via enterStable, so it wouldn't be
+  // cleared otherwise; the settle-idle path goes through enterStable which also
+  // clears it, harmless to do twice).
+  agent.stoppingSince = null;
   // Fresh process ⇒ fresh gated-steering horizon. Symmetric with `onTurnEnd`;
   // prevents a dead process's `compacting` / outstanding-tool-use flags from
   // silently carrying into the next spawn and re-blocking `onWake`.
@@ -557,8 +687,75 @@ function onTick(state: ManagerState, nowMs: number): ReduceResult {
       a.lastDeliverAt > a.lastProgressAt &&
       nowMs - a.lastDeliverAt >= state.staleThresholdMs;
     if (stalled || suspectedDeaf) {
-      agents[id] = { ...a, status: "stopping", idleSince: null };
+      agents[id] = { ...a, status: "stopping", idleSince: null, stoppingSince: nowMs };
       effects.push({ type: "terminate_stalled", agentId: id });
+      continue;
+    }
+
+    // Reset-stuck reconcile (plans/daemon-fsm-desync.md batch D): the reset
+    // window (`resetting`) is closed exclusively by `enterStable` when the agent
+    // reaches a stable `running`/`idle` state. If the converging event never
+    // arrives — an idle-branch spawn whose process never emits `spawned`, or an
+    // onExit-respawn that wedges in `starting` — `resetting` stays true forever
+    // with an aging `resettingSince`, and every wake gets gated to the inbox
+    // (onWake's reset gate) and never delivered = a permanent orphan. The three
+    // predicates above can't catch it: they all require `status === "running"`,
+    // but a reset-stuck agent is stuck in `starting`/`stopping` (never reached
+    // running, so `enterStable` never ran, so `resetting` is still true). This
+    // is the ONE belief-vs-reality gap the running-keyed detectors leave open.
+    // Escalate by forcing an `exit`: `onExit` drains any queued rewake and
+    // respawns (or settles idle), and its `enterStable` atomically closes the
+    // window — recovery REUSES C's single-owner clear, no second clear path.
+    // The `status !== "stopping"` guard is what makes this NOT fire-and-assume
+    // AND storm-free: the escalate flips status to `stopping`, so it can't
+    // re-issue a `terminate_stalled` every tick while the (guaranteed) exit is
+    // in flight — the running-keyed predicates get this for free by leaving
+    // `running`, but `resetStuck` keys on `resetting` (which `enterStable`, not
+    // this branch, clears) so it needs the explicit guard. Re-escalation still
+    // happens correctly when it's warranted: if the forced exit's respawn wedges
+    // AGAIN, onExit puts the agent back in `starting` (not `stopping`) with
+    // `resetting` still true and `resettingSince` still aging, so a later tick
+    // fires this anew — the recovery keeps trying until the reset converges to a
+    // stable state (`enterStable` clears `resetting` → this stops firing).
+    // Mutually exclusive with stalled/suspectedDeaf by the disjoint `status`
+    // precondition (they need `running`; a reset-stuck orphan is in `starting`).
+    const resetStuck =
+      a.resetting &&
+      a.status !== "stopping" &&
+      a.resettingSince !== null &&
+      nowMs - a.resettingSince >= state.resetStuckThresholdMs;
+    if (resetStuck) {
+      agents[id] = { ...a, status: "stopping", idleSince: null, stoppingSince: nowMs };
+      effects.push({ type: "terminate_stalled", agentId: id });
+      continue;
+    }
+
+    // Stopping-stuck escalation (plans/daemon-fsm-desync.md batch L3): the black
+    // hole. A `stop`/`terminate_stalled` set status=`stopping` expecting the
+    // process to emit `exit` (→ onExit → respawn/idle). If that `exit` never
+    // comes — the stop was a no-op (session handle already gone), or the kill
+    // didn't take — the agent is wedged in `stopping` PERMANENTLY: no predicate
+    // above keys on `stopping` (stalled/suspectedDeaf/idle need `running`;
+    // resetStuck needs `resetting` AND guards `!== "stopping"`), and `onWake`
+    // only queues in `stopping` (inbox grows unboundedly, never delivered —
+    // observed live: Olivia 2026-07-31 stuck 12min, inbox climbing, process
+    // still alive). This is the ONE escape. Force the agent out via `force_exit`
+    // (runtime handler best-effort-kills any tracked process, then dispatches a
+    // SYNTHETIC `exit` so the FSM runs the normal onExit recovery). Threshold ≫
+    // SESSION_STOP_GRACE_MS so it never races a legitimate in-flight stop.
+    // Storm-free: `force_exit` → onExit → enterStable clears `stoppingSince`, so
+    // it can't re-fire for the same stopping episode; if the respawn wedges in
+    // `stopping` again, a fresh `stoppingSince` restarts the clock and it re-
+    // escalates — converging until a respawn sticks.
+    const stoppingStuck =
+      a.status === "stopping" &&
+      a.stoppingSince !== null &&
+      nowMs - a.stoppingSince >= state.stoppingStuckThresholdMs;
+    if (stoppingStuck) {
+      // Leave stoppingSince set until the synthetic exit's onExit clears it —
+      // status stays `stopping` this tick, so the `!== "stopping"` shape holds
+      // and nothing else touches it; the effect drives the transition out.
+      effects.push({ type: "force_exit", agentId: id, reason: "stopping_stuck" });
       continue;
     }
 
@@ -573,7 +770,7 @@ function onTick(state: ManagerState, nowMs: number): ReduceResult {
       state.idleTimeoutMs > 0 &&
       Number.isFinite(state.idleTimeoutMs);
     if (idleEligible && a.idleSince !== null && nowMs - a.idleSince >= state.idleTimeoutMs) {
-      agents[id] = { ...a, status: "stopping", idleSince: null };
+      agents[id] = { ...a, status: "stopping", idleSince: null, stoppingSince: nowMs };
       effects.push({ type: "stop", agentId: id, reason: "idle_timeout" });
     }
   }
@@ -595,6 +792,7 @@ function freshAgent(agentId: string, caps: AgentRuntimeCaps): AgentState {
     lastProgressAt: 0,
     lastDeliverAt: null,
     idleSince: null,
+    stoppingSince: null,
     resetting: false,
     resettingSince: null,
     apm: createInitialApmGatedSteeringState(),
@@ -625,6 +823,8 @@ function enterStable(agent: AgentState, status: "running" | "idle"): void {
   agent.status = status;
   agent.resetting = false;
   agent.resettingSince = null;
+  // Left `stopping` (reached a stable state) ⇒ the stopping-stuck clock is moot.
+  agent.stoppingSince = null;
 }
 
 /** Coalesce all queued messages into one prompt, deduplicating identical lines. */

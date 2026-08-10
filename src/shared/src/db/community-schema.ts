@@ -17,16 +17,33 @@ import { user } from "./schema";
 // ---------------------------------------------------------------------------
 
 // 1. community_server
-export const communityServer = sqliteTable("community_server", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
-  name: text("name").notNull(),
-  description: text("description").default(""),
-  icon: text("icon"),
-  ownerId: text("owner_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "restrict" }),
-  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
-});
+export const communityServer = sqliteTable(
+  "community_server",
+  {
+    id: text("id").primaryKey().$defaultFn(() => nanoid()),
+    name: text("name").notNull(),
+    discriminator: text("discriminator").notNull().default("0000"),
+    description: text("description").default(""),
+    icon: text("icon"),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    // Unique server handle `name#discriminator` — the server-segment address
+    // anchor, so a ref `/name#disc/...` resolves to exactly one server. Mirrors
+    // the user `(name, discriminator)` handle. Source of truth:
+    // migration 0079_community_server_discriminator.sql. NOCASE on `name` there
+    // so the DB ruler folds identically to resolveServerByNameForMember's
+    // `COLLATE NOCASE` lookup (the index/resolver alignment migration 0075
+    // established for top-level channel names). Plain `.on()` here can't express
+    // COLLATE — the migration is authoritative. No `deletedAt` clause: servers
+    // are not soft-deleted (community_server has no deletedAt column), unlike the
+    // user index's partial `WHERE deletedAt IS NULL` (0055).
+    uniqueIndex("idx_community_server_name_discriminator").on(t.name, t.discriminator),
+  ]
+);
 
 // 2. community_category
 export const communityCategory = sqliteTable(
@@ -45,8 +62,8 @@ export const communityCategory = sqliteTable(
 );
 
 // 3. community_channel
-// `type`: text | forum | forum_post | thread | dm. DMs have server_id + name
-// NULL (no server, no name); their two participants are relation='access'
+// `type`: text | forum | thread | dm. DMs have server_id + name NULL (no
+// server, no name); their two participants are relation='access'
 // community_channel_member rows.
 export const communityChannel: SQLiteTableWithColumns<any> = sqliteTable(
   "community_channel",
@@ -62,7 +79,6 @@ export const communityChannel: SQLiteTableWithColumns<any> = sqliteTable(
     type: text("type").notNull().default("text"),
     topic: text("topic").default(""),
     position: integer("position").default(0),
-    forumTags: text("forum_tags"), // JSON
     parentChannelId: text("parent_channel_id").references(() => communityChannel.id, {
       onDelete: "cascade",
     }),
@@ -78,8 +94,8 @@ export const communityChannel: SQLiteTableWithColumns<any> = sqliteTable(
     index("idx_channel_server_last_message").on(t.serverId, t.lastMessageAt),
     index("idx_channel_parent").on(t.parentChannelId),
     // Partial unique — top-level channel names are unique per server.
-    // Source of truth: migration 0057_channel_unique_name.sql. Threads and
-    // forum posts (parent_channel_id NOT NULL) are exempt by design.
+    // Source of truth: migration 0057_channel_unique_name.sql. Threads
+    // (parent_channel_id NOT NULL) are exempt by design.
     uniqueIndex("idx_channel_server_name")
       .on(t.serverId, t.name)
       .where(sql`parent_channel_id IS NULL`),
@@ -91,9 +107,8 @@ export const communityChannel: SQLiteTableWithColumns<any> = sqliteTable(
 //   - "access" — gates private units: a top-level channel in a PRIVATE
 //     category, a forum, or a DM (a DM's two participants are access rows).
 //     Public/uncategorized channels imply access via server membership.
-//   - "notify" — the thread / forum_post participant (notification) set. A
-//     message reaches only the unit's notify members; a thread never notifies
-//     its whole parent channel, a forum post never notifies the whole server.
+//   - "notify" — a child thread's participant (notification) set. A message
+//     reaches only the thread's notify members, never its whole parent channel.
 // A user may hold BOTH an access and a notify row for the same channel, so the
 // unique key is (channel_id, user_id, relation). `source` records how the row
 // arose: mention | spoke | added.
@@ -338,12 +353,15 @@ export const communityReadState = sqliteTable(
     // INVARIANT: non-null whenever the row exists. Route writes through
     // `markReadToMessageBuilder` — never null out.
     lastReadMessageId: text("last_read_message_id"),
-    // Shared per-user cursor for humans AND bots (bots ARE users invariant).
-    // Populated by: the author read-watermark upsert inside `createMessage`
-    // (every author, bot or human), and `bumpReadCursor` (agent `ack` route
-    // only). NOT maintained by the human-only read routes
+    // Shared per-user cursor for humans AND bots (bots ARE users invariant) —
+    // and now the SINGLE unread ruler for both (ref/id read-model seq
+    // unification): the inbox unread predicate is `EXISTS(message.seq >
+    // lastReadSeq)`, the same seq compare the agent inbox uses. Maintained by
+    // EVERY read-state writer: `createMessage`'s author watermark, `bumpReadCursor`
+    // (agent ack), AND the human read routes
     // (`markReadToMessageBuilder`/`markReadToMessage`/`markAllServerChannelsRead`)
-    // — an explicit, documented gap, see plans/community-agent-cli-bridge.md §4.
+    // — the earlier "humans don't maintain it" gap is closed, or a human's read
+    // would never register under the seq predicate.
     lastReadSeq: integer("last_read_seq").notNull().default(0),
   },
   (t) => [index("idx_read_state_user").on(t.userId)]
@@ -571,3 +589,89 @@ export const communityBotActivityEvent = sqliteTable(
   ]
 );
 
+// 22. community_bot_daily_activity
+// Per-bot, per-calendar-day rollup powering the my-bots activity heatmap:
+// how many messages the bot HANDLED (woke for) and SENT that day. One row per
+// (botId, day); each counter is bumped +1 via an upsert that rides an EXISTING
+// write batch (handled → the wake_trigger audit batch; sent → the community
+// message insert batch), so there is no new hot-path round-trip. `day` is a
+// UTC `YYYY-MM-DD` key computed by a single shared helper so both upserts agree
+// on the day boundary. Unlike `user.handledMessageCount` (the lifecycle counter
+// this replaces), this is a CALENDAR fact: it is NEVER zeroed on nap/reset and
+// never touched by the FSM. Read is the last 30 days per bot (≤30 rows, covered
+// by the PK), so no rolling prune is required.
+export const communityBotDailyActivity = sqliteTable(
+  "community_bot_daily_activity",
+  {
+    botId: text("bot_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    handledCount: integer("handled_count").notNull().default(0),
+    sentCount: integer("sent_count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.botId, t.day] })]
+);
+
+// 23. community_message_mark
+// Per-user private bookmark ("mark") on a message. Unlike community_pin (15),
+// which is channel-shared (everyone sees the same set), a mark is keyed by the
+// marking USER and visible only to them. Powers the Marked inbox tab. Like
+// pins, no denormalized seq: the marked-list read joins communityMessage for
+// the jump key (communityMessage.seq). channelId is stored for the cascade and
+// the phase-2 per-channel markedIds read (inline glyph, cut from phase-1 per
+// Gus /Gus/working #992); the INDEX(userId, channelId) that read needs is
+// deferred with it. UNIQUE(userId, messageId) makes the toggle idempotent
+// (messageId is globally unique, so channelId is not needed for uniqueness).
+export const communityMessageMark = sqliteTable(
+  "community_message_mark",
+  {
+    id: text("id").primaryKey().$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    channelId: text("channel_id")
+      .notNull()
+      .references(() => communityChannel.id, { onDelete: "cascade" }),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => communityMessage.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    unique("uq_mark_user_message").on(t.userId, t.messageId),
+    index("idx_mark_user_created").on(t.userId, t.createdAt),
+  ]
+);
+
+// 24. community_message_tag
+// Post tags (phase2 forum≡thread, Gener #768 — locked shape). A post is now
+// just a message (its opener) that opened a thread — tags describe the
+// CONTENT of that message, not the channel/thread it lives in (a thread can
+// be opened by any message, so a channel/thread-level column would leak a
+// tagging capability onto every thread, not just posts — this field's mere
+// presence on a message row IS the "is this a tagged post" signal, no extra
+// branch needed). Supersedes the old `communityChannel.forumTags` (JSON)
+// column, backfilled here by migration 0082 and dropped by 0083 once that
+// backfill was verified zero-loss.
+export const communityMessageTag = sqliteTable(
+  "community_message_tag",
+  {
+    id: text("id").primaryKey().$defaultFn(() => nanoid()),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => communityMessage.id, { onDelete: "cascade" }),
+    tag: text("tag").notNull(),
+  },
+  (t) => [
+    // Toggle idempotency: adding a tag already present is a no-op, not a
+    // duplicate row (mirrors community_message_mark's uq_mark_user_message).
+    unique("uq_message_tag").on(t.messageId, t.tag),
+    // Tag-first: the read pattern is "find messages with tag X" (the forum
+    // ?tag= filter, always applied on top of an already-resolved,
+    // membership-gated channel's message set) — never a bare cross-channel
+    // tag search (Aigneis #646/#647 red-line: that would hand a bot an
+    // existence-probe, "which channels have this tag").
+    index("idx_message_tag_tag").on(t.tag, t.messageId),
+  ]
+);

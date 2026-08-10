@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { EventEmitter } from "events";
-import { createDaemon, deriveAuditLogSubcommand, emitImplicitTypingStopOnSend } from "./createDaemon";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  createDaemon,
+  createRuntimeRawLineTap,
+  deriveAuditLogSubcommand,
+  emitImplicitTypingStopOnSend,
+  parseRuntimeRawTraceAgentIds,
+} from "./createDaemon";
 import type { Driver } from "../types";
 import type { Logger } from "../logger";
 
@@ -154,10 +163,174 @@ describe("createDaemon", () => {
   });
 });
 
+describe("createDaemon — opt-in raw runtime trace (P0-1)", () => {
+  const dirs: string[] = [];
+  const expectSecureMode = (path: string) => {
+    if (process.platform === "win32") return;
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  };
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("parses only explicit comma-separated agent ids and rejects the all-agents wildcard", () => {
+    expect([...parseRuntimeRawTraceAgentIds(" agent_a,agent_b,agent_a,*, ")]).toEqual([
+      "agent_a",
+      "agent_b",
+    ]);
+    expect(parseRuntimeRawTraceAgentIds(undefined).size).toBe(0);
+  });
+
+  it("stays disabled without both a trace directory and an explicit agent", () => {
+    const logger = stubLogger();
+    expect(createRuntimeRawLineTap({ traceDir: "/tmp/no-create", enabledAgentIds: new Set(), logger })).toBeUndefined();
+    expect(createRuntimeRawLineTap({ enabledAgentIds: new Set(["a1"]), logger })).toBeUndefined();
+  });
+
+  it("writes only selected agents, preserves raw lines, and encodes the agent filename", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runtime-raw-trace-"));
+    dirs.push(dir);
+    const selectedAgent = "../agent_a";
+    const tap = createRuntimeRawLineTap({
+      traceDir: dir,
+      enabledAgentIds: new Set([selectedAgent]),
+      logger: stubLogger(),
+    });
+    expect(tap).toBeDefined();
+
+    tap?.("agent_b", '{"ignored":true}');
+    tap?.(selectedAgent, '{"jsonrpc":"2.0","vendor":"kept"}');
+
+    const path = join(dir, "runtime-raw-events-%2E%2E%2Fagent_a.jsonl");
+    expect(readFileSync(path, "utf8")).toBe('{"jsonrpc":"2.0","vendor":"kept"}\n');
+    expectSecureMode(path);
+    expect(existsSync(join(dir, "runtime-raw-events-agent_b.jsonl"))).toBe(false);
+  });
+
+  it("rotates each selected agent independently and keeps both generations at 0600", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runtime-raw-trace-"));
+    dirs.push(dir);
+    const tap = createRuntimeRawLineTap({
+      traceDir: dir,
+      enabledAgentIds: new Set(["a1", "a2"]),
+      logger: stubLogger(),
+      maxBytes: 20,
+    });
+    tap?.("a1", "x".repeat(19));
+    tap?.("a1", "latest-a1");
+    tap?.("a2", "only-a2");
+
+    const a1 = join(dir, "runtime-raw-events-a1.jsonl");
+    const a2 = join(dir, "runtime-raw-events-a2.jsonl");
+    expect(readFileSync(a1, "utf8")).toBe("latest-a1\n");
+    expect(existsSync(`${a1}.1`)).toBe(true);
+    expect(readFileSync(a2, "utf8")).toBe("only-a2\n");
+    for (const path of [a1, `${a1}.1`, a2]) {
+      expectSecureMode(path);
+      expect(statSync(path).size).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it("drops an oversized multibyte line, warns once, and keeps the file hard-capped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runtime-raw-trace-"));
+    dirs.push(dir);
+    const logger = stubLogger();
+    const tap = createRuntimeRawLineTap({
+      traceDir: dir,
+      enabledAgentIds: new Set(["a1"]),
+      logger,
+      maxBytes: 6,
+    });
+
+    tap?.("a1", "ééé");
+    tap?.("a1", "ééé");
+    tap?.("a1", "ok");
+
+    const path = join(dir, "runtime-raw-events-a1.jsonl");
+    expect(readFileSync(path, "utf8")).toBe("ok\n");
+    expect(statSync(path).size).toBeLessThanOrEqual(6);
+    expect(logger.calls.warn.filter(([, message]) => message === "runtime raw trace sink failed")).toHaveLength(1);
+  });
+
+  it("warns once per agent when the sink is unwritable and never throws", () => {
+    const dir = mkdtempSync(join(tmpdir(), "runtime-raw-trace-"));
+    dirs.push(dir);
+    const blocker = join(dir, "not-a-directory");
+    writeFileSync(blocker, "x");
+    const logger = stubLogger();
+    const tap = createRuntimeRawLineTap({
+      traceDir: blocker,
+      enabledAgentIds: new Set(["a1"]),
+      logger,
+    });
+
+    expect(() => {
+      tap?.("a1", "one");
+      tap?.("a1", "two");
+    }).not.toThrow();
+    expect(logger.calls.warn.filter(([, message]) => message === "runtime raw trace sink failed")).toHaveLength(1);
+  });
+});
+
 describe("createDaemon — logging", () => {
   const originalFetch = global.fetch;
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it("asks a woken agent to read unread messages without requiring a reply", async () => {
+    global.fetch = vi.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (href.includes("/enroll-agent")) {
+        return new Response(JSON.stringify({ runnerKey: "rk_1" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ bots: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    let spawnedPrompt = "";
+    const driver: Driver = {
+      ...fullFakeDriver("codex"),
+      spawn: async (ctx) => {
+        spawnedPrompt = ctx.prompt;
+        const proc = new EventEmitter() as unknown as { kill: () => void };
+        proc.kill = () => { };
+        return { process: proc as never };
+      },
+    } as unknown as Driver;
+
+    const sockets: FakeSocket[] = [];
+    const daemon = await createDaemon({
+      machineKey: "cmk_wake_prompt",
+      serverUrl: "http://localhost:9999",
+      serverWsUrl: "ws://x",
+      webSocketFactory: factory(sockets) as any,
+      runtimeReport: [{ id: "codex" }],
+      driverFor: () => driver,
+      capabilities: [],
+    });
+    sockets[0].emit("open");
+    await new Promise((r) => setTimeout(r, 20));
+
+    sockets[0].emit(
+      "message",
+      JSON.stringify({ type: "bot:added", botId: "bot_1", name: "Bot One", discriminator: "4821" }),
+    );
+    sockets[0].emit(
+      "message",
+      JSON.stringify({
+        type: "agent:wake",
+        agentId: "bot_1",
+        config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
+        launchId: "l1",
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(spawnedPrompt).toContain("Use `alook inbox pull` to read your messages.");
+    expect(spawnedPrompt).not.toContain("message send");
+
+    await daemon.stop();
   });
 
   it("threads the shared logger into WsControlChannel/AgentRouter/AgentProcessManager, and logs bot:removed + a successful wake through the manager", async () => {
@@ -200,7 +373,7 @@ describe("createDaemon — logging", () => {
         agentId: "bot_1",
         config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
         launchId: "l1",
-        unreadNotice: { kind: "unread_notice", channel: "/demo/general", latestSeq: 1 },
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
       }),
     );
     await new Promise((r) => setTimeout(r, 20));
@@ -261,7 +434,7 @@ describe("createDaemon — logging", () => {
         agentId: "bot_1",
         config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
         launchId: "l1",
-        unreadNotice: { kind: "unread_notice", channel: "/demo/general", latestSeq: 1 },
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
       }),
     );
     await new Promise((r) => setTimeout(r, 20));
@@ -288,7 +461,7 @@ describe("createDaemon — logging", () => {
         agentId: "bot_2",
         config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
         launchId: "l2",
-        unreadNotice: { kind: "unread_notice", channel: "/demo/general", latestSeq: 2 },
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 2 },
       }),
     );
     await new Promise((r) => setTimeout(r, 20));
@@ -354,13 +527,56 @@ describe("createDaemon — logging", () => {
         agentId: "bot_1",
         config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
         launchId: "l1",
-        unreadNotice: { kind: "unread_notice", channel: "/demo/general", latestSeq: 1 },
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
       }),
     );
     await new Promise((r) => setTimeout(r, 20));
 
     expect(
       logger.calls.warn.some(([, m, d]) => m === "agent enroll failed" && (d[0] as any).agentId === "bot_1"),
+    ).toBe(true);
+    await daemon.stop();
+  });
+
+  it("preserves status and bounded text when enroll-agent returns a non-JSON error", async () => {
+    global.fetch = vi.fn(async (url: string | URL) => {
+      if (String(url).includes("/enroll-agent")) {
+        return new Response("upstream overloaded", { status: 503 });
+      }
+      return new Response(JSON.stringify({ bots: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const sockets: FakeSocket[] = [];
+    const logger = stubLogger();
+    const daemon = await createDaemon({
+      machineKey: "cmk_enroll_text_error",
+      serverUrl: "http://localhost:9999",
+      serverWsUrl: "ws://x",
+      webSocketFactory: factory(sockets) as any,
+      runtimeReport: [{ id: "codex" }],
+      driverFor: () => fullFakeDriver("codex"),
+      capabilities: [],
+      logger,
+    });
+    sockets[0].emit("open");
+    sockets[0].emit("message", JSON.stringify({ type: "bot:added", botId: "bot_text", name: "Bot Text" }));
+    sockets[0].emit(
+      "message",
+      JSON.stringify({
+        type: "agent:wake",
+        agentId: "bot_text",
+        config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
+        launchId: "l_text",
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(
+      logger.calls.warn.some(([, m, d]) => {
+        const err = String((d[0] as any).err);
+        return m === "agent enroll failed" && err.includes("503") && err.includes("upstream overloaded");
+      }),
     ).toBe(true);
     await daemon.stop();
   });
@@ -483,7 +699,7 @@ describe("createDaemon — level-triggered activity heartbeat (2b: live-connecti
         agentId: "bot_1",
         config: { version: 1, runtime: "codex", model: { kind: "default" }, mode: { kind: "default" } },
         launchId: "l1",
-        unreadNotice: { kind: "unread_notice", channel: "/demo/general", latestSeq: 1 },
+        unreadNotice: { kind: "unread_notice", channel: "/demo#1234/general", latestSeq: 1 },
       }),
     );
     // Let enroll + spawn resolve, then land the runtime handshake so the FSM
@@ -510,32 +726,11 @@ describe("createDaemon — level-triggered activity heartbeat (2b: live-connecti
 });
 
 describe("deriveAuditLogSubcommand", () => {
-  it("maps the CLI's bare /api/* pathnames to their subcommand suffix", () => {
-    expect(deriveAuditLogSubcommand("/api/send")).toBe("send");
-    expect(deriveAuditLogSubcommand("/api/read")).toBe("read");
-    expect(deriveAuditLogSubcommand("/api/inboxPull")).toBe("inboxPull");
-    expect(deriveAuditLogSubcommand("/api/inboxSnapshot")).toBe("inboxSnapshot");
-    expect(deriveAuditLogSubcommand("/api/listChannels")).toBe("listChannels");
-    expect(deriveAuditLogSubcommand("/api/listServers")).toBe("listServers");
-    expect(deriveAuditLogSubcommand("/api/listMembers")).toBe("listMembers");
-    expect(deriveAuditLogSubcommand("/api/joinServer")).toBe("joinServer");
-    expect(deriveAuditLogSubcommand("/api/resolve")).toBe("resolve");
-    expect(deriveAuditLogSubcommand("/api/reactAdd")).toBe("reactAdd");
-  });
-
-  it("maps the rewritten /api/community/* pathnames identically", () => {
-    // The proxy's rewriteAgentPath fires AFTER onProxyRequest, so the sighting
-    // may carry either shape depending on how the CLI called in. Both the flat
-    // client path and the post-rewrite /api/community/* path must derive to the
-    // same subcommand string. (The legacy /api/community/agent/* form is still
-    // normalized too, for any in-flight path.)
-    expect(deriveAuditLogSubcommand("/api/community/send")).toBe("send");
-    expect(deriveAuditLogSubcommand("/api/community/inboxPull")).toBe("inboxPull");
-    expect(deriveAuditLogSubcommand("/api/community/reactAdd")).toBe("reactAdd");
-    expect(deriveAuditLogSubcommand("/api/community/agent/send")).toBe("send");
-  });
-
-  it("returns null for `ack` (dropped — paired with inboxPull, no user intent)", () => {
+  it("does not normalize deleted flat or legacy-agent inputs", () => {
+    expect(deriveAuditLogSubcommand("/api/send")).toBe(null);
+    expect(deriveAuditLogSubcommand("/api/attachmentUpload?target=/x/y")).toBe(null);
+    expect(deriveAuditLogSubcommand("/api/community/send")).toBe(null);
+    expect(deriveAuditLogSubcommand("/api/community/agent/send")).toBe(null);
     expect(deriveAuditLogSubcommand("/api/ack")).toBe(null);
     expect(deriveAuditLogSubcommand("/api/community/agent/ack")).toBe(null);
   });
@@ -543,6 +738,60 @@ describe("deriveAuditLogSubcommand", () => {
   it("returns null for non-/api pathnames", () => {
     expect(deriveAuditLogSubcommand("/health")).toBe(null);
     expect(deriveAuditLogSubcommand("/")).toBe(null);
+  });
+
+  it("maps the canonical id-in-path door shapes back to the logical verb (route/disc retarget)", () => {
+    // Without this, slicing the first segment would log the DOOR (`channels` /
+    // `messages`), losing which action the bot invoked in the cli_invocation row.
+    // Messages door is dual-verb — method disambiguates read vs send.
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/messages", "POST")).toBe("send");
+    expect(deriveAuditLogSubcommand("/api/community/channels/abc123/messages", "POST")).toBe("send");
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/messages", "GET")).toBe("read");
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/messages?ref=%2Fs%2Fg", "GET")).toBe("read");
+    // message-keyed write doors.
+    expect(deriveAuditLogSubcommand("/api/community/messages/resolve/reactions/%F0%9F%91%8D", "PUT")).toBe("reactAdd");
+    // seq→id lookup (folded resolve).
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/messages/seq/42", "GET")).toBe("resolve");
+    // single-message hydrate door GET messages/{id} = the folded `resolve` verb.
+    expect(deriveAuditLogSubcommand("/api/community/messages/resolve?ref=%2Fs%2Fg&seq=42", "GET")).toBe("resolve");
+    expect(deriveAuditLogSubcommand("/api/community/messages/m1", "GET")).toBe("resolve");
+    // hydrate door must not shadow the write sub-paths.
+    expect(deriveAuditLogSubcommand("/api/community/messages/m1/reactions/x", "PUT")).toBe("reactAdd");
+    // members door (folded channelMember).
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/members?ref=%2Fs%2Fg", "GET")).toBe("channelMember");
+    expect(deriveAuditLogSubcommand("/api/community/channels/c1/members", "GET")).toBe("channelMember");
+    // server-scoped list doors (轴3 fold): servers/{id}/members = listMembers;
+    // servers/{id}/channels + servers/channels (all-servers collection) = listChannels.
+    expect(deriveAuditLogSubcommand("/api/community/servers/resolve/members?server=studio", "GET")).toBe("listMembers");
+    expect(deriveAuditLogSubcommand("/api/community/servers/srv_1/members", "GET")).toBe("listMembers");
+    expect(deriveAuditLogSubcommand("/api/community/servers/resolve/channels?server=studio", "GET")).toBe("listChannels");
+    expect(deriveAuditLogSubcommand("/api/community/servers/srv_1/channels", "GET")).toBe("listChannels");
+    expect(deriveAuditLogSubcommand("/api/community/servers/channels", "GET")).toBe("listChannels");
+    // friends bucket doors (轴3 fold): accepted + pending map back to listFriends
+    // (the bot's `alook friend list` fans out to both). blocked is bot-403 → not mapped.
+    expect(deriveAuditLogSubcommand("/api/community/friends/accepted", "GET")).toBe("listFriends");
+    expect(deriveAuditLogSubcommand("/api/community/friends/pending", "GET")).toBe("listFriends");
+    // friend-request door (friendRequest fold): POST friends/request maps back to
+    // `friendRequest`, not the `friends` segment (audit is daemon/proxy = bot path).
+    expect(deriveAuditLogSubcommand("/api/community/friends/request", "POST")).toBe("friendRequest");
+    // inbox bucket doors (轴3 fold): users/me/inbox/{pull,snapshot} map back to
+    // the logical verb, not the `users` segment.
+    expect(deriveAuditLogSubcommand("/api/community/users/me/inbox/pull", "POST")).toBe("inboxPull");
+    expect(deriveAuditLogSubcommand("/api/community/users/me/inbox/snapshot", "GET")).toBe("inboxSnapshot");
+    // ack is the advance op of the trinity but writes NO audit row here (re-homed
+    // to the daemon reborn-ready signal) — null, same as flat /ack, NOT `users`.
+    expect(deriveAuditLogSubcommand("/api/community/users/me/inbox/ack", "POST")).toBe(null);
+    // bot-self lifecycle door (bots/me/*): nap maps back to `nap`, not `bots`.
+    expect(deriveAuditLogSubcommand("/api/community/bots/me/nap", "POST")).toBe("nap");
+    // attachments door (attachments fold): channels/{id}/attachments = upload,
+    // channels/{id}/attachments/{attachmentId} = download. Map back to the
+    // logical verb, not the `channels` door segment. Download shape (has the
+    // sub-segment) must win over the bare-upload shape.
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/attachments", "POST")).toBe("attachmentUpload");
+    expect(deriveAuditLogSubcommand("/api/community/channels/c1/attachments", "POST")).toBe("attachmentUpload");
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/attachments?target=%2Fs%2Fg", "POST")).toBe("attachmentUpload");
+    expect(deriveAuditLogSubcommand("/api/community/channels/resolve/attachments/att_1", "GET")).toBe("attachmentDownload");
+    expect(deriveAuditLogSubcommand("/api/community/channels/c1/attachments/att_1", "GET")).toBe("attachmentDownload");
   });
 });
 

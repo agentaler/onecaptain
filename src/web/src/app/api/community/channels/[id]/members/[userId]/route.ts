@@ -2,13 +2,13 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, WS_EVENTS } from "@alook/shared"
+import { queries, WS_EVENTS, isThread } from "@alook/shared"
 import { broadcastToUserSafe } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireChannelAccess } from "@/lib/community/permissions"
 
 /**
- * Remove a member from a private access unit (channel or forum post).
+ * Remove a member from a private access unit (channel).
  *   - Self-leave: any member may remove THEMSELVES (drop their own access).
  *   - Remove others: CREATOR only (add is open to members, but evicting someone
  *     else is the creator's call; admins have no content privilege here).
@@ -26,6 +26,9 @@ export const DELETE = withAuth(async (_req: NextRequest, ctx) => {
   if (!access.ok) return writeError(access.error, access.status)
 
   const channel = access.value.channel
+  if (isThread(channel.type) || channel.parentMessageId) {
+    return writeError("threads inherit their parent's members — remove participants instead", 400)
+  }
   if (channel.creatorId === targetUserId) {
     // Covers both "creator can't be removed" and "creator can't leave".
     return writeError("can't remove the channel creator", 400)
@@ -34,14 +37,12 @@ export const DELETE = withAuth(async (_req: NextRequest, ctx) => {
   const isSelf = targetUserId === ctx.userId
   if (!isSelf && !access.value.isCreator) return writeError("forbidden", 403)
 
-  const removed = await queries.communityChannel.deleteChannelMember(db, channelId, targetUserId)
+  const removed = await queries.communityChannel.deleteChannelMemberAndChildParticipants(
+    db,
+    channelId,
+    targetUserId,
+  )
   if (!removed) return writeError("member not found", 404)
-
-  // A removed member loses access to every child unit (a forum's posts, a
-  // channel's threads); drop their leftover participant (notify) rows across
-  // those children so fan-out stops pushing new post/thread messages they can no
-  // longer read. A later mention/speak (which requires access) re-adds them.
-  await queries.communityThread.removeParticipantFromChildChannels(db, channelId, targetUserId)
 
   const event = {
     type: WS_EVENTS.CHANNEL_MEMBER_REMOVE,

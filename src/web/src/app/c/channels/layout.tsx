@@ -18,7 +18,7 @@ import { ServerSettings } from "@/components/community/server-settings"
 import { ImageCropDialog } from "@/components/community/image-crop-dialog"
 import { validateIconSourceFile } from "@/lib/community/image-crop"
 import type { MobileZone, SettingsSection } from "@/components/community/_types"
-import { canManageServer, notifLevelDisplay, type ChannelType } from "@alook/shared"
+import { canManageServer, isForum, notifLevelDisplay, type ChannelType } from "@alook/shared"
 import { resolveRowPresence } from "@/lib/community/presence"
 import {
   useCommunityStore,
@@ -30,9 +30,19 @@ import { useServer, useServers } from "@/hooks/community/use-servers"
 import { useServerMembers } from "@/hooks/community/use-server-members"
 import {
   consumeVoluntaryLeave,
-  pickPostEjectDestination,
+  runAuthoritativeServerEject,
 } from "@/components/community/eject-server"
+import { clearLastChannel } from "@/lib/community/last-channel"
+import { getLastMeLeaf, pickMeLandingLocation } from "@/lib/community/last-me-location"
 import { usePresence } from "@/hooks/community/use-server-panels"
+import {
+  patchForumSidebarUnreadExact,
+  removeForumSidebarUnreadChild,
+  resolveForumSidebarRouteCandidate,
+  setForumSidebarParentUnreadBase,
+  useForumSidebarThreads,
+  type ForumSidebarThread,
+} from "@/hooks/community/use-forum-sidebar-threads"
 import { useCommunityWsStore, useOnlineUserIds } from "@/stores/community/ws"
 import { useNotificationSettings } from "@/hooks/community/use-notification-settings"
 import {
@@ -57,6 +67,7 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
   const params = useParams<{ serverId: string; channelId?: string }>()
   const searchParams = useSearchParams()
   const serverId = decodeURIComponent(params.serverId)
+  const routeChannelId = params.channelId ? decodeURIComponent(params.channelId) : null
   const hasChannel = !!params.channelId
 
   const router = useRouter()
@@ -96,6 +107,32 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
   const channelNotif = notifs.channel
   const currentChannelId = useCurrentChannelId()
   const currentChannelMeta = useCurrentChannelMeta()
+  const activeForumThreadId = useMemo(() => {
+    if (!currentChannelId || !currentChannelMeta?.parentChannelId) return null
+    const parent = currentServer?.categories
+      .flatMap((category) => category.channels)
+      .find((channel) => channel.id === currentChannelMeta.parentChannelId)
+    return isForum(parent?.type) ? currentChannelId : null
+  }, [currentChannelId, currentChannelMeta?.parentChannelId, currentServer])
+  const sidebarRouteCandidate = useMemo(() => {
+    const topLevelIds = currentServer?.categories
+      ?.flatMap((category) => category.channels.map((channel) => channel.id)) ?? null
+    return resolveForumSidebarRouteCandidate(routeChannelId, topLevelIds)
+  }, [routeChannelId, currentServer])
+  const forumSidebar = useForumSidebarThreads(
+    serverId,
+    sidebarRouteCandidate,
+    !!currentServer?.categories,
+  )
+  const forumThreadsByParent = useMemo(() => {
+    const grouped: Record<string, ForumSidebarThread[]> = {}
+    for (const thread of forumSidebar.threads) {
+      const siblings = grouped[thread.parentChannelId] ?? []
+      siblings.push(thread)
+      grouped[thread.parentChannelId] = siblings
+    }
+    return grouped
+  }, [forumSidebar.threads])
 
   // Mutations
   const createChannelMut = useCreateChannel()
@@ -128,25 +165,25 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
   //   4. Viewer pasted a URL for a server they were never in (list
   //      finishes loading, id is missing from the start).
   //
-  // Gate on `isFetched && !isFetching`, not on `isLoading`. TanStack v5
-  // `isLoading` is only true on the very first fetch — after any WS
-  // invalidate, reconnect, or IDB rehydrate, `isLoading=false` even while
-  // `servers=[]` between refetches. Using `isLoading` alone false-triggered
-  // this eject on every reload (see the "You're no longer in this server"
-  // toast on refresh regression). Also gate on the `!ejectedRef` to prevent
-  // a re-fire while the redirect is in flight.
+  // Only a settled SUCCESSFUL snapshot can prove absence. `isFetched` is also
+  // true after a first 5xx, while a failed background refetch may retain
+  // last-good data; treating either as authoritative ejects valid URLs on a
+  // transient read failure. The ref prevents a re-fire during navigation.
   const serversList = useServers()
   const ejectedRef = useRef(false)
   useEffect(() => {
     if (ejectedRef.current) return
-    if (!serversList.isFetched || serversList.isFetching) return
-    const inRail = serversList.servers.some((s) => s.id === serverId)
-    if (inRail) return
-    ejectedRef.current = true
-    const voluntary = consumeVoluntaryLeave(serverId)
-    if (!voluntary) toast("You're no longer in this server")
-    router.replace(pickPostEjectDestination(serversList.servers, serverId))
-  }, [serverId, serversList.isFetched, serversList.isFetching, serversList.servers, router])
+    ejectedRef.current = runAuthoritativeServerEject({
+      serverId,
+      servers: serversList.servers,
+      isSuccess: serversList.isSuccess,
+      isFetching: serversList.isFetching,
+      consumeVoluntaryLeave,
+      clearLastChannel,
+      toast,
+      replace: (destination) => router.replace(destination),
+    })
+  }, [serverId, serversList.isSuccess, serversList.isFetching, serversList.servers, router])
   // Reset the guard when the URL changes to a NEW server id — otherwise
   // navigating server → dangling-server → server would leave the ref
   // latched and skip the eject.
@@ -223,12 +260,19 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
     )
   }, [searchParams, serverId, router, hasChannel, currentServer, params.channelId])
 
-  const categories = currentServer?.categories ?? []
+  const categories = useMemo(() => (currentServer?.categories ?? []).map((category) => ({
+    ...category,
+    channels: category.channels.map((channel) =>
+      forumSidebar.parentUnread[channel.id] === undefined
+        ? channel
+        : { ...channel, unread: forumSidebar.parentUnread[channel.id] },
+    ),
+  })), [currentServer?.categories, forumSidebar.parentUnread])
   const channelTree = useChannelTree(categories)
 
   const goHome = useCallback(() => {
     setMobileZone("nav")
-    router.push("/c/me")
+    router.push(pickMeLandingLocation(getLastMeLeaf()))
   }, [router])
   const goServer = useCallback(() => { setMobileZone("nav") }, [])
 
@@ -264,16 +308,36 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
     markSwitch("channel", id)
     router.push(`/c/channels/${serverId}/${id}`)
     channelTree.markRead(id)
-    queryClient.setQueryData<ServerDetail | undefined>(
-      communityKeys.server(serverId),
-      (cache) => patchChannelUnread(cache, id, false),
+    const hasChildFallback = setForumSidebarParentUnreadBase(
+      queryClient,
+      serverId,
+      id,
+      false,
     )
+    if (!hasChildFallback) {
+      queryClient.setQueryData<ServerDetail | undefined>(
+        communityKeys.server(serverId),
+        (cache) => patchChannelUnread(cache, id, false),
+      )
+    }
     if (bp === "mobile") setMobileZone("messages")
   }, [router, serverId, channelTree, bp, queryClient])
+
+  const setActiveForumThread = useCallback((id: string) => {
+    markSwitch("channel", id)
+    router.push(`/c/channels/${serverId}/${id}`)
+    removeForumSidebarUnreadChild(queryClient, serverId, id)
+    patchForumSidebarUnreadExact(queryClient, serverId, id, false)
+    if (bp === "mobile") setMobileZone("messages")
+  }, [bp, queryClient, router, serverId])
 
   const onSidebarOpenSettings = useCallback((section?: SettingsSection) => {
     if (section) setSettingsSection(section)
     setServerSettingsOpen(true)
+  }, [])
+
+  const onRailOpenActiveInvite = useCallback(() => {
+    setInvitePopoverOpen(true)
   }, [])
 
   const onBlockedCreate = useCallback(() => {
@@ -343,6 +407,9 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
     currentUserId: currentUser.id,
     loading: !currentServer,
     setActiveChannel,
+    forumThreadsByParent,
+    activeThreadId: activeForumThreadId,
+    onSelectForumThread: setActiveForumThread,
     onOpenSettings: isAdmin ? onSidebarOpenSettings : undefined,
     onBlockedCreate,
     mutedChannels,
@@ -362,6 +429,7 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
   }), [
     channelTree, currentServer, currentChannelMeta?.parentChannelId,
     currentChannelId, isAdmin, currentUser.id, setActiveChannel,
+    forumThreadsByParent, activeForumThreadId, setActiveForumThread,
     onSidebarOpenSettings, onBlockedCreate, mutedChannels,
     onCreateChannelInSidebar, onCreateCategoryInSidebar, onRenameChannel,
     onDeleteChannelInSidebar, onDeleteCategoryInSidebar, onUpdateCategoryInSidebar,
@@ -487,6 +555,8 @@ export default function ServerLayout({ children }: { children: ReactNode }) {
       setMobileZone={setMobileZone}
       sidebar={sidebar}
       extraDialogs={<>{serverSettingsDialog}{iconCropDialog}</>}
+      onOpenActiveServerSettings={onSidebarOpenSettings}
+      onOpenActiveServerInvite={onRailOpenActiveInvite}
       goHome={goHome}
       goServer={goServer}
     >

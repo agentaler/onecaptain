@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { ListChevronsUpDown, MessagesSquare } from "lucide-react"
+import { Hash, ListChevronsUpDown } from "lucide-react"
 import { getEntityIcon } from "./entity-icon"
 import { ChannelIcon } from "./channel-icon"
 
@@ -13,8 +13,7 @@ describe("getEntityIcon", () => {
     expect(getEntityIcon("forum")).toBe(ListChevronsUpDown)
   })
 
-  it("thread and forum_post → MessagesSquare", () => {
-    expect(getEntityIcon("thread")).toBe(MessagesSquare)
-    expect(getEntityIcon("forum_post")).toBe(MessagesSquare)
+  it("thread → Hash", () => {
+    expect(getEntityIcon("thread")).toBe(Hash)
   })
 })

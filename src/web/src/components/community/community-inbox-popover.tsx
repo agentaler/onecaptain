@@ -1,12 +1,14 @@
-import { ChevronRight, Inbox, MoreHorizontal, Trash2 } from "lucide-react"
+import { Bookmark, ChevronRight, Inbox, MoreHorizontal, Trash2 } from "lucide-react"
 import { stripInlineMarkup } from "@alook/shared"
 import { EntityIcon } from "./entity-icon"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar } from "./avatar"
+import { ChannelIcon } from "./channel-icon"
 import { EmptyState } from "./empty-state"
-import type { Mention, UnreadDm, UnreadServer } from "./_types"
+import { formatRelativeTime } from "./format-time"
+import type { Marked, Mention, UnreadDm, UnreadServer } from "./_types"
 
 function MentionBadge({ count }: { count: number }) {
   if (count <= 0) return null
@@ -17,11 +19,12 @@ function MentionBadge({ count }: { count: number }) {
   )
 }
 
-function UnreadsTab({ servers, dms, loading, onOpenChannel, onOpenDm }: {
+function UnreadsTab({ servers, dms, loading, onOpenChannel, onOpenForumThread, onOpenDm }: {
   servers: UnreadServer[]
   dms: UnreadDm[]
   loading?: boolean
   onOpenChannel?: (serverId: string, channelId: string) => void
+  onOpenForumThread: (serverId: string, parentChannelId: string, childChannelId: string, openerMessageId: string) => void
   onOpenDm?: (dmId: string) => void
 }) {
   const nothingUnread = servers.length === 0 && dms.length === 0
@@ -59,11 +62,17 @@ function UnreadsTab({ servers, dms, loading, onOpenChannel, onOpenDm }: {
                 <MentionBadge count={c.mentionCount} />
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </button>
-              {/* Unread threads / forum-posts, indented under their parent. */}
+              {/* Unread child threads, indented under their parent. */}
               {c.children.map((child) => (
                 <button
                   key={child.channelId}
-                  onClick={() => onOpenChannel?.(s.serverId, child.channelId)}
+                  onClick={() => {
+                    if (child.openerMessageId) {
+                      onOpenForumThread(s.serverId, c.channelId, child.channelId, child.openerMessageId)
+                    } else {
+                      onOpenChannel?.(s.serverId, child.channelId)
+                    }
+                  }}
                   className="flex w-full items-center gap-2 rounded-md py-1.5 pl-8 pr-2 text-left text-sm hover:bg-accent"
                 >
                   <EntityIcon kind={child.type} className="size-3.5 shrink-0 text-muted-foreground" />
@@ -98,7 +107,7 @@ function MentionsTab({ mentions, loading, onOpenMention, onDeleteMention }: {
               <div className="text-sm">
                 <span className="font-medium">{mn.m.authorName}</span>{" "}
                 <span className="text-xs text-muted-foreground">
-                  {mn.kind === "reply" ? "replied to you" : "mentioned you"} in {mn.server} · #{mn.channel}
+                  {mn.kind === "reply" ? "replied to you" : "mentioned you"} in {mn.server} · <ChannelIcon className="inline h-[1em] w-auto align-[-0.1em]" />{mn.channel}
                 </span>
               </div>
               <div className="truncate text-sm text-muted-foreground">{stripInlineMarkup(mn.m.content ?? "")}</div>
@@ -123,31 +132,96 @@ function MentionsTab({ mentions, loading, onOpenMention, onDeleteMention }: {
   )
 }
 
+function MarkedTab({ marked, loading, onOpenMarked, onUnmark }: {
+  marked: Marked[]
+  loading?: boolean
+  onOpenMarked?: (m: Marked) => void
+  onUnmark?: (messageId: string) => void
+}) {
+  return (
+    <div className="h-full overflow-y-auto thin-scrollbar p-3">
+      {loading && marked.length === 0 && <InboxRowsSkeleton />}
+      {!loading && marked.length === 0 && <EmptyState icon={Bookmark} label="No marked messages" />}
+      {marked.map((mk) => (
+        <div key={mk.id} className="group flex w-full items-start gap-3 rounded-md p-2 text-left hover:bg-accent">
+          <button onClick={() => onOpenMarked?.(mk)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+            <Avatar label={mk.m.authorAvatar ?? "?"} seed={mk.m.authorId} size={36} />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm">
+                <span className="font-medium">{mk.m.authorName}</span>{" "}
+                <span className="text-xs text-muted-foreground">
+                  in{" "}
+                  {mk.serverId
+                    ? <>{mk.server} · <ChannelIcon className="inline h-[1em] w-auto align-[-0.1em]" />{mk.channel}</>
+                    : "DM"}
+                  {mk.m.createdAt && <> · {formatRelativeTime(mk.m.createdAt)}</>}
+                </span>
+              </div>
+              <div className="truncate text-sm text-muted-foreground">{stripInlineMarkup(mk.m.content ?? "")}</div>
+            </div>
+          </button>
+          {onUnmark && (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<button className="mt-1 grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100" aria-label="More" />}>
+                <MoreHorizontal className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4} className="w-36">
+                <DropdownMenuItem onClick={() => onUnmark(mk.m.id)}>
+                  <Trash2 className="size-4" />
+                  Unmark
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function InboxPopover({
   unreads,
   unreadDms,
   mentions,
+  marked,
+  markedLoading,
   loading,
   onOpenChannel,
+  onOpenForumThread,
   onOpenDm,
   onOpenMention,
+  onOpenMarked,
   onDeleteMention,
+  onUnmark,
+  onMarkedTabSelected,
   onMarkAllRead,
 }: {
   unreads: UnreadServer[]
   unreadDms: UnreadDm[]
   mentions: Mention[]
+  marked: Marked[]
+  markedLoading?: boolean
   loading?: boolean
   onOpenChannel?: (serverId: string, channelId: string) => void
+  onOpenForumThread: (serverId: string, parentChannelId: string, childChannelId: string, openerMessageId: string) => void
   onOpenDm?: (dmId: string) => void
   onOpenMention?: (m: Mention) => void
+  onOpenMarked?: (m: Marked) => void
   onDeleteMention?: (id: string) => void
+  onUnmark?: (messageId: string) => void
+  // Fired when the Marked tab becomes active — the shell uses this to enable
+  // the (lazy) marked-feed query only once the viewer actually opens the tab.
+  onMarkedTabSelected?: () => void
   onMarkAllRead?: () => void
 }) {
   const hasUnreads = unreads.length > 0 || unreadDms.length > 0
   const hasAnything = hasUnreads || mentions.length > 0
   return (
-    <Tabs defaultValue="unreads" className="flex h-112 flex-col">
+    <Tabs
+      defaultValue="unreads"
+      onValueChange={(v) => { if (v === "marked") onMarkedTabSelected?.() }}
+      className="flex h-112 flex-col"
+    >
       <div className="flex items-center gap-2 px-3 pt-4">
         <Inbox className="size-5" />
         <h2 className="flex-1 text-lg font-semibold">Inbox</h2>
@@ -174,12 +248,16 @@ export function InboxPopover({
             {mentions.length > 0 && <span className="size-1.5 rounded-full bg-primary" />}
           </span>
         </TabsTrigger>
+        <TabsTrigger value="marked">Marked</TabsTrigger>
       </TabsList>
       <TabsContent value="unreads" className="min-h-0 flex-1">
-        <UnreadsTab servers={unreads} dms={unreadDms} loading={loading} onOpenChannel={onOpenChannel} onOpenDm={onOpenDm} />
+        <UnreadsTab servers={unreads} dms={unreadDms} loading={loading} onOpenChannel={onOpenChannel} onOpenForumThread={onOpenForumThread} onOpenDm={onOpenDm} />
       </TabsContent>
       <TabsContent value="mentions" className="min-h-0 flex-1">
         <MentionsTab mentions={mentions} loading={loading} onOpenMention={onOpenMention} onDeleteMention={onDeleteMention} />
+      </TabsContent>
+      <TabsContent value="marked" className="min-h-0 flex-1">
+        <MarkedTab marked={marked} loading={markedLoading} onOpenMarked={onOpenMarked} onUnmark={onUnmark} />
       </TabsContent>
     </Tabs>
   )

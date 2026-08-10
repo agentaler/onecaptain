@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import React from "react"
 import TestRenderer, { act } from "react-test-renderer"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Message } from "./message"
 import type { RenderMsg } from "./_types"
 
@@ -32,11 +33,18 @@ const genericMock = {
 }
 
 let renderCount = 0
-// A probe that counts how many times the body content actually renders by
-// wrapping the memoized Message; we detect bail-out by rendering Message with a
-// spy callback that increments on each real render via a child sentinel.
+// Message consumes query context (the lazy Mark/Unmark state read), so every
+// render tree is wrapped in a provider. A single shared client keeps the
+// wrapper element type stable across `.update()` so the memo behavior under
+// test isn't disturbed. Retries off + no network — the query stays idle
+// (`enabled` only flips true once a menu opens, which these trees don't do).
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 function makeTree(props: Parameters<typeof Message>[0]) {
-  return React.createElement(Message, props)
+  return React.createElement(
+    QueryClientProvider,
+    { client: queryClient },
+    React.createElement(Message, props),
+  )
 }
 
 beforeEach(() => {
@@ -114,6 +122,38 @@ describe("Message memo comparator", () => {
   })
 })
 
+describe("Message image attachment layout", () => {
+  it("keeps a known portrait image intrinsic and constrains it by message width + max height", () => {
+    let renderer: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(
+        makeTree({
+          m: baseMsg({
+            attachments: [{
+              kind: "image",
+              name: "portrait.png",
+              url: "/portrait.png",
+              width: 396,
+              height: 702,
+            }],
+          }),
+          onOpenThread: vi.fn(),
+        }),
+        { createNodeMock: () => genericMock },
+      )
+    })
+
+    const image = renderer!.root.findByType("img")
+    expect(image.props).toMatchObject({ width: 396, height: 702 })
+    expect(image.props.className).toContain("h-auto")
+    expect(image.props.className).toContain("w-auto")
+    expect(image.props.className).toContain("max-h-75")
+    expect(image.props.className).toContain("max-w-full")
+    expect(image.parent?.props.className).toContain("w-fit")
+    expect(image.parent?.props.className).toContain("max-w-full")
+  })
+})
+
 describe("Message lazy overlays", () => {
   it("does not mount the ContextMenu root until the row is activated", () => {
     const onOpenThread = vi.fn()
@@ -134,5 +174,48 @@ describe("Message lazy overlays", () => {
     const tree = JSON.stringify(json)
     // The reaction-add testid only renders inside the activated toolbar.
     expect(tree).not.toContain("reaction-add")
+  })
+
+  it.each([
+    ["Retry", (onRetry: ReturnType<typeof vi.fn>, _onDismiss: ReturnType<typeof vi.fn>) => onRetry],
+    ["Dismiss", (_onRetry: ReturnType<typeof vi.fn>, onDismiss: ReturnType<typeof vi.fn>) => onDismiss],
+  ])("keeps a failed row out of lazy overlays so pointerenter → first %s click fires once", (label, expectedCallback) => {
+    const onRetry = vi.fn()
+    const onDismiss = vi.fn()
+    let renderer: TestRenderer.ReactTestRenderer
+    act(() => {
+      renderer = TestRenderer.create(
+        makeTree({
+          m: baseMsg({ failed: true }),
+          onOpenThread: vi.fn(),
+          onCopy: vi.fn(),
+          onRetry,
+          onDismiss,
+        }),
+        { createNodeMock: () => genericMock },
+      )
+    })
+
+    const row = renderer!.root.find(
+      (node) => typeof node.props.className === "string"
+        && node.props.className.includes("group relative -mx-2"),
+    )
+    expect(row.props.onPointerEnter).toBeUndefined()
+    act(() => row.props.onPointerEnter?.())
+    expect(renderer!.root.findAll(
+      (node) => node.props["data-slot"] === "context-menu-trigger",
+    )).toHaveLength(0)
+
+    const action = renderer!.root.findAllByType("button").find((button) =>
+      label === "Dismiss"
+        ? button.children.includes("Dismiss")
+        : button.children.some((child) => typeof child === "string" && child.includes("Message failed to send")),
+    )
+    expect(action).toBeDefined()
+    act(() => action!.props.onClick())
+
+    expect(expectedCallback(onRetry, onDismiss)).toHaveBeenCalledOnce()
+    const otherCallback = label === "Dismiss" ? onRetry : onDismiss
+    expect(otherCallback).not.toHaveBeenCalled()
   })
 })

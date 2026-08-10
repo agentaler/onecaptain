@@ -16,7 +16,6 @@ function channelRow(over: Record<string, unknown> = {}) {
     type: "text",
     topic: "",
     position: 0,
-    forumTags: null,
     parentChannelId: null,
     creatorId: "creator",
     messageCount: 0,
@@ -72,6 +71,35 @@ describe("canSeePrivateChannel — shared rule", () => {
     expect(canSeePrivateChannel({ role: "member", isCreator: false, isChannelMember: false })).toBe(false)
   })
 })
+
+describe("deleteChannelMemberAndChildParticipants", () => {
+  it("batches access removal with child notify cleanup", async () => {
+    const accessStatement: any = {};
+    accessStatement.where = vi.fn(() => accessStatement);
+    accessStatement.returning = vi.fn(() => accessStatement);
+    const notifyStatement: any = {};
+    notifyStatement.where = vi.fn(() => notifyStatement);
+    const selectStatement: any = {};
+    selectStatement.from = vi.fn(() => selectStatement);
+    selectStatement.where = vi.fn(() => selectStatement);
+    const db: any = {
+      delete: vi
+        .fn()
+        .mockReturnValueOnce(accessStatement)
+        .mockReturnValueOnce(notifyStatement),
+      select: vi.fn(() => selectStatement),
+      batch: vi.fn().mockResolvedValue([[{ id: "cm1" }], { rowsAffected: 3 }]),
+    };
+
+    await expect(channelQueries.deleteChannelMemberAndChildParticipants(
+      db,
+      "c1",
+      "u2",
+    )).resolves.toEqual({ id: "cm1" });
+
+    expect(db.batch).toHaveBeenCalledWith([accessStatement, notifyStatement]);
+  });
+});
 
 describe("getChannelForMember — private visibility", () => {
   // Every queue leads with `[]` — the new `type='dm'` probe returns no row for
@@ -152,6 +180,5 @@ describe("getChannelForMember — private visibility", () => {
     ]);
     const res = await channelQueries.getChannelForMember(db, "c1", "u1");
     expect(res).not.toHaveProperty("memberRole");
-    expect(res).toHaveProperty("tags");
   });
 });

@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useState } from "react"
+import { useMessageMarked } from "@/hooks/community/use-inbox"
 import type React from "react"
 import {
   MessagesSquare, UserPlus, SmilePlus, Reply,
@@ -21,16 +22,7 @@ import { avatarInitial } from "@/lib/community/avatar"
 import { displayName } from "@/lib/community/display-name"
 import { stripInlineMarkup } from "@alook/shared"
 import type { RenderMsg, OpenProfile } from "./_types"
-
-// Fallback ratio for an attachment image with no known dimensions
-// (pre-feature rows sent before width/height were tracked). A more neutral
-// default than the embed-image branch's "40/21" wide-banner ratio — plain
-// attachments are typically screenshots/photos, not link-preview banners.
-const ATTACHMENT_FALLBACK_ASPECT_RATIO = "4/3"
-
-export function attachmentAspectRatio(width: number | undefined, height: number | undefined): string {
-  return width && height ? `${width}/${height}` : ATTACHMENT_FALLBACK_ASPECT_RATIO
-}
+import { attachmentAspectRatio } from "./attachment-layout"
 
 // Whether the "Share as Image" action is offered for a message. Share is
 // computed inside `Message` from the message alone (no handler is threaded in),
@@ -47,7 +39,7 @@ export function messageCanShare(m: RenderMsg, compact?: boolean): boolean {
 
 function MessageImpl({
   m, compact, pinned, onOpenThread, onOpenProfile, onJumpReply,
-  onToggleReaction, onReact, onReply, onPin, onCreateThread, onCopy, onRetry,
+  onToggleReaction, onReact, onReply, onPin, onMark, onCreateThread, onCopy, onEdit, onRetry, onDismiss,
   onPreviewImage, onDownloadFile, highlighted, resolveUserName, onImageLoad,
   selectMode, selected, onToggleSelect, onEnterSelect, onShareSingle,
 }: {
@@ -61,9 +53,15 @@ function MessageImpl({
   onReact?: (emoji: string) => void
   onReply?: () => void
   onPin?: () => void
+  // Toggle this message in the viewer's private saved ("marked") set. The
+  // Mark/Unmark label is driven by a lazy per-message read (see `marked`
+  // below), so a channel never pre-loads mark state for every row.
+  onMark?: () => void
   onCreateThread?: () => void
   onCopy?: () => void
+  onEdit?: () => void
   onRetry?: () => void
+  onDismiss?: () => void
   onPreviewImage?: (name: string) => void
   onDownloadFile?: (name: string) => void
   highlighted?: boolean
@@ -86,6 +84,16 @@ function MessageImpl({
 }) {
   // keep the hover toolbar pinned open while its ⋯ dropdown is open
   const [toolbarOpen, setToolbarOpen] = useState(false)
+  // Right-click context-menu open state — tracked so the Mark/Unmark label's
+  // lazy read fires for the context menu too, not just the ⋯ dropdown.
+  const [contextOpen, setContextOpen] = useState(false)
+  // The Mark/Unmark label needs to know if THIS message is already in the
+  // viewer's saved set. That's a single indexed row read, fired lazily only
+  // while a menu that shows the item is open (never per-row on mount) — so a
+  // channel scroll doesn't pre-load mark state for every row. Defaults to
+  // "Mark"; flips to "Unmark" silently once the read resolves (no spinner).
+  const markMenuOpen = (toolbarOpen || contextOpen) && !!onMark
+  const { data: markedData } = useMessageMarked(m.id, markMenuOpen)
   // Lazy-mount the row's Base UI overlay roots (ContextMenu / DropdownMenu /
   // EmojiPicker Popover / reaction Tooltips). Eagerly mounting them per visible
   // row was the bulk of the switch re-render storm (FloatingTree/MenuRoot ×1000s
@@ -112,14 +120,15 @@ function MessageImpl({
   const menuHandlers = {
     onAddReaction: onReact ? () => onReact("👍") : undefined,
     onReply, onPin, pinned,
+    onMark, marked: markedData?.marked ?? false,
     onCreateThread: m.thread ? undefined : onCreateThread,
-    onCopy,
+    onCopy, onEdit,
     // Share: enter multi-select (main list) if wired, else direct single-share
     // (context-sheet). Undefined only when the surface wired NEITHER.
     onShare: canShare ? (onEnterSelect ?? onShareSingle) : undefined,
   }
   const showMenu = hasMessageMenu(menuHandlers)
-  const interactive = !compact && showMenu
+  const interactive = !compact && !m.failed && showMenu
   const activate = interactive && !activated ? () => setActivated(true) : undefined
   // In select mode (multi-share), the whole row is a big toggle target and gets
   // a leading checkbox overlay + a tint when picked. `canShare` rows only —
@@ -238,16 +247,25 @@ function MessageImpl({
 
           {m.attachments && (
             <div className="mt-2 flex flex-col gap-2 pb-2">
-              {m.attachments.map((a, i) =>
-                a.kind === "image" ? (
+              {m.attachments.map((a, i) => {
+                if (a.kind === "image") return (
                   <button
                     key={i}
                     onClick={() => onPreviewImage?.(a.url)}
-                    className="block w-fit max-w-[320px] overflow-hidden rounded-lg border border-border transition-colors hover:border-primary/40"
+                    className="block w-fit max-w-full overflow-hidden rounded-lg border border-border transition-colors hover:border-primary/40"
                   >
-                    <img src={a.url} alt={a.name} width={a.width} height={a.height} className="max-h-50 max-w-[320px] rounded-lg object-contain" style={{ aspectRatio: attachmentAspectRatio(a.width, a.height) }} onLoad={onImageLoad} />
+                    <img
+                      src={a.url}
+                      alt={a.name}
+                      width={a.width}
+                      height={a.height}
+                      className="block h-auto w-auto max-h-75 max-w-full rounded-lg object-contain"
+                      style={{ aspectRatio: attachmentAspectRatio(a.width, a.height) }}
+                      onLoad={onImageLoad}
+                    />
                   </button>
-                ) : (
+                )
+                return (
                   <button
                     key={i}
                     onClick={() => onDownloadFile?.(a.url)}
@@ -260,8 +278,8 @@ function MessageImpl({
                     </div>
                     <Download className="size-4 shrink-0 text-muted-foreground" />
                   </button>
-                ),
-              )}
+                )
+              })}
             </div>
           )}
 
@@ -398,9 +416,16 @@ function MessageImpl({
           )}
 
           {m.failed && (
-            <button onClick={onRetry} className="mt-1 flex items-center gap-2 text-xs text-destructive hover:underline">
-              <X className="size-3.5" /> Message failed to send. Click to retry.
-            </button>
+            <div className="mt-1 flex items-center gap-3 text-xs text-destructive">
+              <button onClick={onRetry} className="flex items-center gap-2 hover:underline">
+                <X className="size-3.5" /> Message failed to send. Click to retry.
+              </button>
+              {onDismiss && (
+                <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground hover:underline">
+                  Dismiss
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -418,7 +443,7 @@ function MessageImpl({
   // In select mode the row is a toggle target — no context menu / toolbar.
   if (!interactive || !activated || selectMode) return row
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={setContextOpen}>
       <ContextMenuTrigger className="select-text" render={row} />
       <ContextMenuContent className="w-48">
         <MessageContextItems {...menuHandlers} />
@@ -472,9 +497,12 @@ function messagePropsEqual(prev: MessageProps, next: MessageProps): boolean {
     prev.onReact === next.onReact &&
     prev.onReply === next.onReply &&
     prev.onPin === next.onPin &&
+    prev.onMark === next.onMark &&
     prev.onCreateThread === next.onCreateThread &&
     prev.onCopy === next.onCopy &&
+    prev.onEdit === next.onEdit &&
     prev.onRetry === next.onRetry &&
+    prev.onDismiss === next.onDismiss &&
     prev.onPreviewImage === next.onPreviewImage &&
     prev.onDownloadFile === next.onDownloadFile &&
     prev.resolveUserName === next.resolveUserName &&

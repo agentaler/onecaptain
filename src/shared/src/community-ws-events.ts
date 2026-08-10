@@ -14,8 +14,13 @@ import type { MentionType } from "./utils/community-mentions"
 export type CommunityMessageCreate = {
   type: "community:message.create"
   channelId: string
+  /** Present for server-channel messages; lets server-scoped collections react without unread state. */
+  serverId?: string
+  /** Present when channelId is a child thread/post. */
+  parentChannelId?: string
   message: {
     id: string
+    seq: number
     authorId: string
     authorName: string
     authorAvatar?: string
@@ -39,6 +44,20 @@ export type CommunityMessageCreate = {
       height?: number | null
     }[]
     createdAt: string
+    /**
+     * The sender's CLIENT-PROVIDED idempotency nonce, echoed back so the
+     * sender's client can match this broadcast against its optimistic row and
+     * update it in place (tempId→id) instead of inserting a duplicate — the
+     * optimistic row and the echo otherwise share no key (the echo carries the
+     * server id; the optimistic row a `temp_` id). Present ONLY when the client
+     * supplied a nonce (i.e. only when there is an optimistic row to match).
+     * The server-side `srv:`-prefixed fallback nonce is deliberately NEVER put
+     * here: it is a content fingerprint (existence/content-correlation leak on
+     * the broadcast wire) AND a fallback send has no client optimistic row to
+     * match, so it is structurally unneeded. Absent = no client nonce (nothing
+     * to reconcile) — a plain random opaque token when present, safe to fan out.
+     */
+    clientNonce?: string
     /** Present only on a friend-approval card (DM channels). Client renders the card when set. */
     approval?: FriendApprovalPayload
   }
@@ -57,6 +76,16 @@ export type CommunityMessageUpdated = {
   channelId: string
   messageId: string
   approval: FriendApprovalPayload
+}
+
+export type CommunityMessageEdited = {
+  type: "community:message.edited"
+  channelId: string
+  messageId: string
+  content: string
+  // Present only when this message is the child channel's opener. Consumers
+  // use it to refresh the parent forum/thread summary; ordinary replies omit it.
+  parentChannelId?: string
 }
 
 export type CommunityReactionAdd = {
@@ -115,7 +144,7 @@ export type CommunityTypingStop = {
   discriminator?: string
 }
 
-// ── Child channel events (threads + forum posts) ─────────────────────────────
+// ── Child channel events (threads) ────────────────────────────────────────────
 
 export type CommunityChildChannelCreate = {
   type: "community:channel.child_create"
@@ -123,7 +152,7 @@ export type CommunityChildChannelCreate = {
   channel: {
     id: string
     name: string
-    type: "thread" | "forum_post"
+    type: "thread"
     creatorId?: string
     createdAt: string
   }
@@ -185,7 +214,6 @@ export type CommunityChannelUpdate = {
     topic?: string
     categoryId?: string | null
     type?: ChannelType
-    forumTags?: string | null
   }
 }
 
@@ -193,11 +221,10 @@ export type CommunityChannelDelete = {
   type: "community:channel.delete"
   serverId: string
   channelId: string
-  // The parent forum/thread channel, when the deleted channel is a child
-  // (forum_post / thread). Lets clients invalidate the parent's post/thread
-  // list so the deleted card disappears from the feed. Optional and additive —
-  // older events without it still work (the handler simply skips the parent
-  // invalidate).
+  // The parent channel, when the deleted channel is a child (thread). Lets
+  // clients invalidate the parent's post/thread list so the deleted card
+  // disappears from the feed. Optional and additive — older events without
+  // it still work (the handler simply skips the parent invalidate).
   parentChannelId?: string | null
 }
 
@@ -406,7 +433,8 @@ export type CommunityUnreadBump = {
   type: "community:unread.bump"
   userId: string
   /** The channel the message actually landed in (a thread bump = the thread's
-   * id). Use `railChannelId` to locate the sidebar row; this is the true scope. */
+   * id). Clients with a loaded child row may badge it directly; otherwise use
+   * `railChannelId` as the locatable fallback. */
   channelId: string
   /**
    * The server whose tree/rail badge to patch (inbox-dot-ws-driven plan). Lets
@@ -417,9 +445,9 @@ export type CommunityUnreadBump = {
    */
   serverId?: string
   /**
-   * The sidebar-locatable channel row = `parentChannelId ?? channelId`, computed
-   * server-side. A thread/forum-post message has no independent sidebar row, so
-   * its dot must light the PARENT channel's row; a plain channel is its own row.
+   * The always-locatable fallback row = `parentChannelId ?? channelId`, computed
+   * server-side. A participating forum thread may now have its own nested row;
+   * when it does not, this parent fallback keeps the unread signal visible.
    * Absent → client falls back to `channelId`.
    */
   railChannelId?: string
@@ -515,7 +543,7 @@ export type CommunityBotAuditEvent = {
   type: "community:bot.audit_event"
   botId: string
   id: string
-  kind: "cli_invocation" | "tool_call" | "thinking" | "wake_trigger" | "session_reset" | "model_changed" | "error"
+  kind: "cli_invocation" | "tool_call" | "thinking" | "wake_trigger" | "session_reset" | "nap" | "model_changed" | "provider_changed" | "error"
   payload: unknown
   sessionId?: string | null
   launchId?: string | null
@@ -564,6 +592,7 @@ export type CommunityBotHostFrame = BotAddedFrame | BotUpdatedFrame | BotRemoved
 export type CommunityWsEvent =
   | CommunityMessageCreate
   | CommunityMessageUpdated
+  | CommunityMessageEdited
   | CommunityReactionAdd
   | CommunityReactionRemove
   | CommunityPinAdd
@@ -603,15 +632,11 @@ export type CommunityWsEvent =
   | CommunityMachineRemoved
   | CommunityBotAuditEvent
 
-/** Type guard: is this a community WS event? */
-export function isCommunityEvent(msg: { type: string }): msg is CommunityWsEvent {
-  return msg.type.startsWith("community:")
-}
-
 /** Constant map of every community WS event type string. */
 export const WS_EVENTS = {
   MESSAGE_CREATE: "community:message.create",
   MESSAGE_UPDATED: "community:message.updated",
+  MESSAGE_EDITED: "community:message.edited",
   REACTION_ADD: "community:reaction.add",
   REACTION_REMOVE: "community:reaction.remove",
   PIN_ADD: "community:pin.add",
@@ -651,3 +676,17 @@ export const WS_EVENTS = {
   MACHINE_REMOVED: "community:machine.removed",
   BOT_AUDIT_EVENT: "community:bot.audit_event",
 } as const
+
+type DeclaredCommunityEventType = (typeof WS_EVENTS)[keyof typeof WS_EVENTS]
+type ExactCommunityEventType = Exclude<CommunityWsEvent["type"], DeclaredCommunityEventType> extends never
+  ? Exclude<DeclaredCommunityEventType, CommunityWsEvent["type"]> extends never
+    ? CommunityWsEvent["type"]
+    : never
+  : never
+
+const COMMUNITY_EVENT_TYPES: ReadonlySet<string> = new Set<ExactCommunityEventType>(Object.values(WS_EVENTS))
+
+/** Type guard: is this a community WS event? */
+export function isCommunityEvent(msg: { type: string }): msg is CommunityWsEvent {
+  return COMMUNITY_EVENT_TYPES.has(msg.type)
+}

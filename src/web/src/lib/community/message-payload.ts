@@ -14,7 +14,7 @@
  * embeds pass-through, and mentionType projection so adding/removing a
  * field on the wire is one edit, not four.
  */
-import { MESSAGE_PREVIEW_LENGTH, type MentionType } from "@alook/shared"
+import { truncateMessagePreview, type MentionType } from "@alook/shared"
 import type { FriendApprovalPayload } from "@alook/shared"
 import { avatarInitial } from "@/lib/community/avatar"
 
@@ -37,6 +37,7 @@ export type MessageRow = {
   embeds: unknown
   seq: number
   createdAt: string
+  clientNonce?: string | null
   /** Friend-approval card back-ref — set only on approval card messages. */
   friendshipId?: string | null
 }
@@ -49,7 +50,16 @@ type UiReaction = { emoji: string; count: number; me: boolean; userIds: string[]
 
 type ReplyPreview = { id: string; authorName: string; text: string; deleted?: boolean }
 
-type ThreadPreview = { id: string; name: string; messageCount: number }
+type ThreadPreview = {
+  id: string
+  name: string
+  messageCount: number
+  lastReplyAt?: string
+  tags?: string[]
+  preview?: string
+  participants?: { id: string; name: string; avatar: string }[]
+  participantCount?: number
+}
 
 /** Common fields shared by both API and WS variants — derived exactly once. */
 function coreFields(row: MessageRow) {
@@ -84,7 +94,7 @@ function resolveReply(row: MessageRow, replyMap: Map<string, ReplyTargetRow>): R
   return {
     id: target.id,
     authorName: target.authorName,
-    text: (target.content ?? "").slice(0, MESSAGE_PREVIEW_LENGTH),
+    text: truncateMessagePreview(target.content ?? ""),
   }
 }
 
@@ -119,14 +129,17 @@ export function mapMessageForApi(row: MessageRow, ctx: ApiMessageContext) {
   const core = coreFields(row)
   const thread = ctx.threadByMessageId?.get(row.id)
   const approval = ctx.approvalByMessageId?.get(row.id)
+  const clientNonce =
+    row.clientNonce && !row.clientNonce.startsWith("srv:") ? row.clientNonce : undefined
   return {
     ...core,
     ...splitType(row.type),
+    ...(clientNonce ? { clientNonce } : {}),
     replyTo: resolveReply(row, ctx.replyMap),
     embeds: row.embeds,
     attachments: ctx.attachmentsByMessage[row.id]?.length ? ctx.attachmentsByMessage[row.id] : undefined,
     reactions: ctx.reactionsByMessage[row.id]?.length ? ctx.reactionsByMessage[row.id] : undefined,
-    thread: thread ? { id: thread.id, name: thread.name, messageCount: thread.messageCount } : undefined,
+    thread,
     approval,
   }
 }
@@ -134,13 +147,29 @@ export function mapMessageForApi(row: MessageRow, ctx: ApiMessageContext) {
 export type WsMessageContext = {
   replyMap: Map<string, ReplyTargetRow>
   attachments: WsAttachment[]
+  /**
+   * The sender's client-provided idempotency nonce, echoed on the broadcast so
+   * the sender's optimistic row can be reconciled in place (see
+   * `CommunityMessageCreate.message.clientNonce`). Pass the RAW client nonce
+   * (undefined when the client sent none); the `srv:`-prefixed server fallback
+   * is filtered out below so a content fingerprint never reaches the wire.
+   */
+  clientNonce?: string
 }
 
 export function mapMessageForWs(row: MessageRow, ctx: WsMessageContext) {
   const core = coreFields(row)
+  // Echo ONLY a client-provided nonce, and never the `srv:`-prefixed server
+  // fallback (a content fingerprint — a content-correlation leak on the
+  // broadcast wire, and a fallback send has no client optimistic row to match
+  // anyway). The prefix guard is defense-in-depth: callers pass the raw client
+  // nonce, but if a `srv:` value ever reaches here it is dropped, not fanned.
+  const clientNonce =
+    ctx.clientNonce && !ctx.clientNonce.startsWith("srv:") ? ctx.clientNonce : undefined
   return {
     ...core,
     ...splitType(row.type),
+    ...(clientNonce ? { clientNonce } : {}),
     replyTo: resolveReply(row, ctx.replyMap),
     // The shared CommunityMessageCreate.embeds is `unknown[]` — narrow here
     // rather than widening the wire type.

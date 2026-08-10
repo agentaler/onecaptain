@@ -57,16 +57,19 @@ function buildTargetFilter(data: { userId: string; channelId: string }) {
  * `channelId` is the only scope; the upsert targets the plain unique
  * `(user_id, channel_id)`.
  */
-// lastReadSeq intentionally not maintained here — humans only, bot-wake
-// filter never reads a human's row (see plans/community-agent-cli-bridge.md
-// design §4 for the full accounting of which of the four read-state writers
-// do/don't need to thread `lastReadSeq` through).
+// `lastReadSeq` IS maintained here now (ref/id read-model seq unification): the
+// unread predicate switched from `lastMessageAt > lastReadAt` (timestamp) to
+// `EXISTS(message.seq > lastReadSeq)` — the same seq ruler the agent side uses —
+// so every human read write must advance `lastReadSeq` too, else a human's read
+// never registers under the new predicate (permanent phantom-unread). `seq`
+// co-advances with `createdAt` (both from the same message), so the monotone
+// guard stays on `lastReadAt` and `lastReadSeq` is set alongside.
 export function markReadToMessageBuilder(
   db: Database,
   data: {
     userId: string;
     channelId: string;
-    message: { id: string; createdAt: string };
+    message: { id: string; createdAt: string; seq: number };
   }
 ) {
   const { userId, channelId, message } = data;
@@ -90,12 +93,14 @@ export function markReadToMessageBuilder(
       channelId,
       lastReadAt: message.createdAt,
       lastReadMessageId: message.id,
+      lastReadSeq: message.seq,
     })
     .onConflictDoUpdate({
       target: [communityReadState.userId, communityReadState.channelId],
       set: {
         lastReadAt: message.createdAt,
         lastReadMessageId: message.id,
+        lastReadSeq: message.seq,
       },
       setWhere: sql`${communityReadState.lastReadAt} < ${message.createdAt}`,
     });
@@ -111,14 +116,14 @@ export function markReadToMessageBuilder(
  * The routes don't consume the returned row today — see `PUT /dm/:id/read`
  * and `PUT /threads/:id/read` which respond `{ ok: true }`.
  */
-// lastReadSeq intentionally not maintained here — see comment on
+// `lastReadSeq` maintained via the builder — see comment on
 // `markReadToMessageBuilder` above.
 export async function markReadToMessage(
   db: Database,
   data: {
     userId: string;
     channelId: string;
-    message: { id: string; createdAt: string };
+    message: { id: string; createdAt: string; seq: number };
   }
 ): Promise<void> {
   await markReadToMessageBuilder(db, data);
@@ -149,7 +154,7 @@ export async function markAllServerChannelsRead(
   // inbox unread + mentions consumers use (resolved once per fetch via
   // `listVisibleChannelIdsForUser`). Convergence on the id set replaces the
   // old inlined category `or()`, which climbed nothing and so evaluated child
-  // threads/forum-posts by their own (always-NULL) categoryId as public. The
+  // child threads by their own (always-NULL) categoryId as public. The
   // id set parent-climbs, so a child under a private parent the viewer can't
   // see is now correctly EXCLUDED — mark-all no longer writes read-state rows
   // for channels behind an invisible private parent.
@@ -194,14 +199,14 @@ export async function markAllServerChannelsRead(
 
   // Split latest into (a) rows we need to UPDATE by primary key and (b) rows
   // we need to INSERT fresh.
-  const toUpdate: Array<{ id: string; channelId: string; msgId: string; createdAt: string }> = [];
-  const toInsert: Array<{ channelId: string; msgId: string; createdAt: string }> = [];
+  const toUpdate: Array<{ id: string; channelId: string; msgId: string; createdAt: string; seq: number }> = [];
+  const toInsert: Array<{ channelId: string; msgId: string; createdAt: string; seq: number }> = [];
   for (const l of latest) {
     const existingId = existingByChannel.get(l.channelId);
     if (existingId) {
-      toUpdate.push({ id: existingId, channelId: l.channelId, msgId: l.id, createdAt: l.createdAt });
+      toUpdate.push({ id: existingId, channelId: l.channelId, msgId: l.id, createdAt: l.createdAt, seq: l.seq });
     } else {
-      toInsert.push({ channelId: l.channelId, msgId: l.id, createdAt: l.createdAt });
+      toInsert.push({ channelId: l.channelId, msgId: l.id, createdAt: l.createdAt, seq: l.seq });
     }
   }
 
@@ -218,7 +223,7 @@ export async function markAllServerChannelsRead(
   for (const u of toUpdate) {
     await db
       .update(communityReadState)
-      .set({ lastReadAt: u.createdAt, lastReadMessageId: u.msgId })
+      .set({ lastReadAt: u.createdAt, lastReadMessageId: u.msgId, lastReadSeq: u.seq })
       .where(
         and(
           eq(communityReadState.id, u.id),
@@ -229,8 +234,9 @@ export async function markAllServerChannelsRead(
 
   if (toInsert.length > 0) {
     // communityReadState emits 6 bind params/row (id $defaultFn, user_id,
-    // channel_id, last_read_at, last_read_message_id, last_read_seq default),
-    // so cap at floor(100/6)=16 rows/statement for D1's 100-param limit.
+    // channel_id, last_read_at, last_read_message_id, last_read_seq — now
+    // explicitly supplied, no longer defaulted), so cap at floor(100/6)=16
+    // rows/statement for D1's 100-param limit.
     for (const batch of chunk(toInsert, maxRowsPerInsert(6))) {
       await db.insert(communityReadState).values(
         batch.map((i) => ({
@@ -238,6 +244,7 @@ export async function markAllServerChannelsRead(
           channelId: i.channelId,
           lastReadAt: i.createdAt,
           lastReadMessageId: i.msgId,
+          lastReadSeq: i.seq,
         }))
       );
     }

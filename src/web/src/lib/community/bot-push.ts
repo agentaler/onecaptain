@@ -105,6 +105,57 @@ export async function pushAgentResetToMachine(
 }
 
 /**
+ * Push an owner-triggered BATCH reset (`machine:reset_all`) to a machine's
+ * daemon over WS — one frame carrying every agent's reset payload, NOT N
+ * fanned-out `agent:reset` calls.
+ *
+ * Narrowly typed (only the reset array) so no caller can smuggle another
+ * command shape. Returns `{ sent }` — `sent === 0` means the daemon isn't
+ * connected; the caller translates that into a 409.
+ */
+export async function pushBatchResetToMachine(
+  env: Env,
+  machineId: string,
+  resets: Array<{ agentId: string; config: RuntimeConfig; launchId: string }>,
+): Promise<{ sent: number }> {
+  const path = `/community-machine/by-id/${encodeURIComponent(machineId)}/forward-batch-reset`
+  const body = JSON.stringify({
+    resets: resets.map((r) => ({
+      agentId: r.agentId,
+      config: r.config,
+      launchId: r.launchId,
+    })),
+  })
+  try {
+    const res = await wsDoFetch(
+      env,
+      path,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+      { label: machineId, type: "machine:reset_all" },
+    )
+    if (!res.ok) {
+      log.warn("machine:reset_all push non-ok", {
+        machineId,
+        status: res.status,
+      })
+      return { sent: 0 }
+    }
+    const data = (await res.json()) as { sent?: number }
+    return { sent: data.sent ?? 0 }
+  } catch (err) {
+    log.warn("machine:reset_all push threw", {
+      machineId,
+      err: String(err),
+    })
+    return { sent: 0 }
+  }
+}
+
+/**
  * Push an agent-self-initiated `agent:nap` to the bot's OWN machine over WS.
  *
  * Twin of `pushAgentResetToMachine` — same narrow allowlist plus the mandatory
@@ -152,20 +203,28 @@ export async function pushAgentNapToMachine(
  * `pushAgentResetToMachine`, this DISTINGUISHES a transport failure from "no
  * daemon connected": a non-ok response or a thrown fetch returns
  * `deliveryError: true`, while a 200 with `sent: 0` (daemon just offline)
- * returns `deliveryError: false`. The caller needs the difference to choose the
- * right toast copy — and to write no audit row in either case, since the audit
- * contract is confirmed-application (`sent > 0`).
+ * returns `deliveryError: false`. The route maps those to 503 and 409;
+ * completion audit is written later when the switched launch reports its
+ * `agent_session`.
  */
 export async function pushAgentModelSwitchToMachine(
   env: Env,
   machineId: string,
-  args: { agentId: string; config: RuntimeConfig; launchId: string },
+  args: {
+    agentId: string
+    config: RuntimeConfig
+    launchId: string
+    from: string | null
+    to: string | null
+  },
 ): Promise<{ sent: number; deliveryError: boolean }> {
   const path = `/community-machine/by-id/${encodeURIComponent(machineId)}/forward-agent-model-switch`
   const body = JSON.stringify({
     agentId: args.agentId,
     config: args.config,
     launchId: args.launchId,
+    from: args.from,
+    to: args.to,
   })
   try {
     const res = await wsDoFetch(
@@ -192,6 +251,42 @@ export async function pushAgentModelSwitchToMachine(
       machineId,
       err: String(err),
     })
+    return { sent: 0, deliveryError: true }
+  }
+}
+
+export async function pushAgentProviderSwitchToMachine(
+  env: Env,
+  machineId: string,
+  args: {
+    agentId: string
+    config: RuntimeConfig
+    launchId: string
+    from: string
+    to: string
+  },
+): Promise<{ sent: number; deliveryError: boolean }> {
+  const path = `/community-machine/by-id/${encodeURIComponent(machineId)}/forward-agent-provider-switch`
+  const body = JSON.stringify(args)
+  try {
+    const res = await wsDoFetch(
+      env,
+      path,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+      { label: machineId, type: "agent:provider_switch" },
+    )
+    if (!res.ok) {
+      log.warn("agent:provider_switch push non-ok", { machineId, status: res.status })
+      return { sent: 0, deliveryError: true }
+    }
+    const data = (await res.json()) as { sent?: number }
+    return { sent: data.sent ?? 0, deliveryError: false }
+  } catch (err) {
+    log.warn("agent:provider_switch push threw", { machineId, err: String(err) })
     return { sent: 0, deliveryError: true }
   }
 }

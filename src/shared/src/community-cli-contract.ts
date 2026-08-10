@@ -24,7 +24,9 @@
 
 import { z } from "zod";
 import type { RuntimeConfig } from "./runtime-config";
-import type { ChannelType } from "./utils/community-roles";
+import type { ChannelType, StoredChannelType } from "./utils/community-roles";
+import { CHANNEL_TRAITS } from "./utils/community-roles";
+import { parseNameAndTag } from "./lib/discriminator";
 
 /* ------------------------------------------------------------------ */
 /* Identifiers                                                         */
@@ -63,8 +65,7 @@ export interface Agent {
 
 /** A server == a workspace. An agent participates in many of these. */
 export interface Server {
-  id: ServerId;
-  name: string;
+  handle: string;
 }
 
 export type ChannelKind = "channel" | "dm";
@@ -153,7 +154,7 @@ export type Target =
  * The flat, agent-facing message. This is exactly what the agent sees (one JSON
  * object per line, JSONL). Deliberately minimal:
  *   - `seq`     — "#N", the per-channel sequence (locate via channel + seq).
- *   - `channel` — the path ref, e.g. "/demo-workspace/general" or "/.dm/gustavo#4821".
+ *   - `channel` — the path ref, e.g. "/demo-workspace#1234/general" or "/.dm/gustavo#4821".
  *   - `sender`  — "@handle" (`name#0042`, no id, no human/agent/system type).
  *   - `content` — `{ text }` today; an object (not a bare string) so future
  *                 content kinds (attachments, embeds, …) can be added without
@@ -377,6 +378,34 @@ export interface CommunityAgentReactAddResponse {
   duplicate?: boolean;
 }
 
+/**
+ * Create a new forum post (`alook message post`). `forum` is a forum REF
+ * (`/server/forum`), resolved server-side (bots hold refs, not ids — same reason
+ * `send` takes a ref). The canonical messages door stores `title` as an opener
+ * message in the forum and `content` as the first reply in its ordinary thread.
+ * The reply may contain text OR at least one attachment. `attachments` are
+ * pending ids the bot uploaded against the forum before the thread exists.
+ */
+export interface CreatePostRequest {
+  agentId: AgentId;
+  forum: ChannelRef;
+  title: string;
+  content: MessageContent;
+  attachments?: string[];
+  /** Idempotency key — reused across retries, server dedupes (same as `send`). */
+  nonce?: string;
+}
+
+/**
+ * The created thread's canonical address. `ref` is `/server/forum/#N`, where
+ * `N` is the opener message seq; `seq` is the first reply's seq in that thread.
+ */
+export interface CreatePostResponse {
+  ref: ChannelRef;
+  name: string;
+  seq: Seq;
+}
+
 export interface ReadRequest {
   agentId: AgentId;
   channel: ChannelRef;
@@ -442,11 +471,28 @@ export interface ChannelGroup {
  * `alook channel member` result — a public channel/forum returns a hint
  * pointing at `alook server member` (no roster enumeration); everything else
  * (private channel, private forum, forum post, thread) returns the concrete
- * roster.
+ * roster. The private roster carries the same `cursor?`/`hasMore` shape as
+ * `server member` for a uniform agent mental model, but is NOT paginated this
+ * round — a channel/thread roster is membership-bounded (small by construction)
+ * so it always returns whole (`hasMore: false`, `cursor` omitted). If a very
+ * large private channel ever needs it, the pagination is a pure back-end add
+ * (the wire shape is already here).
  */
 export type ChannelMemberResult =
   | { visibility: "public"; hint: string }
-  | { visibility: "private"; members: ServerMember[] };
+  | { visibility: "private"; members: ServerMember[]; cursor?: string; hasMore: boolean };
+
+/**
+ * A member's current status — activity pill or custom text — sourced from
+ * `community_user_profile`. Structured (not a joined string) so the reader
+ * decides how to render. Humans set it manually; bots get it written by the
+ * daemon's activity frames (🌀 running / 💤 Idle). `emoji` is null when unset;
+ * `text` is "" when unset.
+ */
+export interface MemberStatus {
+  emoji: string | null;
+  text: string;
+}
 
 /** One server member, as surfaced to the agent CLI (`server member`). */
 export interface ServerMember {
@@ -455,6 +501,26 @@ export interface ServerMember {
   /** "owner" | "admin" | "member" — never null on the wire (defaults to "member"). */
   role: string;
   nickname?: string;
+  /**
+   * A point-in-time presence snapshot at fetch time (human = live WS socket;
+   * bot = bound-machine status), NOT a live-updating signal — an agent reads
+   * the roster once. Never a hardcoded placeholder: it reflects a real bulk
+   * presence read (batched over the returned page's user ids).
+   */
+  online: boolean;
+  /** Current status ({emoji, text}) — see MemberStatus. */
+  status: MemberStatus;
+}
+
+/**
+ * `alook server member` result — the server roster, forward-paginated with an
+ * opaque cursor. `cursor` is present iff `hasMore` — the agent echoes it back
+ * verbatim (never parses it) to fetch the next page; omitted on the last page.
+ */
+export interface ServerMemberListResult {
+  members: ServerMember[];
+  cursor?: string;
+  hasMore: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -532,14 +598,26 @@ export interface ServerApi {
   /** Send a message to a channel ref. May be held by the freshness guard. */
   send(req: SendRequest): Promise<SendResponse>;
 
+  /** Create a new forum post in a forum ref, with its body as the first message. */
+  createPost(req: CreatePostRequest): Promise<CreatePostResponse>;
+
   /** Read history for a channel with seq-anchored pagination. */
   read(req: ReadRequest): Promise<Page<Message>>;
 
   /** Look up a single message by channel + seq. */
   resolve(req: ResolveRequest): Promise<{ message: Message }>;
 
-  /** Members of a server, resolved by id-or-name (never id-only, never name-only). */
-  listMembers(req: { agentId: AgentId; server: string }): Promise<{ members: ServerMember[] }>;
+  /**
+   * Members of a server, resolved by id-or-name (never id-only, never
+   * name-only). Forward-paginated: pass `limit` and an opaque `cursor` (from a
+   * prior page's response) to page through; omit both for the first page.
+   */
+  listMembers(req: {
+    agentId: AgentId;
+    server: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<ServerMemberListResult>;
 
   /** Join a server via an invite link/token. Throws on any rejection — see plan's I/O contract. */
   joinServer(req: { agentId: AgentId; invite: string }): Promise<{ server: Server }>;
@@ -663,6 +741,23 @@ export type HostCommand =
    * new model, never wrong about it. See `AgentProcessManager.switchModel`.
    */
   | { type: "agent:model_switch"; agentId: AgentId; config: RuntimeConfig; launchId: string }
+  /**
+   * Owner-triggered BATCH reset — reset every agent bound to this machine in a
+   * SINGLE command (not N fanned-out `agent:reset` frames). The server
+   * enumerates the machine's full binding set and packs one `resets` entry per
+   * agent (each the payload of a normal `agent:reset`: agentId + config +
+   * launchId). The daemon loops `AgentProcessManager.resetSession` over the
+   * array, reusing the exact per-agent reset path — so a bound-but-idle agent
+   * cold-starts (register + fresh session), same as a single reset on an idle
+   * bot. Each per-agent reset is independent (a failure is a per-agent error
+   * ack, not a batch abort). The daemon MUST gate each `agentId` on its own
+   * `botsById` (bound) set — an agentId it doesn't own is a no-op+warn (defends
+   * the reconnect transient + closes the pre-existing "register+spawn any
+   * agentId" hole). Routed by machineId to the single daemon that owns it (one
+   * live credential per machineId). See the `machine:reset_all` case in
+   * `agentRouter` and plans/daemon-batch-reset.md.
+   */
+  | { type: "machine:reset_all"; resets: Array<{ agentId: AgentId; config: RuntimeConfig; launchId: string }> }
   // ─── Bot lifecycle events (server → daemon) ────────────────────────────
   // Colon-namespaced to match the agent:* naming convention. Delivered to
   // the specific machine's daemon connection via the WS DO. On the daemon,
@@ -765,7 +860,14 @@ export type BotAuditEventPayload =
         message: string;
         model: string | null;
       };
-    };
+    }
+  // Reset/nap completion events, emitted upward by the DO when the reborn
+  // agent's `agent_session` frame lands (not at dispatch). `trigger`
+  // distinguishes the entry-point so my-bots can read "was reset" vs "slept";
+  // `actorId` never travels — it is the bot owner, resolved server-side at the
+  // landing (reset is owner-only). See plans/reset-nap-completion-rehome.md.
+  | { kind: "session_reset"; payload: { trigger: "single" | "reset_all" } }
+  | { kind: "nap"; payload: { trigger: "nap" } };
 
 export interface HostBotAuditEventFrame {
   type: "bot_audit_event";
@@ -783,6 +885,7 @@ export interface SessionErrorFrame {
   type: "session.error";
   code: "runtime_not_available";
   agentId?: AgentId;
+  launchId?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -998,20 +1101,10 @@ export interface ServerApiError {
 
 /** A parsed channel ref: the channel location + an optional message seq (`#N`). */
 export interface ParsedRef {
-  /** Server segment (a real server id/name, or `.dm`). */
+  /** Server segment (a real server id/handle, or `.dm`). */
   server: string;
   /** Channel name (or DM peer when `server === DM_SERVER`). */
   channel: string;
-  /**
-   * Forum-post child-channel name when the ref addresses a forum post
-   * (`/server/forum/post`). A forum post is a `forum_post` child channel with
-   * no addressable root-message seq (unlike a thread), so it is anchored by its
-   * OWN name under the parent forum — `channel` is the forum, `childChannelName`
-   * is the post. May carry a `seq` (`/server/forum/post#N`) to pin a message
-   * inside the post, symmetric to the top-level `/server/channel#N` form.
-   * Mutually exclusive with `threadRootSeq`.
-   */
-  childChannelName?: string;
   /** Thread root seq when the ref points into a thread (`/server/channel/#N`). */
   threadRootSeq?: Seq;
   /** Message seq when the ref pins a specific message (`/server/channel#N`). */
@@ -1022,7 +1115,6 @@ export interface ParsedRef {
  * Parse a path ref into its parts. Grammar:
  *   /<server>/<channel>          → { server, channel }
  *   /<server>/<channel>#N        → { server, channel, seq:N }
- *   /<server>/<forum>/<post>     → { server, channel:forum, childChannelName:post }
  *   /<server>/<channel>/#N       → { server, channel, threadRootSeq:N }
  *   /<server>/<channel>/#N#M     → { server, channel, threadRootSeq:N, seq:M }
  *   /.dm/<peer>[...]             → DM (server = ".dm", channel = peer, a
@@ -1031,6 +1123,14 @@ export interface ParsedRef {
  *                                  generic channel-ref `#`-split (a handle's
  *                                  `#0042` suffix must NOT be mistaken for a
  *                                  pinned-message seq).
+ *
+ * (The old `/<server>/<forum>/<post>` forum-post form is GONE, not merely
+ * unsupported — a post is now addressed like any other thread, by-root-seq.
+ * A 3-segment ref whose last segment doesn't start with "#" no longer
+ * matches any grammar rule below and throws, same as any other malformed
+ * ref; callers already render an unparseable ref as plain literal text
+ * rather than a clickable pill, so an old-style link degrades cleanly
+ * instead of silently resolving to the wrong target.)
  */
 export function parseRef(ref: ChannelRef): ParsedRef {
   if (!ref.startsWith("/")) throw new Error(`ref must start with "/": ${ref}`);
@@ -1038,6 +1138,9 @@ export function parseRef(ref: ChannelRef): ParsedRef {
   const parts = body.split("/");
   if (parts.length < 2) throw new Error(`ref needs /<server>/<channel>: ${ref}`);
   const server = parts[0];
+  if (server !== DM_SERVER && !parseNameAndTag(server)) {
+    throw new Error(`server ref must use a name#discriminator handle: ${ref}`);
+  }
   // Trailing "#N" on the last segment pins a message seq.
   let seq: Seq | undefined;
 
@@ -1049,25 +1152,11 @@ export function parseRef(ref: ChannelRef): ParsedRef {
     return { server, channel: parts[1], ...tail };
   }
 
-  // Forum-post form: /server/forum/post — exactly 3 segments, third NOT
-  // starting with "#" (that's the thread form above). The post is anchored by
-  // its own name under the parent forum. An optional trailing "#N" pins a
-  // message seq WITHIN the post (`/server/forum/post#N`), symmetric to the
-  // top-level message form `/server/channel#N` — used by `message emoji` to
-  // react to a specific message inside a post. A 4th path segment is not
-  // addressable today — reject rather than silently truncate.
+  // Any other 3+ segment shape (the old forum-post form's territory) no
+  // longer names a valid ref — reject rather than silently truncate to the
+  // first two segments.
   if (parts.length >= 3 && server !== DM_SERVER) {
-    if (parts.length > 3) {
-      throw new Error(`ref has too many segments: ${ref}`);
-    }
-    const postSeg = parts[2];
-    const hashIdx = postSeg.indexOf("#");
-    if (hashIdx >= 0) {
-      const postName = postSeg.slice(0, hashIdx);
-      if (!postName) throw new Error(`forum-post ref missing post name: ${ref}`);
-      return { server, channel: parts[1], childChannelName: postName, seq: parseSeq(postSeg.slice(hashIdx)) };
-    }
-    return { server, channel: parts[1], childChannelName: postSeg };
+    throw new Error(`ref has too many segments: ${ref}`);
   }
 
   const chSeg = parts[1];
@@ -1085,7 +1174,7 @@ export function parseRef(ref: ChannelRef): ParsedRef {
     if (lastHash < 0) return { server, channel: chSeg };
     const firstHash = chSeg.indexOf("#");
     const tail = chSeg.slice(lastHash + 1);
-    const isBareHandle = firstHash === lastHash && /^\d{4}$/.test(tail);
+    const isBareHandle = firstHash === lastHash && /^\d{4,}$/.test(tail);
     if (isBareHandle) return { server, channel: chSeg };
     // A non-numeric tail after the last `#` isn't a valid seq — rather
     // than throwing (which crashes every caller not wrapped in
@@ -1136,38 +1225,86 @@ function parseThreadTail(segment: string): { threadRootSeq: Seq; seq?: Seq } {
 /**
  * Format a ParsedRef back to a path ref. Valid combinations:
  *   {}                             → /server/channel
- *   { childChannelName }           → /server/channel/childChannelName (forum post)
- *   { childChannelName, seq }      → /server/channel/childChannelName#N (msg in a post)
  *   { threadRootSeq }              → /server/channel/#N
  *   { threadRootSeq, seq }         → /server/channel/#N#M
- * A bare `seq` (neither `threadRootSeq` nor `childChannelName`) is NOT
- * supported — the top-level message form `/server/channel#N` puts `#N` on the
- * channel segment, not on a trailing path segment, and no caller needs to emit
- * that shape via formatRef today. `childChannelName` (forum post) is mutually
- * exclusive with `threadRootSeq`, but MAY carry a `seq` to pin a message inside
- * the post (`/server/forum/post#N`), symmetric to the top-level message form.
+ * A bare `seq` (without `threadRootSeq`) is NOT supported — the top-level
+ * message form `/server/channel#N` puts `#N` on the channel segment, not on
+ * a trailing path segment, and no caller needs to emit that shape via
+ * formatRef today.
  */
 export function formatRef(p: {
   server: string;
   channel: string;
-  childChannelName?: string;
   threadRootSeq?: Seq;
   seq?: Seq;
 }): ChannelRef {
-  if (p.childChannelName !== undefined && p.threadRootSeq !== undefined) {
-    throw new Error("formatRef: childChannelName is mutually exclusive with threadRootSeq");
-  }
-  if (p.seq !== undefined && p.threadRootSeq === undefined && p.childChannelName === undefined) {
-    throw new Error("formatRef: seq without threadRootSeq or childChannelName is not supported");
+  if (p.seq !== undefined && p.threadRootSeq === undefined) {
+    throw new Error("formatRef: seq without threadRootSeq is not supported");
   }
   const base = `/${p.server}/${p.channel}`;
-  if (p.childChannelName !== undefined) {
-    const postBase = `${base}/${p.childChannelName}`;
-    return p.seq === undefined ? postBase : `${postBase}#${p.seq}`;
-  }
   if (p.threadRootSeq === undefined) return base;
   if (p.seq === undefined) return `${base}/#${p.threadRootSeq}`;
   return `${base}/#${p.threadRootSeq}#${p.seq}`;
+}
+
+/**
+ * The single canonical-ref EMITTER (trait model B1, red-line ①). Every place
+ * that turns a stored channel into its addressable `ChannelRef` — the agent
+ * inbox's `resolveScopeRefs` (per-message + per-scope refs), the wake notice's
+ * `resolveUnreadNoticeChannel`, `listChannels` — used to hand-pick the
+ * `formatRef` shape by re-branching on the channel's type, so the SAME
+ * type→shape mapping lived in multiple copies and could drift (a post emitted
+ * one way here, another way there → a ref that won't round-trip). This funnels
+ * all of them through ONE dispatch keyed on `CHANNEL_TRAITS[type].addressing`,
+ * so a channel type has exactly one addressing identity by construction.
+ *
+ * `scope` is the already-resolved context each caller gathers (server/parent
+ * names, the DM peer segment, the thread root seq) — this function does no I/O,
+ * it only selects the ref SHAPE from the addressing trait. A caller that can't
+ * supply the field an addressing value needs (e.g. a thread with no resolvable
+ * root seq) passes it `undefined` and gets `null` back, so the caller keeps its
+ * existing "unresolvable → fallback/skip" handling rather than emitting a bogus
+ * ref. The exhaustive `switch` (with the `never` tail) forces every new
+ * addressing value to be handled here or the build fails.
+ */
+export type CanonicalRefScope = {
+  type: StoredChannelType;
+  /** Server handle (channel arm). Absent/irrelevant for a DM. */
+  serverHandle?: string;
+  /** The channel's own stored name — the top-level channel's name. */
+  name?: string;
+  /** Parent channel display name — for by-root-seq. */
+  parentName?: string;
+  /** Thread root message seq — for by-root-seq. */
+  rootSeq?: Seq;
+  /** DM peer handle segment (`name#0042`) — for by-peer-identity. */
+  peerSegment?: string;
+};
+
+export function formatCanonicalRef(scope: CanonicalRefScope): ChannelRef | null {
+  const addressing = CHANNEL_TRAITS[scope.type].addressing;
+  switch (addressing) {
+    case "by-server-name": {
+      // Top-level channel/forum: `/server/<name>`.
+      if (scope.serverHandle === undefined || scope.name === undefined) return null;
+      return formatRef({ server: scope.serverHandle, channel: scope.name });
+    }
+    case "by-root-seq": {
+      // Thread: `/server/<parent-channel>/#<rootSeq>`.
+      if (scope.serverHandle === undefined || scope.parentName === undefined || scope.rootSeq === undefined) return null;
+      return formatRef({ server: scope.serverHandle, channel: scope.parentName, threadRootSeq: scope.rootSeq });
+    }
+    case "by-peer-identity": {
+      // DM: `/.dm/<peer#0042>`.
+      if (scope.peerSegment === undefined) return null;
+      return formatRef({ server: DM_SERVER, channel: scope.peerSegment });
+    }
+    default: {
+      // Exhaustiveness: a new AddressingTrait value must add a case above.
+      const _never: never = addressing;
+      return _never;
+    }
+  }
 }
 
 /** "#12" → 12 ; "12" → 12. */
@@ -1244,6 +1381,16 @@ export const HostCommandSchema = z.discriminatedUnion("type", [
     agentId: z.string().min(1),
     config: z.unknown(),
     launchId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("machine:reset_all"),
+    resets: z.array(
+      z.object({
+        agentId: z.string().min(1),
+        config: z.unknown(),
+        launchId: z.string().min(1),
+      }),
+    ),
   }),
   // The `bot:*` arms are NOT what #6 targets — the daemon acts on `agent:*`;
   // `bot:*` merely mutate/evict the `botsById` cache at the createDaemon layer.

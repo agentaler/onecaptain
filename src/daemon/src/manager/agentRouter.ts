@@ -345,6 +345,7 @@ export class AgentRouter {
           type: "session.error",
           code: "runtime_not_available",
           agentId,
+          launchId,
           payload: { requested: err.requested ?? null, available: err.available },
         };
         await this.opts.channel.reportSessionError?.(frame);
@@ -453,6 +454,7 @@ export class AgentRouter {
               type: "session.error",
               code: "runtime_not_available",
               agentId: cmd.agentId,
+              launchId: cmd.launchId,
               payload: {
                 requested: err.requested ?? null,
                 available: err.available,
@@ -501,6 +503,28 @@ export class AgentRouter {
             rewakePrompt: REWAKE_PROMPT,
           }),
         );
+        break;
+      case "machine:reset_all":
+        // Batch reset every agent the server packed into `resets` (the machine's
+        // full binding set — see the server-side enumerate; NOT filtered to
+        // running, so bound-but-idle agents get cold-started). Each entry runs
+        // through the SAME `runRestartCommand` path as a single `agent:reset`,
+        // so it inherits (a) the `onBeforeAgent` botsById ownership gate — a
+        // foreign/cross-owner agentId throws UnknownBotError → that entry gets a
+        // `bot_unknown` ack and is NOT reset — and (b) per-entry try/catch, so
+        // one failure never aborts the rest of the batch. Sequential await keeps
+        // the restart orchestration (stop→forget→respawn) from interleaving
+        // across agents. One frame, not fan-out (owner-triggered "reset this
+        // machine"). See plans/daemon-batch-reset.md.
+        for (const r of cmd.resets) {
+          await this.runRestartCommand(r.agentId, r.launchId, "agent:reset", () =>
+            this.opts.manager.resetSession(r.agentId, {
+              runtimeConfig: r.config,
+              launchId: r.launchId,
+              rewakePrompt: REWAKE_PROMPT,
+            }),
+          );
+        }
         break;
       case "agent:nap":
         // Self-initiated twin of agent:reset — same enroll → forget-session →

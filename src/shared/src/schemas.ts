@@ -925,6 +925,7 @@ export const SessionErrorFrameSchema = z.object({
   type: z.literal("session.error"),
   code: z.enum(["runtime_not_available"]),
   agentId: z.string().optional(),
+  launchId: z.string().optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 export type SessionErrorFrame = z.infer<typeof SessionErrorFrameSchema>;
@@ -961,6 +962,39 @@ export const AgentTypingStopMessageSchema = z.object({
   channelId: z.string().min(1),
 });
 export type AgentTypingStopMessage = z.infer<typeof AgentTypingStopMessageSchema>;
+
+/**
+ * `agent_session` frame — daemon → server. Emitted per live agent once it is
+ * really up and has a session (reborn-ready), carrying the `launchId` of the
+ * launch that produced it. This is the completion signal the reset/nap
+ * audit+awake re-home hangs on: the DO correlates `launchId` back to the
+ * pending (launchId → trigger) map it recorded at dispatch, writes the audit +
+ * awake stamp exactly once, then drops the map entry. See
+ * plans/reset-nap-completion-rehome.md.
+ */
+export const AgentSessionMessageSchema = z.object({
+  type: z.literal("agent_session"),
+  agentId: z.string().min(1),
+  sessionId: z.string().min(1),
+  launchId: z.string().min(1),
+});
+export type AgentSessionMessage = z.infer<typeof AgentSessionMessageSchema>;
+
+/**
+ * `agent_wake_ack` frame — daemon → server. Acknowledges a wake/reset/nap
+ * command. `status: "error"` on the non-runtime failure branch of
+ * `runRestartCommand` (enroll fail, spawn threw) — used by the reset/nap
+ * re-home to evict the pending attribution map entry on a cold-start failure
+ * (the twin branch, `runtime_not_available`, arrives as `session.error`).
+ */
+export const AgentWakeAckMessageSchema = z.object({
+  type: z.literal("agent_wake_ack"),
+  agentId: z.string().min(1),
+  launchId: z.string().min(1),
+  status: z.enum(["ok", "error"]),
+  error: z.object({ code: z.string().optional(), message: z.string().optional() }).optional(),
+});
+export type AgentWakeAckMessage = z.infer<typeof AgentWakeAckMessageSchema>;
 
 
 export const CommunityPairTokenResponseSchema = z.object({
@@ -1074,12 +1108,14 @@ export const CommunityBotPatchRequestSchema = z
     // Full launchable model id, or null for the runtime's default. Explicit
     // `null` clears a set model; `undefined` leaves it untouched.
     model: z.string().trim().min(1).max(100).nullable().optional(),
+    runtime: z.string().trim().min(1).max(COMMUNITY_RUNTIME_ID_MAX).optional(),
   })
   .refine(
     (v) =>
       v.name !== undefined ||
       v.description !== undefined ||
       v.image !== undefined ||
+      v.runtime !== undefined ||
       // `model` alone is a valid patch. An explicit `null` must count as
       // present — hence the `in` form, not a truthiness check.
       "model" in v,
@@ -1097,8 +1133,8 @@ export type CommunityBotAddToServerRequest = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
-// Community agent CLI bridge — `withAgentRunnerAuth`-mounted `/api/community/agent/*`
-// request/response validators. Mirror the lifted `@alook/shared/community-cli-contract`
+// Community REST agent-door request/response validators. Mirror the lifted
+// `@alook/shared/community-cli-contract`
 // wire types verbatim (see `community-cli-contract.ts`). `agentId` is deliberately
 // OMITTED from every request schema below — identity comes from the `crk_` bearer
 // via `withAgentRunnerAuth`, never a client-supplied field (see plan §2/§7).
@@ -1133,6 +1169,10 @@ export const CommunityAgentSendRequestSchema = z
     // retries; server dedupes on (author, nonce). Bounded length so a client
     // can't stuff arbitrary data. Absent = no dedup (legacy behavior).
     nonce: z.string().min(1).max(128).optional(),
+    // When the resolved target is a forum this message becomes the opener and
+    // the server synchronously creates its child thread. A first reply is a
+    // separate ordinary send to the returned thread ref; there is no combined
+    // title/body field on the canonical message contract.
   })
   .refine(
     (d) => d.content.text.trim().length > 0 || d.attachments.length > 0,
@@ -1140,7 +1180,7 @@ export const CommunityAgentSendRequestSchema = z
   );
 export type CommunityAgentSendRequest = z.infer<typeof CommunityAgentSendRequestSchema>;
 
-// Response body for POST /api/community/agent/attachmentUpload. Bots see
+// Response body for POST /api/community/channels/{id}/attachments. Bots see
 // filename+contentType+size and nothing else — no url, no r2 key, no path.
 export const CommunityAgentAttachmentUploadResponseSchema = z.object({
   id: z.string(),
@@ -1196,8 +1236,31 @@ export type CommunityAgentListChannelsRequest = z.infer<
   typeof CommunityAgentListChannelsRequestSchema
 >;
 
+// CLI adapter input for `alook message post`. The daemon maps this shape onto
+// the canonical forum send body: title → opener message, content → the ordinary
+// thread's first reply. An attachment-only reply is legitimate; pending ids are
+// uploaded against the forum before the thread exists.
+export const CommunityAgentCreatePostRequestSchema = z
+  .object({
+    forum: z.string().min(1),
+    title: z.string().min(1),
+    content: CommunityAgentMessageContentSchema,
+    attachments: z
+      .array(z.string().min(1))
+      .max(MAX_ATTACHMENTS_PER_MESSAGE)
+      .default([]),
+    nonce: z.string().min(1).max(128).optional(),
+  })
+  .refine(
+    (d) => d.content.text.trim().length > 0 || d.attachments.length > 0,
+    { message: "post must have text or attachments" }
+  );
+export type CommunityAgentCreatePostRequest = z.infer<typeof CommunityAgentCreatePostRequestSchema>;
+
 export const CommunityAgentListMembersRequestSchema = z.object({
   server: z.string().min(1),
+  limit: z.number().int().positive().optional(),
+  cursor: z.string().min(1).optional(),
 });
 export type CommunityAgentListMembersRequest = z.infer<
   typeof CommunityAgentListMembersRequestSchema
@@ -1238,7 +1301,7 @@ export type CommunityAgentReactAddRequest = z.infer<
   typeof CommunityAgentReactAddRequestSchema
 >;
 
-// POST /api/community/agent/friendRequest — body `{ username: "name#0042" }`.
+// POST /api/community/friends/request — body `{ username: "name#0042" }`.
 // Only the human `name#discriminator` handle is accepted (parsed + resolved
 // server-side); a raw userId is intentionally NOT accepted so the agent surface
 // mirrors the human handle format.
@@ -1249,8 +1312,7 @@ export type CommunityAgentFriendRequest = z.infer<
   typeof CommunityAgentFriendRequestSchema
 >;
 
-// POST /api/community/agent/listFriends — empty body, kept for POST uniformity
-// with the rest of `/api/community/agent/*`.
+// Empty body retained for the shared list-friends request contract.
 export const CommunityAgentListFriendsSchema = z.object({});
 export type CommunityAgentListFriends = z.infer<
   typeof CommunityAgentListFriendsSchema
@@ -1331,8 +1393,29 @@ export const AuditLogWakeTriggerPayloadSchema = z.object({
 });
 export type AuditLogWakeTriggerPayload = z.infer<typeof AuditLogWakeTriggerPayloadSchema>;
 
-export const AuditLogSessionResetPayloadSchema = z.object({});
+/**
+ * `session_reset` payload — an owner-triggered reset that has actually
+ * completed (written when the reborn agent's `agent_session` lands, not at
+ * dispatch). `trigger` distinguishes a single-bot reset from a machine-wide
+ * "reset all" so my-bots can label them. No `actorId`: reset is owner-only, so
+ * the actor is the bot owner, resolved server-side at the landing — it never
+ * travels on the wire. (Rows written before this shape carried `{}` and parse
+ * to null, which the lenient client parser tolerates.)
+ */
+export const AuditLogSessionResetPayloadSchema = z.object({
+  trigger: z.enum(["single", "reset_all"]),
+});
 export type AuditLogSessionResetPayload = z.infer<typeof AuditLogSessionResetPayloadSchema>;
+
+/**
+ * `nap` payload — the agent reset ITS OWN session via `alook nap`. Twin of
+ * `session_reset` but self-initiated, so `trigger` is always `"nap"` and there
+ * is no actor. Written at the same completion landing.
+ */
+export const AuditLogNapPayloadSchema = z.object({
+  trigger: z.literal("nap"),
+});
+export type AuditLogNapPayload = z.infer<typeof AuditLogNapPayloadSchema>;
 
 /**
  * `model_changed` payload — the owner switched a bot's LLM model. `from`/`to`
@@ -1344,6 +1427,12 @@ export const AuditLogModelChangedPayloadSchema = z.object({
   to: z.string().nullable(),
 });
 export type AuditLogModelChangedPayload = z.infer<typeof AuditLogModelChangedPayloadSchema>;
+
+export const AuditLogProviderChangedPayloadSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+export type AuditLogProviderChangedPayload = z.infer<typeof AuditLogProviderChangedPayloadSchema>;
 
 /**
  * `error` payload — a launch/runtime failure the owner should see. Emitted by
@@ -1372,7 +1461,9 @@ export const BotAuditEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("thinking"), payload: AuditLogThinkingPayloadSchema }),
   z.object({ kind: z.literal("wake_trigger"), payload: AuditLogWakeTriggerPayloadSchema }),
   z.object({ kind: z.literal("session_reset"), payload: AuditLogSessionResetPayloadSchema }),
+  z.object({ kind: z.literal("nap"), payload: AuditLogNapPayloadSchema }),
   z.object({ kind: z.literal("model_changed"), payload: AuditLogModelChangedPayloadSchema }),
+  z.object({ kind: z.literal("provider_changed"), payload: AuditLogProviderChangedPayloadSchema }),
   z.object({ kind: z.literal("error"), payload: AuditLogErrorPayloadSchema }),
 ]);
 export type BotAuditEvent = z.infer<typeof BotAuditEventSchema>;
@@ -1383,7 +1474,9 @@ export const BotAuditEventKindSchema = z.enum([
   "thinking",
   "wake_trigger",
   "session_reset",
+  "nap",
   "model_changed",
+  "provider_changed",
   "error",
 ]);
 export type BotAuditEventKind = z.infer<typeof BotAuditEventKindSchema>;
@@ -1401,4 +1494,3 @@ export const HostBotAuditEventFrameSchema = z.object({
   event: BotAuditEventSchema,
 });
 export type HostBotAuditEventFrame = z.infer<typeof HostBotAuditEventFrameSchema>;
-

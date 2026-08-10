@@ -15,25 +15,22 @@ import { SortableServer } from "./sortable-server"
 import { RailFolder } from "./rail-folder"
 import { CreateServerDialog } from "./create-server-dialog"
 import { useRailOrder, isFolderKey, extractFolderId } from "./use-rail-order"
-import { MarbleBackground } from "@/components/avatar"
+import { SeededBackdrop } from "@/components/avatar"
 import type { Server, CommunityFolder, MobileZone, View } from "./_types"
+import {
+  completeCommunityOnboarding,
+  isCommunityOnboardingStage,
+} from "@/lib/community-onboarding"
 
 export const ServerRail = memo(function ServerRail({
-  servers, folders, activeServerId: activeServerIdProp, serversLoading, serversReady, setMobileZone, view, bottomInset,
-  onHome, onServer, onServerNavigate, onCreateServer, onJoinServer, onLeaveServer,
+  servers, folders, activeServerId: activeServerIdProp, serversLoading, setMobileZone, view, bottomInset,
+  onHome, onServer, onServerNavigate, onCreateServer, onLeaveServer,
   onOpenSettings, onOpenInvitePopover, onUngroupFolder, onReorderRail, onReorderFolders, onFolderItemsChange, onDragCreateFolder,
 }: {
   servers: Server[]
   folders: CommunityFolder[]
   activeServerId?: string
   serversLoading?: boolean
-  // Auto-open the "Create a Server" dialog when the user genuinely has no
-  // servers — gated on `serversReady` (query has completed at least one
-  // fetch AND isn't refetching) instead of `!serversLoading`. TanStack v5
-  // `isLoading` is only true on the very first fetch, so any subsequent
-  // invalidate (WS `member.leave`, reconnect) briefly flips servers=[] with
-  // `isLoading=false`, which would re-trigger the dialog mid-session.
-  serversReady?: boolean
   setMobileZone?: (z: MobileZone) => void
   view: View
   bottomInset?: number
@@ -41,7 +38,6 @@ export const ServerRail = memo(function ServerRail({
   onServer: () => void
   onServerNavigate?: (id: string) => void
   onCreateServer?: (name: string, icon?: File) => void
-  onJoinServer?: (invite: string) => void
   onLeaveServer?: (id: string) => void
   onOpenSettings?: (serverId: string) => void
   onOpenInvitePopover?: (serverId: string) => void
@@ -75,18 +71,6 @@ export const ServerRail = memo(function ServerRail({
   useEffect(() => { if (activeFromProps) setActiveId(activeFromProps) }, [activeFromProps])
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [didAutoOpen, setDidAutoOpen] = useState(false)
-  useEffect(() => {
-    // Only fire when the servers query has genuinely settled (fetched at
-    // least once AND not currently refetching). `serversLoading` (from
-    // TanStack `isLoading`) is only true on the very first fetch, so it
-    // false-triggers on any subsequent cache invalidate where the servers
-    // list is transiently empty. `serversReady` is `isFetched && !isFetching`.
-    if (!didAutoOpen && serversReady && servers.length === 0 && folders.length === 0) {
-      setDidAutoOpen(true)
-      setCreateOpen(true)
-    }
-  }, [servers.length, folders.length, serversReady, didAutoOpen])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const pickServer = (id: string) => { setActiveId(id); onServer(); onServerNavigate?.(id); setMobileZone?.("nav") }
@@ -164,6 +148,8 @@ export const ServerRail = memo(function ServerRail({
                           server={{ id: fs.id, name: fs.name, initial: fs.initial, icon: fs.icon, active: false, mentions: 0, isOwner: false }}
                           active={view !== "dm" && activeId === sid}
                           onClick={() => pickServer(sid)}
+                          onOpenSettings={() => onOpenSettings?.(sid)}
+                          onOpenInvitePopover={onOpenInvitePopover ? () => onOpenInvitePopover(sid) : undefined}
                           inFolder
                           dragging={dragActiveId === sid}
                         />
@@ -226,7 +212,7 @@ export const ServerRail = memo(function ServerRail({
                           s.icon ? "bg-card text-muted-foreground" : "text-white [text-shadow:0_1px_1px_rgb(0_0_0/0.35)]",
                         ].join(" ")}
                       >
-                        {s.icon ? <img src={s.icon} alt={s.name} className="size-full object-cover" /> : <><MarbleBackground seed={s.id} /><span className="relative -translate-x-[2px] [-webkit-text-stroke:0.5px_currentColor]">{s.initial}</span></>}
+                        {s.icon ? <img src={s.icon} alt={s.name} className="size-full object-cover" /> : <><SeededBackdrop seed={s.id} /><span className="relative -translate-x-0.5 [-webkit-text-stroke:0.5px_currentColor]">{s.initial}</span></>}
                       </span>
                     ) : (
                       <span key={idx} className="aspect-square rounded-sm bg-card/50" />
@@ -245,20 +231,31 @@ export const ServerRail = memo(function ServerRail({
                   icon ? "bg-secondary text-foreground" : "text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.35)]",
                 ].join(" ")}
               >
-                {icon ? <img src={icon} alt={s.name} className="size-full object-cover" /> : <><MarbleBackground seed={s.id} /><span className="relative -translate-x-[2px] [-webkit-text-stroke:0.5px_currentColor]">{s.initial}</span></>}
+                {icon ? <img src={icon} alt={s.name} className="size-full object-cover" /> : <><SeededBackdrop seed={s.id} /><span className="relative -translate-x-0.5 [-webkit-text-stroke:0.5px_currentColor]">{s.initial}</span></>}
               </div>
             )
           })()}
         </DragOverlay>
       </DndContext>
       )}
-      <RailIcon label={<Plus className="size-6" />} round accent tooltip="Add a Server" testId={tid.serverAdd} onClick={() => setCreateOpen(true)} />
+      <RailIcon
+        label={<Plus className="size-6" />}
+        round
+        accent
+        tooltip="Add a Server"
+        testId={tid.serverAdd}
+        onboardingTarget="add-server"
+        onClick={() => {
+          const guided = isCommunityOnboardingStage("server")
+          setCreateOpen(true)
+          if (guided) completeCommunityOnboarding()
+        }}
+      />
 
       {createOpen && (
         <CreateServerDialog
           onClose={() => setCreateOpen(false)}
           onCreateServer={(name, icon) => { onCreateServer?.(name, icon) }}
-          onJoinServer={(invite) => { onJoinServer?.(invite) }}
         />
       )}
     </nav>

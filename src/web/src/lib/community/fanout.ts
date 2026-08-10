@@ -2,21 +2,21 @@
  * Server-side fan-out helpers for community real-time events.
  *
  * Each function resolves the recipient set via D1 queries,
- * then POSTs the event to each user's per-user DO via the existing
- * broadcast service binding (WS_DO_WORKER -> /broadcast/user/<userId>).
+ * then sends one bounded bulk request through the existing broadcast
+ * service binding (WS_DO_WORKER -> /broadcast/users).
  *
- * Uses the same `broadcastToUser` function that existing code uses,
- * ensuring consistent service-binding -> HTTP fallback behavior.
+ * The bulk helper uses the same service-binding -> HTTP fallback behavior
+ * as the compatibility single-user helper.
  *
  * Contract: these helpers absorb all failures internally and never reject.
  * Routes call them as fire-and-forget statements without `.catch()`.
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries, createLogger, WS_EVENTS, isThread, isForumPost, isDm } from "@alook/shared"
+import { queries, createLogger, WS_EVENTS, withD1Retry } from "@alook/shared"
 import type { CommunityWsEvent, Database } from "@alook/shared"
 import { getDb } from "../db"
-import { broadcastToUser } from "../broadcast"
+import { broadcastToUser, broadcastToUsers } from "../broadcast"
 import { enqueueBotWakes, type WakeMessageRow } from "./wake-producer"
 
 const log = createLogger({ service: "community-fanout" })
@@ -43,13 +43,13 @@ async function getServerMemberUserIds(db: Database, serverId: string): Promise<s
 /**
  * Resolves the recipient set for a channel event.
  *
- * - THREAD (`type="thread"`) or FORUM_POST (`type="forum_post"`) → the unit's
- *   NOTIFY set (its participant rows). Both are the notification dimension:
- *   message events reach only participants (join by spoke/mention/added), NOT
- *   the whole parent channel or server, and NOT admins (never auto-participants).
- *   A public post therefore no longer blasts the whole server, and a private
- *   post no longer pings every roster member on every message — only the people
- *   actually involved. Nested-membership model.
+ * - THREAD (`type="thread"`, including a post — a thread rooted directly
+ *   under a forum) → the unit's NOTIFY set (its participant rows) — the
+ *   notification dimension: message events reach only participants (join by
+ *   spoke/mention/added), NOT the whole parent channel or server, and NOT
+ *   admins (never auto-participants). A public post therefore doesn't blast
+ *   the whole server, and a private post doesn't ping every roster member on
+ *   every message — only the people actually involved.
  * - DM (`type="dm"`) → its two `relation='access'` members. A DM has
  *   `server_id = NULL`, so it must NOT fall through to the server-scoped
  *   resolver (which would query `server_id = NULL` and return an empty set).
@@ -59,24 +59,24 @@ async function getServerMemberUserIds(db: Database, serverId: string): Promise<s
  * The split lives here so fan-out and bot-wake use the same recipient set.
  */
 async function getChannelRecipientUserIds(db: Database, channelId: string): Promise<string[]> {
-  const rows = await queries.communityChannel.getChannelType(db, channelId)
-  if (isThread(rows) || isForumPost(rows)) {
-    return queries.communityThread.listThreadParticipantUserIds(db, channelId)
-  }
-  if (isDm(rows)) {
-    return queries.communityChannel.listChannelMemberUserIds(db, channelId)
-  }
-  return queries.communityMembersResolver.resolveScopeMemberUserIds(db, {
-    scope: "channel",
-    scopeId: channelId,
-  })
+  const retryRoute = {
+    "channel-type": "fanout:channel-type",
+    "thread-participants": "fanout:thread-participants",
+    "dm-members": "fanout:dm-members",
+    "scope-members": "fanout:scope-members",
+  } as const
+  return queries.communityMembersResolver.resolveChannelRecipientUserIds(
+    db,
+    channelId,
+    (phase, query) => withD1Retry(query, { route: retryRoute[phase] }),
+  )
 }
 
 /**
  * Public wrapper so `message-handler` can resolve a channel's recipient set
  * ONCE and share it between the unfiltered `MESSAGE_CREATE` fan-out and the
  * level-filtered notify pipeline (no second membership query). Same split as
- * `getChannelRecipientUserIds` (thread/forum_post → participants; dm → access
+ * `getChannelRecipientUserIds` (child thread → participants; dm → access
  * members; channel/forum → scope audience).
  */
 export async function resolveChannelRecipients(db: Database, channelId: string): Promise<string[]> {
@@ -86,26 +86,44 @@ export async function resolveChannelRecipients(db: Database, channelId: string):
 /**
  * Fan out an event to all members of the server that owns a channel.
  */
-export async function fanOutToChannel(
+export function fanOutToChannel(
   channelId: string,
   event: BroadcastableEvent,
   opts?: { excludeUserId?: string; recipients?: string[] } & WakeOpts
 ): Promise<void> {
   try {
-    const { env } = getCloudflareContext()
+    const { env, ctx } = getCloudflareContext()
     const db = getDb((env as Env).DB)
-    // Reuse a pre-resolved recipient set when the caller already resolved it
-    // (message-handler shares one set between fan-out and the notify pipeline),
-    // else resolve here.
-    const userIds = opts?.recipients ?? await getChannelRecipientUserIds(db, channelId)
-    await broadcastToRecipients(userIds, event, opts?.excludeUserId)
-    maybeEnqueueWakes(event, userIds, { channelId }, opts)
+    const work = (async () => {
+      try {
+        // Reuse a pre-resolved recipient set when the caller already resolved it
+        // (message-handler shares one set between fan-out and the notify pipeline),
+        // else resolve here.
+        const userIds = opts?.recipients ?? await getChannelRecipientUserIds(db, channelId)
+        // Register the wake's waitUntil before any human-WS broadcast can stall.
+        // A slow best-effort UI fan-out must never delay or drop the bot wake.
+        maybeEnqueueWakes(event, userIds, { channelId }, opts)
+        await broadcastToRecipients(userIds, event, opts?.excludeUserId)
+      } catch (err) {
+        log.warn("fanout_to_channel_failed", {
+          eventType: event.type,
+          targetId: channelId,
+          err: String(err),
+        })
+      }
+    })()
+    // Callers deliberately fire-and-forget this helper. Keep the whole setup
+    // alive from the first tick, including recipient resolution before the
+    // leaf wake/broadcast operations register their own waitUntil promises.
+    try { ctx.waitUntil(work) } catch { /* non-CF test/runtime context */ }
+    return work
   } catch (err) {
     log.warn("fanout_to_channel_failed", {
       eventType: event.type,
       targetId: channelId,
       err: String(err),
     })
+    return Promise.resolve()
   }
 }
 
@@ -114,28 +132,42 @@ export async function fanOutToChannel(
  * channels now — kept as a thin named wrapper for the DM call sites; the
  * recipient set is the channel's relation='access' members.
  */
-export async function fanOutToDM(
+export function fanOutToDM(
   channelId: string,
   event: BroadcastableEvent,
   opts?: { excludeUserId?: string } & WakeOpts
 ): Promise<void> {
   try {
-    const { env } = getCloudflareContext()
+    const { env, ctx } = getCloudflareContext()
     const db = getDb((env as Env).DB)
-    const dm = await queries.communityDm.getDM(db, channelId)
-    if (!dm) {
-      log.warn("fanOutToDM: DM channel not found", { channelId })
-      return
-    }
-    const userIds = await queries.communityChannel.listChannelMemberUserIds(db, channelId)
-    await broadcastToRecipients(userIds, event, opts?.excludeUserId)
-    maybeEnqueueWakes(event, userIds, { channelId }, opts)
+    const work = (async () => {
+      try {
+        const dm = await queries.communityDm.getDM(db, channelId)
+        if (!dm) {
+          log.warn("fanOutToDM: DM channel not found", { channelId })
+          return
+        }
+        const userIds = await queries.communityChannel.listChannelMemberUserIds(db, channelId)
+        // Keep wake delivery independent from the best-effort UI broadcast.
+        maybeEnqueueWakes(event, userIds, { channelId }, opts)
+        await broadcastToRecipients(userIds, event, opts?.excludeUserId)
+      } catch (err) {
+        log.warn("fanout_to_dm_failed", {
+          eventType: event.type,
+          targetId: channelId,
+          err: String(err),
+        })
+      }
+    })()
+    try { ctx.waitUntil(work) } catch { /* non-CF test/runtime context */ }
+    return work
   } catch (err) {
     log.warn("fanout_to_dm_failed", {
       eventType: event.type,
       targetId: channelId,
       err: String(err),
     })
+    return Promise.resolve()
   }
 }
 
@@ -210,22 +242,39 @@ export async function fanOutStatusUpdate(
 /**
  * Fan out an event to all members of a server.
  */
-export async function fanOutToServerMembers(
+export function fanOutToServerMembers(
   serverId: string,
   event: BroadcastableEvent,
   opts?: { excludeUserId?: string }
 ): Promise<void> {
   try {
-    const { env } = getCloudflareContext()
+    const { env, ctx } = getCloudflareContext()
     const db = getDb((env as Env).DB)
-    const userIds = await getServerMemberUserIds(db, serverId)
-    await broadcastToRecipients(userIds, event, opts?.excludeUserId)
+    // Register the whole recipient-resolution + broadcast chain immediately.
+    // Most mutation routes intentionally fire-and-forget this helper; without
+    // an outer waitUntil the worker may finish after the D1 await but before
+    // broadcastToUsers gets a chance to register its own lifetime promise.
+    const work = (async () => {
+      try {
+        const userIds = await getServerMemberUserIds(db, serverId)
+        await broadcastToRecipients(userIds, event, opts?.excludeUserId)
+      } catch (err) {
+        log.warn("fanout_to_server_members_failed", {
+          eventType: event.type,
+          targetId: serverId,
+          err: String(err),
+        })
+      }
+    })()
+    try { ctx.waitUntil(work) } catch { /* non-CF test/runtime context */ }
+    return work
   } catch (err) {
     log.warn("fanout_to_server_members_failed", {
       eventType: event.type,
       targetId: serverId,
       err: String(err),
     })
+    return Promise.resolve()
   }
 }
 
@@ -257,17 +306,14 @@ async function broadcastToRecipients(
   event: BroadcastableEvent,
   excludeUserId?: string
 ): Promise<void> {
-  const recipients = excludeUserId
-    ? userIds.filter((id) => id !== excludeUserId)
-    : userIds
-
-  if (recipients.length === 0) return
-
-  // Fire all broadcasts concurrently — non-blocking via waitUntil in broadcastToUser
-  const promises = recipients.map((userId) =>
-    broadcastToUser(userId, event).catch((err) => {
-      log.warn("broadcastToRecipient failed", { userId, type: event.type, err: String(err) })
+  if (userIds.length === 0) return
+  try {
+    await broadcastToUsers(userIds, event, excludeUserId)
+  } catch (err) {
+    log.warn("broadcast_to_recipients_failed", {
+      recipientCount: userIds.length,
+      type: event.type,
+      err: String(err),
     })
-  )
-  await Promise.all(promises)
+  }
 }

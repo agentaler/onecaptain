@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronLeft, Monitor } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import type { CommunityMachineSummary } from "@alook/shared"
 import { isPresenceOnline } from "@alook/shared"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { GeneratedAvatar } from "@/components/avatar"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -21,10 +24,39 @@ import {
 import { apiFetch } from "@/lib/api/client"
 import { MachineCard } from "./machine-card"
 import { PairMachineSheet, type PairMachineSheetMode } from "./pair-machine-sheet"
+import { ConnectTile } from "@/components/community/onboarding-tiles/connect-tile"
 import { useMachines, type MachinesResponse } from "@/hooks/community/use-machines"
 import { useBots } from "@/hooks/community/use-bots"
 import { useCommunityStore, usePendingMachineTokenId } from "@/stores/community"
 import { communityKeys } from "@/lib/query-keys"
+import {
+  advanceCommunityOnboarding,
+  readCommunityOnboardingState,
+  startCommunityOnboarding,
+  updateCommunityOnboardingResources,
+  useCommunityOnboarding,
+} from "@/lib/community-onboarding"
+
+// Loading placeholder shaped like a real MachineCard (size-10 rounded-xl icon +
+// name row + meta lines + trailing kebab slot) so the list doesn't reflow when
+// data lands — replaces the old structureless muted box.
+function MachineCardSkeleton() {
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <Skeleton className="size-10 shrink-0 rounded-xl" />
+          <div className="flex flex-col gap-2 py-0.5">
+            <Skeleton className="h-3.5 w-32 rounded" />
+            <Skeleton className="h-3 w-44 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+        </div>
+        <Skeleton className="size-8 shrink-0 rounded-md" />
+      </div>
+    </Card>
+  )
+}
 
 export function MachineList({ onBack }: { onBack?: () => void } = {}) {
   const router = useRouter()
@@ -38,6 +70,12 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
   const [pendingTokenId, setPendingTokenId] = useState<string | null>(null)
   const [connectedHostname, setConnectedHostname] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<CommunityMachineSummary | null>(null)
+  const [guideAvatarSeed, setGuideAvatarSeed] = useState("alook-guide")
+  const onboardingState = useCommunityOnboarding()
+
+  useEffect(() => {
+    setGuideAvatarSeed(`alook-guide-${crypto.randomUUID()}`)
+  }, [])
 
   // When the WS layer announces a machine for our pending token, flip the sheet.
   useEffect(() => {
@@ -50,8 +88,22 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
     )
     if (justConnected && !connectedHostname) {
       setConnectedHostname(justConnected.hostname || "machine")
+      const onboarding = readCommunityOnboardingState()
+      let continueOnboarding = false
+      if (onboarding?.status === "active" && onboarding.stage === "machine") {
+        advanceCommunityOnboarding("machine", "bot")
+        continueOnboarding = true
+      } else if (
+        onboarding?.status === "active" &&
+        onboarding.stage === "bot" &&
+        onboarding.machineRecovery
+      ) {
+        updateCommunityOnboardingResources({ machineRecovery: false })
+        continueOnboarding = true
+      }
+      if (continueOnboarding) router.push("/c/me/bots")
     }
-  }, [machines, pendingMachineTokenId, pendingTokenId, connectedHostname])
+  }, [machines, pendingMachineTokenId, pendingTokenId, connectedHostname, router])
 
   const openPair = useCallback(() => {
     setPairMode({ kind: "pair" })
@@ -152,9 +204,9 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
       <div className="flex min-h-0 flex-1 flex-col">
         {backBar}
         <div className="flex flex-col gap-3 p-6">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-22 animate-pulse rounded-lg border bg-muted/30" />
-          ))}
+          <MachineCardSkeleton />
+          <MachineCardSkeleton />
+          <MachineCardSkeleton />
         </div>
       </div>
     )
@@ -165,17 +217,42 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
       <div className="flex min-h-0 flex-1 flex-col">
         {backBar}
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
-          <div className="grid size-12 place-items-center rounded-2xl bg-secondary text-muted-foreground">
-            <Monitor className="size-6" />
+          <div className="w-full max-w-70 overflow-hidden rounded-xl">
+            <div className="aspect-200/130 w-full">
+              <ConnectTile />
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-medium text-foreground">No machines yet</h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              Connect your computer to keep your agent always-on. Generate a key,
-              run the daemon, and the machine shows up here.
+              Connect a machine and your bots run on it always-on — reach them from
+              your phone or anywhere, wherever you sign in.
             </p>
           </div>
-          <Button onClick={openPair}>Connect a machine</Button>
+          <div className="flex items-center gap-2">
+            <Button data-onboarding-target="connect-machine" onClick={openPair}>
+              Connect a machine
+            </Button>
+            <span className="community-guide-me">
+              {onboardingState === null ? (
+                <span className="community-guide-me-orbit" aria-hidden="true">
+                  <span className="community-guide-me-avatar">
+                    <GeneratedAvatar
+                      seed={guideAvatarSeed}
+                      size={24}
+                      className="rounded-full ring-2 ring-background shadow-sm"
+                    />
+                  </span>
+                </span>
+              ) : null}
+              <Button
+                variant="ghost"
+                onClick={() => startCommunityOnboarding({ guideAvatarSeed })}
+              >
+                Guide me
+              </Button>
+            </span>
+          </div>
         </div>
         <PairMachineSheet
           open={pairOpen}
@@ -200,7 +277,9 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
               Your computers running the alook daemon.
             </p>
           </div>
-          <Button onClick={openPair}>Connect a machine</Button>
+          <div data-onboarding-target="connect-machine" className="w-fit">
+            <Button onClick={openPair}>Connect a machine</Button>
+          </div>
         </header>
         <div className="flex flex-col gap-3">
           {machines.map((m) => (

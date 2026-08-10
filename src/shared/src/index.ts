@@ -135,7 +135,6 @@ export {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_ATTACHMENT_SIZE_BYTES,
   MAX_SERVER_ICON_SIZE_BYTES,
-  ALLOWED_ATTACHMENT_MIME_PREFIXES,
   ALLOWED_ICON_MIME_TYPES,
   MAX_ICON_SOURCE_FILE_SIZE_BYTES,
   ICON_CROP_OUTPUT_SIZE,
@@ -152,6 +151,7 @@ export {
   MAX_ACTIVE_INVITES_PER_SERVER,
   UNCATEGORIZED_CATEGORY_ID,
   MESSAGE_PREVIEW_LENGTH,
+  truncateMessagePreview,
   DEFAULT_INBOX_PAGE_SIZE,
   MAX_INBOX_PAGE_SIZE,
   PRESENCE_MEMBER_CAP,
@@ -263,6 +263,8 @@ export {
   AgentActivityMessageSchema,
   AgentTypingMessageSchema,
   AgentTypingStopMessageSchema,
+  AgentSessionMessageSchema,
+  AgentWakeAckMessageSchema,
   COMMUNITY_RUNTIME_ID_MAX,
   COMMUNITY_RUNTIME_VERSION_MAX,
   COMMUNITY_RUNTIME_LIST_MAX,
@@ -276,6 +278,7 @@ export {
   CommunityAgentReadRequestSchema,
   CommunityAgentResolveRequestSchema,
   CommunityAgentListChannelsRequestSchema,
+  CommunityAgentCreatePostRequestSchema,
   CommunityAgentListMembersRequestSchema,
   CommunityAgentChannelMemberRequestSchema,
   CommunityAgentJoinServerRequestSchema,
@@ -292,7 +295,9 @@ export {
   AuditLogThinkingPayloadSchema,
   AuditLogWakeTriggerPayloadSchema,
   AuditLogModelChangedPayloadSchema,
+  AuditLogProviderChangedPayloadSchema,
   AuditLogSessionResetPayloadSchema,
+  AuditLogNapPayloadSchema,
   AuditLogErrorPayloadSchema,
   HostBotAuditEventFrameSchema,
 } from "./schemas";
@@ -357,6 +362,8 @@ export type {
   AgentActivityMessage,
   AgentTypingMessage,
   AgentTypingStopMessage,
+  AgentSessionMessage,
+  AgentWakeAckMessage,
   CommunityBotCreateRequest,
   CommunityBotPatchRequest,
   CommunityBotAddToServerRequest,
@@ -374,6 +381,7 @@ export type {
   BotAuditEvent,
   BotAuditEventKind,
   AuditLogWakeTriggerPayload,
+  AuditLogProviderChangedPayload,
 } from "./schemas";
 
 // Community agent CLI bridge contract — lifted from `src/daemon/src/server/contract.ts`.
@@ -418,6 +426,8 @@ export type {
   ChannelGroup as CommunityCliChannelGroup,
   ChannelMemberResult as CommunityCliChannelMemberResult,
   ServerMember as CommunityCliServerMember,
+  MemberStatus as CommunityCliMemberStatus,
+  ServerMemberListResult as CommunityCliServerMemberListResult,
   ServerApi as CommunityCliServerApi,
   FriendRequestResult,
   FriendCard,
@@ -433,7 +443,8 @@ export type {
   HostBotAuditEventFrame,
   BotAuditEventPayload,
 } from "./community-cli-contract";
-export { DM_SERVER, parseRef, formatRef, parseSeq, formatSeq } from "./community-cli-contract";
+export { DM_SERVER, parseRef, formatRef, formatCanonicalRef, parseSeq, formatSeq } from "./community-cli-contract";
+export type { CanonicalRefScope } from "./community-cli-contract";
 
 export type {
   ReasoningEffort,
@@ -532,7 +543,7 @@ export { withD1Retry, readOrStale, isRetryableD1Error } from "./db/resilience";
 export type { RetryOpts } from "./db/resilience";
 export * as schema from "./db/schema";
 export * as queries from "./db/queries-index";
-export { communityServer, communityServerInvite, communityFriendship, communityServerMember, communityServerFolder, communityServerFolderItem, communityBotActivityEvent } from "./db/community-schema";
+export { communityServer, communityServerInvite, communityFriendship, communityServerMember, communityServerFolder, communityServerFolderItem, communityBotActivityEvent, communityBotDailyActivity } from "./db/community-schema";
 
 // Logger
 export { Logger, createLogger } from "./logger"
@@ -566,6 +577,7 @@ export type { PromptAgent, PromptMention, ParseResult } from "./utils/prompt-par
 export { MENTION_TOKEN_RE, stripMentionTokens } from "./utils/mention-token";
 export { isValidToken, isValidEmail } from "./utils/validation";
 export { escapeLikePattern } from "./utils/sql-like";
+export { utcDayKey, utcDayKeyDaysAgo } from "./utils/day-key";
 export { isOnline, formatStatus, isPresenceOnline, isPresenceOffline } from "./utils/status";
 export { isUniqueConstraintError } from "./utils/db-errors";
 export { generateWorkspaceSlug, sanitizeSlug, slugSuffix } from "./utils/slug";
@@ -577,14 +589,31 @@ export {
   isAssignableRole,
   isChannelType,
   isForum,
-  isForumPost,
   isThread,
   isDm,
+  isMessageBearingSurface,
   ROLES,
   ASSIGNABLE_ROLES,
   CHANNEL_TYPES,
+  CHANNEL_TRAITS,
+  channelReach,
+  reachIsParticipantSet,
+  isStoredChannelType,
+  channelVisibility,
+  visibilityIsDmParticipant,
+  channelCreation,
 } from "./utils/community-roles";
-export type { CommunityRole, ChannelType, StoredChannelType, AssignableRole } from "./utils/community-roles";
+export type {
+  CommunityRole,
+  ChannelType,
+  StoredChannelType,
+  AssignableRole,
+  AddressingTrait,
+  VisibilityTrait,
+  ReachTrait,
+  CreationTrait,
+  ChannelTraits,
+} from "./utils/community-roles";
 export {
   isAccepted,
   isPending,

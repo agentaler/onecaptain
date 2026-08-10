@@ -55,9 +55,11 @@ export function useCreateChannel() {
       // send `null` so the server doesn't 404 on `getCategory`. onMutate still
       // uses the bucket to place the optimistic row in the cache.
       const apiCategoryId = isUncategorizedTarget(categoryId) ? null : categoryId
+      // Unified create door (route/disc create-door step): POST /channels with a
+      // type-discriminated descriptor. text/forum carries serverId + name.
       return apiFetch<CreateChannelResult>(
-        `/api/community/servers/${serverId}/channels`,
-        { method: "POST", body: JSON.stringify({ categoryId: apiCategoryId, name, type }) },
+        `/api/community/channels`,
+        { method: "POST", body: JSON.stringify({ type, serverId, categoryId: apiCategoryId, name }) },
       )
     },
     onMutate: async (args) => {
@@ -126,7 +128,7 @@ export function useCreateChannel() {
       if (ctx?.snapshot) queryClient.setQueryData(communityKeys.server(args.serverId), ctx.snapshot)
     },
     onSettled: (_data, _err, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -154,7 +156,7 @@ export function useMoveChannel() {
       })
     },
     onSuccess: (_data, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -169,7 +171,7 @@ export function useDeleteChannel() {
     },
     onSuccess: (_data, args) => {
       if (args.serverId) {
-        void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+        void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
       }
     },
   })
@@ -241,7 +243,7 @@ export function useCreateCategory() {
       if (ctx?.snapshot) queryClient.setQueryData(communityKeys.server(args.serverId), ctx.snapshot)
     },
     onSettled: (_data, _err, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -263,7 +265,7 @@ export function useUpdateCategory() {
       })
     },
     onSuccess: (_data, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -300,7 +302,7 @@ export function useDeleteCategory() {
       if (ctx?.snapshot) queryClient.setQueryData(communityKeys.server(args.serverId), ctx.snapshot)
     },
     onSettled: (_data, _err, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -357,7 +359,7 @@ export function useReorderCategories() {
       })
     },
     onSuccess: (_data, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }
@@ -374,7 +376,7 @@ export function useReorderChannels() {
       })
     },
     onSuccess: (_data, args) => {
-      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId) })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.server(args.serverId), exact: true })
     },
   })
 }

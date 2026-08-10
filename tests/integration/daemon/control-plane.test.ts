@@ -9,7 +9,7 @@
  *     → sendWakeToMachine → alook-ws-do (real DO) → the daemon's real
  *       `WsControlChannel`, over a real WebSocket, receives `agent:wake`
  *     → the test (playing the "agent" — no CLI spawned) replies via the
- *       real `enroll-agent` → `inboxPull`/`ack`/`send` HTTP chain
+ *       real `enroll-agent` → canonical pull/ack/send HTTP chain
  *     → the reply is visible via a real read of the channel.
  *
  * Requires `wrangler dev` (`@alook/web`), `@alook/ws-do dev`, and
@@ -36,6 +36,17 @@ import { nanoid, seedPairedBot, cleanupPairedBot, type DaemonItFixture } from ".
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000"
 const WS_DO_URL = process.env.WS_DO_URL ?? "ws://localhost:8789"
+
+// Assert a response is ok, but on failure surface the STATUS + body — a bare
+// `expect(res.ok).toBe(true)` only tells you "false", which is undiagnosable in
+// CI (is it a 401 key-timing? a 500 handler throw? a transport timeout?). This
+// turns the opaque failure into an actionable signature.
+async function assertResOk(res: Response, label: string): Promise<void> {
+  if (res.ok) return
+  let body = ""
+  try { body = (await res.text()).slice(0, 500) } catch { body = "<unreadable body>" }
+  throw new Error(`${label}: expected ok, got HTTP ${res.status} ${res.statusText} — body: ${body}`)
+}
 
 async function waitFor<T>(check: () => T | undefined, timeoutMs = 15_000, intervalMs = 200): Promise<T> {
   const deadline = Date.now() + timeoutMs
@@ -148,8 +159,8 @@ describe("daemon control plane — real ws-do wake round-trip", () => {
     expect(wake.agentId).toBe(fixture.bot.botUserId)
 
     // Acting as the "agent" (no CLI spawned): mint the runner key, then
-    // pull the backlog, ack it, and send a reply — all real HTTP against
-    // /api/community/agent/*, exactly what a real agent's CLI would do.
+    // pull the backlog, ack it, and send a reply through the canonical HTTP
+    // resources exactly as a real agent's CLI would do.
     const enrollRes = await fetchWithRetry(`${APP_URL}/api/community/daemon/enroll-agent`, {
       method: "POST",
       headers: { Authorization: `Bearer ${fixture.paired.credential}`, "content-type": "application/json" },
@@ -159,19 +170,19 @@ describe("daemon control plane — real ws-do wake round-trip", () => {
     const { runnerKey } = (await enrollRes.json()) as { runnerKey: string; expiresAt: string | null }
     expect(runnerKey.startsWith("crk_")).toBe(true)
 
-    const pullRes = await fetchWithRetry(`${APP_URL}/api/community/agent/inboxPull`, {
+    const pullRes = await fetchWithRetry(`${APP_URL}/api/community/users/me/inbox/pull`, {
       method: "POST",
       headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
       body: JSON.stringify({}),
     })
-    expect(pullRes.ok).toBe(true)
+    await assertResOk(pullRes, "inbox pull (enroll→pull hop)")
     // Wire `seq` is formatted `"#N"` (see `formatSeq`/`toAgentMessages`) —
     // the ack cursor schema wants the bare number back (`parseSeq`).
     const pulled = (await pullRes.json()) as { messages: Array<{ seq: string; channel: string }> }
     expect(pulled.messages.length).toBeGreaterThan(0)
     const lastPulled = pulled.messages[pulled.messages.length - 1]!
 
-    const ackRes = await fetchWithRetry(`${APP_URL}/api/community/agent/ack`, {
+    const ackRes = await fetchWithRetry(`${APP_URL}/api/community/users/me/inbox/ack`, {
       method: "POST",
       headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
       body: JSON.stringify({ cursors: [{ channel: lastPulled.channel, seq: parseSeq(lastPulled.seq) }] }),
@@ -179,10 +190,10 @@ describe("daemon control plane — real ws-do wake round-trip", () => {
     expect(ackRes.ok).toBe(true)
 
     const replyText = `reply from the real credential chain ${nanoid()}`
-    const sendRes = await fetchWithRetry(`${APP_URL}/api/community/agent/send`, {
+    const sendRes = await fetchWithRetry(`${APP_URL}/api/community/channels/resolve/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ channel: `/${fixture.serverId}/${fixture.channelName}`, content: { text: replyText } }),
+      body: JSON.stringify({ channel: `/${fixture.serverHandle}/${fixture.channelName}`, content: { text: replyText } }),
     })
     expect(sendRes.ok).toBe(true)
     const sendBody = (await sendRes.json()) as { state: string }
@@ -271,27 +282,27 @@ describe("daemon control plane — real ws-do wake round-trip", () => {
         expect(enrollRes.ok).toBe(true)
         const { runnerKey } = (await enrollRes.json()) as { runnerKey: string }
 
-        const pullRes = await fetchWithRetry(`${APP_URL}/api/community/agent/inboxPull`, {
+        const pullRes = await fetchWithRetry(`${APP_URL}/api/community/users/me/inbox/pull`, {
           method: "POST",
           headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
           body: JSON.stringify({}),
         })
-        expect(pullRes.ok).toBe(true)
+        await assertResOk(pullRes, "inbox pull (multi-bot enroll→pull)")
         const pulled = (await pullRes.json()) as { messages: Array<{ seq: string; channel: string }> }
         expect(pulled.messages.length).toBeGreaterThan(0)
         const lastPulled = pulled.messages[pulled.messages.length - 1]!
 
-        await fetchWithRetry(`${APP_URL}/api/community/agent/ack`, {
+        await fetchWithRetry(`${APP_URL}/api/community/users/me/inbox/ack`, {
           method: "POST",
           headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
           body: JSON.stringify({ cursors: [{ channel: lastPulled.channel, seq: parseSeq(lastPulled.seq) }] }),
         })
 
         const replyText = `reply from ${bot.botUserId} ${nanoid()}`
-        const sendRes = await fetchWithRetry(`${APP_URL}/api/community/agent/send`, {
+        const sendRes = await fetchWithRetry(`${APP_URL}/api/community/channels/resolve/messages`, {
           method: "POST",
           headers: { Authorization: `Bearer ${runnerKey}`, "content-type": "application/json" },
-          body: JSON.stringify({ channel: `/${fixture.serverId}/${fixture.channelName}`, content: { text: replyText } }),
+          body: JSON.stringify({ channel: `/${fixture.serverHandle}/${fixture.channelName}`, content: { text: replyText } }),
         })
         expect(sendRes.ok).toBe(true)
         const sendBody = (await sendRes.json()) as { state: string }

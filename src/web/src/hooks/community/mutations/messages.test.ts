@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
 import { communityKeys } from "@/lib/query-keys"
+import type { Msg } from "@/components/community/_types"
 
 // ── React shim (mirrors use-community-ws.test.ts) ────────────────────────
 let refs: Map<string, { current: unknown }> = new Map()
@@ -97,11 +98,50 @@ async function loadMod() {
   return await import("./messages")
 }
 
-function makeCache(msgs: { id: string; failed?: boolean; reactions?: unknown[] }[] = []) {
+function makeCache(msgs: Array<{ id: string } & Record<string, unknown>> = []) {
   return {
     pages: [{ messages: msgs, hasMore: false }],
     pageParams: [null],
   }
+}
+
+function postedMessage(id: string, seq: number) {
+  return {
+    id,
+    seq,
+    createdAt: "2026-08-07T10:00:00.000Z",
+    content: "canonical content",
+    authorId: "u_me",
+    authorName: "Canonical Name",
+    authorImage: "https://avatar.test/me.png",
+    type: "default",
+    embeds: [{ title: "Canonical embed" }],
+  }
+}
+
+function sidebarData(threadId = "post_1") {
+  return {
+    channels: [],
+    included: { parentMessages: [] },
+    serverNow: "2026-08-07T00:00:00.000Z",
+    serverClockOffsetMs: 0,
+    threads: [{
+      id: threadId,
+      parentChannelId: "forum_1",
+      parentMessageId: "opener_1",
+      title: "Old title",
+      activityAt: "2026-08-06T00:00:00.000Z",
+      expiresAt: "2026-08-09T00:00:00.000Z",
+      unread: false,
+    }],
+  }
+}
+
+function seedParent(type: "forum" | "text", parentId = "forum_1") {
+  capturedQc.setQueryData(communityKeys.server("s1"), {
+    id: "s1",
+    categories: [{ id: "cat_1", channels: [{ id: parentId, type }] }],
+  })
 }
 
 beforeEach(() => {
@@ -115,25 +155,199 @@ beforeEach(() => {
   callbackCounter = 0
 })
 
+describe("useEditMessage", () => {
+  it("optimistically patches content and rolls back when PATCH fails", async () => {
+    const key = communityKeys.channelMessages("ch_1")
+    const messageKey = communityKeys.message("m1")
+    capturedQc.setQueryData(key, makeCache([{ id: "m1", content: "old" }]))
+    capturedQc.setQueryData(messageKey, { id: "m1", content: "old" })
+    apiFetchMock.mockRejectedValueOnce(new Error("boom"))
+    const mod = await loadMod()
+    mod.useEditMessage()
+
+    await runMutation({ serverId: "s1", channelId: "ch_1", messageId: "m1", content: "new" }).catch(() => {})
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/api/community/messages/m1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "new" }),
+    })
+    const cache = capturedQc.getQueryData<{ pages: { messages: { content?: string }[] }[] }>(key)
+    expect(cache?.pages[0].messages[0]?.content).toBe("old")
+    expect(capturedQc.getQueryData<{ content: string }>(messageKey)?.content).toBe("old")
+  })
+
+  it("optimistically patches the single-message cache used by a post header", async () => {
+    const messageKey = communityKeys.message("opener_1")
+    capturedQc.setQueryData(messageKey, { id: "opener_1", content: "Old title" })
+    apiFetchMock.mockResolvedValueOnce(undefined)
+    const mod = await loadMod()
+    mod.useEditMessage()
+
+    await runMutation({
+      serverId: "s1", channelId: "forum_1", messageId: "opener_1", content: "New title", forumChannelId: "forum_1",
+    })
+
+    expect(capturedQc.getQueryData<{ content: string }>(messageKey)?.content).toBe("New title")
+  })
+
+  it("invalidates every forum summary variant after an opener edit", async () => {
+    const root = communityKeys.channelMessages("forum_1")
+    const bug = [...root, "tag", "bug"] as const
+    capturedQc.setQueryData(root, { pages: [], pageParams: [] })
+    capturedQc.setQueryData(bug, { pages: [], pageParams: [] })
+    apiFetchMock.mockResolvedValueOnce(undefined)
+    const mod = await loadMod()
+    mod.useEditMessage()
+
+    await runMutation({
+      serverId: "s1", channelId: "forum_1", messageId: "opener_1", content: "new", forumChannelId: "forum_1",
+    })
+
+    expect(capturedQc.getQueryState(root)?.isInvalidated).toBe(true)
+    expect(capturedQc.getQueryState(bug)?.isInvalidated).toBe(true)
+  })
+
+  it("patches a loaded forum-sidebar title after the opener edit succeeds", async () => {
+    seedParent("forum")
+    const sidebarKey = communityKeys.forumSidebarThreads("s1")
+    capturedQc.setQueryData(sidebarKey, sidebarData())
+    apiFetchMock.mockResolvedValueOnce(undefined)
+    const mod = await loadMod()
+    mod.useEditMessage()
+
+    await runMutation({
+      serverId: "s1",
+      channelId: "forum_1",
+      messageId: "opener_1",
+      content: "New title",
+      forumChannelId: "forum_1",
+      forumThreadId: "post_1",
+    })
+
+    expect(capturedQc.getQueryData<ReturnType<typeof sidebarData>>(sidebarKey)?.threads[0].title)
+      .toBe("New title")
+  })
+})
+
 // ── useSendMessage ────────────────────────────────────────────────────────
 
 describe("useSendMessage — happy path", () => {
-  it("optimistic insert then reconciles server id on success", async () => {
+  it("keeps Query base-only and acknowledges the accepted overlay intent", async () => {
     capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), makeCache([]))
-    apiFetchMock.mockResolvedValueOnce({ message: { id: "server_id_1" } })
+    apiFetchMock.mockResolvedValueOnce({ message: postedMessage("server_id_1", 9) })
 
     const mod = await loadMod()
+    const stream = await import("@/stores/community/message-stream")
+    stream.useMessageStreamStore.getState().accept(
+      { kind: "channel", id: "ch_1", serverId: "s1" },
+      { nonce: "n1", tempId: "temp_n1", message: { type: "chat", content: "hi" }, localUploads: [] },
+    )
     mod.useSendMessage() // populate capturedConfig
     await runMutation({
+      serverId: "s1",
       channelId: "ch_1",
+      content: "hi",
+      nonce: "n1",
+      author: { id: "u_me", name: "me", avatar: "M" },
+    })
+
+    const cache = capturedQc.getQueryData<{ pages: { messages: Msg[] }[] }>(
+      communityKeys.channelMessages("ch_1"),
+    )
+    expect(cache?.pages[0].messages).toEqual([])
+    expect(stream.getMessageOverlay({ kind: "channel", id: "ch_1", serverId: "s1" }).outboxByNonce.get("n1")).toEqual(
+      expect.objectContaining({
+        status: "acked",
+        serverMessageId: "server_id_1",
+        serverSeq: 9,
+        message: expect.objectContaining({
+          authorName: "Canonical Name",
+          content: "canonical content",
+          embeds: [{ title: "Canonical embed" }],
+        }),
+      }),
+    )
+  })
+
+  it("re-ranks a loaded participating forum thread from the canonical send timestamp", async () => {
+    seedParent("forum")
+    const sidebarKey = communityKeys.forumSidebarThreads("s1")
+    capturedQc.setQueryData(sidebarKey, sidebarData())
+    apiFetchMock.mockResolvedValueOnce({ message: postedMessage("server_id_1", 9) })
+    const mod = await loadMod()
+    mod.useSendMessage()
+
+    await runMutation({
+      serverId: "s1",
+      channelId: "post_1",
+      forumParentChannelId: "forum_1",
       content: "hi",
       author: { id: "u_me", name: "me", avatar: "M" },
     })
 
-    const cache = capturedQc.getQueryData<{ pages: { messages: { id: string }[] }[] }>(
-      communityKeys.channelMessages("ch_1"),
-    )
-    expect(cache?.pages[0].messages.map((m) => m.id)).toEqual(["server_id_1"])
+    expect(capturedQc.getQueryData<ReturnType<typeof sidebarData>>(sidebarKey)?.threads[0])
+      .toMatchObject({
+        activityAt: "2026-08-07T10:00:00.000Z",
+        expiresAt: "2026-08-10T10:00:00.000Z",
+      })
+  })
+
+  it("invalidates the sidebar collection when a just-enrolled thread is not loaded", async () => {
+    seedParent("forum")
+    const sidebarKey = communityKeys.forumSidebarThreads("s1")
+    const empty = { ...sidebarData(), threads: [] }
+    capturedQc.setQueryData(sidebarKey, empty)
+    apiFetchMock.mockResolvedValueOnce({ message: postedMessage("server_id_1", 9) })
+    const mod = await loadMod()
+    mod.useSendMessage()
+
+    await runMutation({
+      serverId: "s1",
+      channelId: "post_new",
+      forumParentChannelId: "forum_1",
+      content: "hi",
+      author: { id: "u_me", name: "me", avatar: "M" },
+    })
+
+    expect(capturedQc.getQueryState(sidebarKey)?.isInvalidated).toBe(true)
+  })
+
+  it("does not touch forum resources when sending in an ordinary text thread", async () => {
+    seedParent("text", "text_parent")
+    const baseKey = communityKeys.forumSidebarThreads("s1")
+    const retainedKey = communityKeys.forumSidebarRetained("s1", "forum_post")
+    const metaKey = communityKeys.channelMeta("s1", "text_thread")
+    const hintKey = communityKeys.forumOpenerHint("s1", "forum_opener")
+    capturedQc.setQueryData(baseKey, sidebarData())
+    capturedQc.setQueryData(retainedKey, { id: "forum_post" })
+    capturedQc.setQueryData(metaKey, { id: "text_thread", parentChannelId: "text_parent" })
+    capturedQc.setQueryData(hintKey, { id: "forum_opener", content: "Forum title" })
+    const before = [
+      capturedQc.getQueryData(baseKey),
+      capturedQc.getQueryData(retainedKey),
+      capturedQc.getQueryData(metaKey),
+      capturedQc.getQueryData(hintKey),
+    ]
+    apiFetchMock.mockResolvedValueOnce({ message: postedMessage("server_id_1", 9) })
+    const mod = await loadMod()
+    mod.useSendMessage()
+
+    await runMutation({
+      serverId: "s1",
+      channelId: "text_thread",
+      forumParentChannelId: "text_parent",
+      content: "hi",
+      author: { id: "u_me", name: "me", avatar: "M" },
+    })
+
+    expect(capturedQc.getQueryState(baseKey)?.isInvalidated).toBe(false)
+    expect([
+      capturedQc.getQueryData(baseKey),
+      capturedQc.getQueryData(retainedKey),
+      capturedQc.getQueryData(metaKey),
+      capturedQc.getQueryData(hintKey),
+    ]).toEqual(before)
   })
 })
 
@@ -142,84 +356,108 @@ describe("useSendMessage — rollback", () => {
     capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), makeCache([]))
     apiFetchMock.mockRejectedValueOnce(new Error("boom"))
     const mod = await loadMod()
+    const stream = await import("@/stores/community/message-stream")
+    stream.useMessageStreamStore.getState().accept(
+      { kind: "channel", id: "ch_1", serverId: "s1" },
+      { nonce: "n1", tempId: "temp_n1", message: { type: "chat", content: "hi" }, localUploads: [] },
+    )
     mod.useSendMessage()
     await runMutation({
+      serverId: "s1",
       channelId: "ch_1",
       content: "hi",
+      nonce: "n1",
       author: { id: "u_me", name: "me", avatar: "M" },
     }).catch(() => { })
     const cache = capturedQc.getQueryData<{ pages: { messages: { id: string; failed?: boolean }[] }[] }>(
       communityKeys.channelMessages("ch_1"),
     )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
+    expect(cache?.pages[0].messages).toEqual([])
+    expect(stream.getMessageOverlay({ kind: "channel", id: "ch_1", serverId: "s1" }).outboxByNonce.get("n1")?.status).toBe("failed")
   })
 })
 
 // Regression pin — the mount-time effect in <MessageList> gates self-send
-// auto-scroll on `tail.authorId === viewerUserId`. A missing `authorId` on
-// the optimistic row silently disables that scroll, so pin the field on
-// BOTH the channel and DM optimistic paths.
+// auto-scroll on `tail.authorId === viewerUserId`.
 describe("useSendMessage — stamps authorId on optimistic row", () => {
   it("optimistic row carries the sender's authorId", async () => {
     capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), makeCache([]))
-    // Never resolves — we only care about the optimistic write from onMutate.
-    apiFetchMock.mockImplementation(() => new Promise(() => { }))
     const mod = await loadMod()
-    mod.useSendMessage()
-    const cfg = capturedConfig!
-    await cfg.onMutate!({
-      channelId: "ch_1",
-      content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
-    })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { authorId?: string }[] }[] }>(
-      communityKeys.channelMessages("ch_1"),
+    const stream = await import("@/stores/community/message-stream")
+    stream.useMessageStreamStore.getState().accept(
+      { kind: "channel", id: "ch_1", serverId: "s1" },
+      {
+        nonce: "n1",
+        tempId: "temp_n1",
+        message: { type: "chat", content: "hi", authorId: "u_me" },
+        localUploads: [],
+      },
     )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].authorId).toBe("u_me")
+    expect(stream.getMessageOverlay({ kind: "channel", id: "ch_1", serverId: "s1" }).outboxByNonce.get("n1")?.message.authorId).toBe("u_me")
+    expect(mod.useSendMessage).toBeTypeOf("function")
   })
 })
 
 // ── useSendDmMessage ──────────────────────────────────────────────────────
 
-describe("useSendDmMessage — stamps authorId on optimistic row", () => {
-  // Companion regression: without authorId the self-send auto-scroll bails
-  // in <MessageList> because `undefined !== viewerUserId`. Pin the field.
-  it("optimistic DM row carries the sender's authorId", async () => {
-    capturedQc.setQueryData(communityKeys.dmMessages("dm_1"), makeCache([]))
-    apiFetchMock.mockImplementation(() => new Promise(() => { }))
-    const mod = await loadMod()
-    mod.useSendDmMessage()
-    const cfg = capturedConfig!
-    await cfg.onMutate!({
-      dmId: "dm_1",
-      content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
-    })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { authorId?: string }[] }[] }>(
-      communityKeys.dmMessages("dm_1"),
-    )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].authorId).toBe("u_me")
-  })
-})
+async function acceptDmIntent(nonce = "n1") {
+  const stream = await import("@/stores/community/message-stream")
+  stream.useMessageStreamStore.getState().accept(
+    { kind: "dm", id: "dm_1" },
+    {
+      nonce,
+      tempId: `temp_${nonce}`,
+      message: { type: "chat", content: "hi", authorId: "u_me" },
+      localUploads: [],
+    },
+  )
+  return stream
+}
 
-describe("useSendDmMessage — rollback", () => {
-  it("marks the temp DM row failed on server failure", async () => {
+describe("useSendDmMessage — overlay terminal emitter", () => {
+  it("keeps Query base-only and emits exactly one postAck", async () => {
+    capturedQc.setQueryData(communityKeys.dmMessages("dm_1"), makeCache([]))
+    apiFetchMock.mockResolvedValueOnce({ message: postedMessage("server_1", 8) })
+    const mod = await loadMod()
+    const stream = await acceptDmIntent()
+    const dispatch = vi.spyOn(stream.useMessageStreamStore.getState(), "dispatch")
+    mod.useSendDmMessage()
+    await runMutation({ dmId: "dm_1", content: "hi", nonce: "n1" })
+
+    expect(capturedQc.getQueryData(communityKeys.dmMessages("dm_1"))).toEqual(makeCache([]))
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith(
+      { kind: "dm", id: "dm_1" },
+      {
+        type: "postAck",
+        nonce: "n1",
+        message: expect.objectContaining({
+          id: "server_1",
+          seq: 8,
+          authorName: "Canonical Name",
+          content: "canonical content",
+          clientNonce: "n1",
+        }),
+      },
+    )
+  })
+
+  it("emits postFail for a generic network failure and leaves Query untouched", async () => {
     capturedQc.setQueryData(communityKeys.dmMessages("dm_1"), makeCache([]))
     apiFetchMock.mockRejectedValueOnce(new Error("boom"))
     const mod = await loadMod()
+    const stream = await acceptDmIntent()
+    const dispatch = vi.spyOn(stream.useMessageStreamStore.getState(), "dispatch")
     mod.useSendDmMessage()
-    await runMutation({
-      dmId: "dm_1",
-      content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
-    }).catch(() => { })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { failed?: boolean }[] }[] }>(
-      communityKeys.dmMessages("dm_1"),
+    await runMutation({ dmId: "dm_1", content: "hi", nonce: "n1" }).catch(() => { })
+
+    expect(capturedQc.getQueryData(communityKeys.dmMessages("dm_1"))).toEqual(makeCache([]))
+    expect(stream.getMessageOverlay({ kind: "dm", id: "dm_1" }).outboxByNonce.get("n1")?.status).toBe("failed")
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith(
+      { kind: "dm", id: "dm_1" },
+      { type: "postFail", nonce: "n1" },
     )
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
   })
 })
 
@@ -231,17 +469,21 @@ describe("useSendDmMessage — 403 blocked special-case", () => {
     // instance the hook's `err instanceof ApiError` check will see.
     const { ApiError } = await import("@/lib/errors")
     apiFetchMock.mockRejectedValueOnce(new ApiError("blocked", 403))
+    const stream = await acceptDmIntent()
+    const dispatch = vi.spyOn(stream.useMessageStreamStore.getState(), "dispatch")
     mod.useSendDmMessage()
     await runMutation({
       dmId: "dm_1",
       content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
+      nonce: "n1",
     }).catch(() => { })
-    const cache = capturedQc.getQueryData<{ pages: { messages: unknown[] }[] }>(
-      communityKeys.dmMessages("dm_1"),
+    expect(stream.getMessageOverlay({ kind: "dm", id: "dm_1" }).outboxByNonce.size).toBe(0)
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledWith(
+      { kind: "dm", id: "dm_1" },
+      { type: "terminalReject", nonce: "n1" },
     )
-    // Temp row scrubbed — no bubble, no failed:true.
-    expect(cache?.pages[0].messages).toHaveLength(0)
+    expect(capturedQc.getQueryData(communityKeys.dmMessages("dm_1"))).toEqual(makeCache([]))
     expect(toastMock).toHaveBeenCalledWith("You cannot send messages to this user")
   })
 
@@ -250,17 +492,15 @@ describe("useSendDmMessage — 403 blocked special-case", () => {
     const mod = await loadMod()
     const { ApiError } = await import("@/lib/errors")
     apiFetchMock.mockRejectedValueOnce(new ApiError("boom", 500))
+    const stream = await acceptDmIntent()
     mod.useSendDmMessage()
     await runMutation({
       dmId: "dm_1",
       content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
+      nonce: "n1",
     }).catch(() => { })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { failed?: boolean }[] }[] }>(
-      communityKeys.dmMessages("dm_1"),
-    )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
+    expect(stream.getMessageOverlay({ kind: "dm", id: "dm_1" }).outboxByNonce.get("n1")?.status).toBe("failed")
+    expect(capturedQc.getQueryData(communityKeys.dmMessages("dm_1"))).toEqual(makeCache([]))
     // Not the blocked-specific copy — any other error falls through to the
     // generic send-failed toast (see `useSendDmMessage`'s `onError` fallback).
     expect(toastMock).not.toHaveBeenCalledWith("You cannot send messages to this user")
@@ -278,15 +518,23 @@ describe("useSendMessage — 429 rate limit fires a toast + marks failed", () =>
     const { ApiError } = await import("@/lib/errors")
     apiFetchMock.mockRejectedValueOnce(new ApiError("rate_limited", 429))
     mod.useSendMessage()
+    const stream = await import("@/stores/community/message-stream")
+    stream.useMessageStreamStore.getState().accept(
+      { kind: "channel", id: "ch_1", serverId: "s1" },
+      { nonce: "n1", tempId: "temp_n1", message: { type: "chat", content: "hi" }, localUploads: [] },
+    )
     await runMutation({
+      serverId: "s1",
       channelId: "ch_1",
       content: "hi",
+      nonce: "n1",
       author: { id: "u_me", name: "me", avatar: "M" },
     }).catch(() => { })
     const cache = capturedQc.getQueryData<{ pages: { messages: { failed?: boolean }[] }[] }>(
       communityKeys.channelMessages("ch_1"),
     )
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
+    expect(cache?.pages[0].messages).toEqual([])
+    expect(stream.getMessageOverlay({ kind: "channel", id: "ch_1", serverId: "s1" }).outboxByNonce.get("n1")?.status).toBe("failed")
     expect(toastMock).toHaveBeenCalledWith(expect.stringContaining("Rate limited"))
   })
 })
@@ -297,17 +545,15 @@ describe("useSendDmMessage — 429 rate limit fires a toast + marks failed", () 
     const mod = await loadMod()
     const { ApiError } = await import("@/lib/errors")
     apiFetchMock.mockRejectedValueOnce(new ApiError("rate_limited", 429))
+    const stream = await acceptDmIntent()
     mod.useSendDmMessage()
     await runMutation({
       dmId: "dm_1",
       content: "hi",
-      author: { id: "u_me", name: "me", avatar: "M" },
+      nonce: "n1",
     }).catch(() => { })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { failed?: boolean }[] }[] }>(
-      communityKeys.dmMessages("dm_1"),
-    )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
+    expect(stream.getMessageOverlay({ kind: "dm", id: "dm_1" }).outboxByNonce.get("n1")?.status).toBe("failed")
+    expect(capturedQc.getQueryData(communityKeys.dmMessages("dm_1"))).toEqual(makeCache([]))
     expect(toastMock).toHaveBeenCalledWith(expect.stringContaining("Rate limited"))
   })
 })
@@ -324,63 +570,25 @@ describe("useSendMessage — no blocked branch on channel path", () => {
     const { ApiError } = await import("@/lib/errors")
     apiFetchMock.mockRejectedValueOnce(new ApiError("blocked", 403))
     mod.useSendMessage()
+    const stream = await import("@/stores/community/message-stream")
+    stream.useMessageStreamStore.getState().accept(
+      { kind: "channel", id: "ch_1", serverId: "s1" },
+      { nonce: "n1", tempId: "temp_n1", message: { type: "chat", content: "hi" }, localUploads: [] },
+    )
     await runMutation({
+      serverId: "s1",
       channelId: "ch_1",
       content: "hi",
+      nonce: "n1",
       author: { id: "u_me", name: "me", avatar: "M" },
     }).catch(() => { })
     const cache = capturedQc.getQueryData<{ pages: { messages: { failed?: boolean }[] }[] }>(
       communityKeys.channelMessages("ch_1"),
     )
-    expect(cache?.pages[0].messages).toHaveLength(1)
-    expect(cache?.pages[0].messages[0].failed).toBe(true)
+    expect(cache?.pages[0].messages).toEqual([])
+    expect(stream.getMessageOverlay({ kind: "channel", id: "ch_1", serverId: "s1" }).outboxByNonce.get("n1")?.status).toBe("failed")
     expect(toastMock).not.toHaveBeenCalledWith("You cannot send messages to this user")
     expect(toastMock).toHaveBeenCalledWith("blocked")
-  })
-})
-
-// ── useToggleReaction ─────────────────────────────────────────────────────
-
-describe("useToggleReaction — optimistic flip + rollback", () => {
-  it("optimistically adds a reaction with me=true and issues PUT", async () => {
-    capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), {
-      pages: [{ messages: [{ id: "m_1", reactions: [] }], hasMore: false }],
-      pageParams: [null],
-    })
-    apiFetchMock.mockResolvedValueOnce(undefined)
-    const mod = await loadMod()
-    mod.useToggleReaction()
-    await runMutation({
-      channelId: "ch_1",
-      messageId: "m_1",
-      emoji: "👍",
-      userId: "u_me",
-    })
-    const cache = capturedQc.getQueryData<{
-      pages: { messages: { reactions: { emoji: string; me: boolean }[] }[] }[]
-    }>(communityKeys.channelMessages("ch_1"))
-    expect(cache?.pages[0].messages[0].reactions).toMatchObject([{ emoji: "👍", me: true }])
-    expect(apiFetchMock).toHaveBeenCalledWith(expect.any(String), { method: "PUT" })
-  })
-
-  it("rolls back on failure — reactions return to []", async () => {
-    capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), {
-      pages: [{ messages: [{ id: "m_1", reactions: [] }], hasMore: false }],
-      pageParams: [null],
-    })
-    apiFetchMock.mockRejectedValueOnce(new Error("boom"))
-    const mod = await loadMod()
-    mod.useToggleReaction()
-    await runMutation({
-      channelId: "ch_1",
-      messageId: "m_1",
-      emoji: "👍",
-      userId: "u_me",
-    }).catch(() => { })
-    const cache = capturedQc.getQueryData<{ pages: { messages: { reactions: unknown[] }[] }[] }>(
-      communityKeys.channelMessages("ch_1"),
-    )
-    expect(cache?.pages[0].messages[0].reactions).toEqual([])
   })
 })
 
@@ -391,6 +599,130 @@ describe("useToggleReaction — optimistic flip + rollback", () => {
 // timer on subsequent clicks. Step 3's hook dropped the coalescing; this
 // restores it via useCommunityStore.reactionTimers.
 describe("useToggleReactionApi — 300ms debounce coalescing", () => {
+  it("updates and rolls back a fallback-only channel row without creating a second row", async () => {
+    vi.useFakeTimers()
+    try {
+      capturedQc.setQueryData(communityKeys.channelMessages("ch_1"), makeCache([]))
+      apiFetchMock.mockRejectedValueOnce(new Error("boom"))
+      const mod = await loadMod()
+      const stream = await import("@/stores/community/message-stream")
+      const scope = { kind: "channel" as const, id: "ch_1", serverId: "s1" }
+      stream.useMessageStreamStore.getState().dispatch(scope, {
+        type: "wsMessage",
+        message: {
+          id: "m_1",
+          seq: 1,
+          type: "chat",
+          authorId: "u_other",
+          authorName: "Other",
+          content: "hello",
+          createdAt: "2026-08-06T00:00:00.000Z",
+          reactions: [{ emoji: "👍", count: 1, me: true, userIds: ["u_me"] }],
+        },
+      })
+
+      const toggle = mod.useToggleReactionApi()
+      toggle({
+        serverId: "s1",
+        channelId: "ch_1",
+        messageId: "m_1",
+        emoji: "👍",
+        userId: "u_me",
+      })
+
+      let overlay = stream.getMessageOverlay(scope)
+      expect(overlay.liveById).toHaveLength(1)
+      expect(overlay.liveById.get("m_1")?.reactions).toEqual([])
+
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      overlay = stream.getMessageOverlay(scope)
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/community/messages/m_1/reactions/"),
+        { method: "DELETE" },
+      )
+      expect(overlay.liveById).toHaveLength(1)
+      expect(overlay.liveById.get("m_1")?.reactions).toEqual([
+        expect.objectContaining({ emoji: "👍", me: true, count: 1 }),
+      ])
+      expect(capturedQc.getQueryData<{ pages: { messages: unknown[] }[] }>(
+        communityKeys.channelMessages("ch_1"),
+      )?.pages[0].messages).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("updates and rolls back a fallback-only DM row, starting from me=true", async () => {
+    vi.useFakeTimers()
+    try {
+      capturedQc.setQueryData(communityKeys.dmMessages("dm_1"), makeCache([]))
+      apiFetchMock.mockRejectedValueOnce(new Error("boom"))
+      const mod = await loadMod()
+      const stream = await import("@/stores/community/message-stream")
+      const scope = { kind: "dm" as const, id: "dm_1" }
+      stream.useMessageStreamStore.getState().dispatch(scope, {
+        type: "wsMessage",
+        message: {
+          id: "m_dm",
+          seq: 2,
+          type: "chat",
+          content: "hello",
+          reactions: [{ emoji: "👍", count: 1, me: true, userIds: ["u_me"] }],
+        },
+      })
+
+      mod.useToggleReactionApi()({
+        dmId: "dm_1",
+        messageId: "m_dm",
+        emoji: "👍",
+        userId: "u_me",
+      })
+      expect(stream.getMessageOverlay(scope).liveById.get("m_dm")?.reactions).toEqual([])
+
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      expect(apiFetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/community/messages/m_dm/reactions/"),
+        { method: "DELETE" },
+      )
+      expect(stream.getMessageOverlay(scope).liveById.get("m_dm")?.reactions).toEqual([
+        expect.objectContaining({ emoji: "👍", me: true, count: 1 }),
+      ])
+      expect(capturedQc.getQueryData<{ pages: { messages: unknown[] }[] }>(
+        communityKeys.dmMessages("dm_1"),
+      )?.pages[0].messages).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("does not invent a DM fallback when the message exists in neither base nor overlay", async () => {
+    vi.useFakeTimers()
+    try {
+      capturedQc.setQueryData(communityKeys.dmMessages("dm_1"), makeCache([]))
+      apiFetchMock.mockRejectedValueOnce(new Error("boom"))
+      const mod = await loadMod()
+      const stream = await import("@/stores/community/message-stream")
+      const scope = { kind: "dm" as const, id: "dm_1" }
+
+      mod.useToggleReactionApi()({
+        dmId: "dm_1",
+        messageId: "missing",
+        emoji: "👍",
+        userId: "u_me",
+      })
+      await vi.advanceTimersByTimeAsync(300)
+      await Promise.resolve()
+
+      expect(stream.getMessageOverlay(scope).liveById.size).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("5 rapid clicks with alternating me→!me→me settle to a SINGLE API call at end of window", async () => {
     vi.useFakeTimers()
     try {
@@ -818,9 +1150,60 @@ describe("useAdvanceChannelWatermark", () => {
   })
 })
 
+describe("useReadForumThreadFromInbox", () => {
+  it("PUTs the exact opener target to the parent forum immediately", async () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    const mod = await loadMod()
+    mod.useReadForumThreadFromInbox()
+
+    await runMutation({ parentChannelId: "forum_1", openerMessageId: "opener_42" })
+
+    expect(apiFetchMock).toHaveBeenCalledWith("/api/community/channels/forum_1/read", {
+      method: "PUT",
+      body: JSON.stringify({ lastReadMessageId: "opener_42" }),
+    })
+  })
+
+  it("has no optimistic cache mutation and invalidates inbox + servers only after success", async () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    const before = { servers: [{ serverId: "s1", channels: [{ channelId: "forum_1" }] }] }
+    capturedQc.setQueryData(communityKeys.inboxUnreads(), before)
+    const setSpy = vi.spyOn(capturedQc, "setQueryData")
+    const invalidateSpy = vi.spyOn(capturedQc, "invalidateQueries")
+    const mod = await loadMod()
+    mod.useReadForumThreadFromInbox()
+
+    await runMutation({ parentChannelId: "forum_1", openerMessageId: "opener_42" })
+
+    expect(setSpy).not.toHaveBeenCalled()
+    expect(capturedQc.getQueryData(communityKeys.inboxUnreads())).toEqual(before)
+    const invalidated = invalidateSpy.mock.calls.map((call) => call[0]?.queryKey)
+    expect(invalidated).toContainEqual(communityKeys.inbox())
+    expect(invalidated).toContainEqual(communityKeys.servers())
+  })
+
+  it("keeps cache intact, skips success invalidation, and toasts when the PUT fails", async () => {
+    const error = new Error("parent read failed")
+    apiFetchMock.mockRejectedValue(error)
+    const before = { servers: [{ serverId: "s1", channels: [{ channelId: "forum_1" }] }] }
+    capturedQc.setQueryData(communityKeys.inboxUnreads(), before)
+    const setSpy = vi.spyOn(capturedQc, "setQueryData")
+    const invalidateSpy = vi.spyOn(capturedQc, "invalidateQueries")
+    const mod = await loadMod()
+    mod.useReadForumThreadFromInbox()
+
+    await runMutation({ parentChannelId: "forum_1", openerMessageId: "opener_42" }).catch(() => {})
+
+    expect(setSpy).not.toHaveBeenCalled()
+    expect(invalidateSpy).not.toHaveBeenCalled()
+    expect(capturedQc.getQueryData(communityKeys.inboxUnreads())).toEqual(before)
+    expect(toastMock).toHaveBeenCalledWith("parent read failed")
+  })
+})
+
 // ── useAdvanceDmWatermark — DM sibling of the channel wrapper ───────────
 describe("useAdvanceDmWatermark", () => {
-  it("returns a callable that PUTs { lastReadMessageId } to the DM read route", async () => {
+  it("returns a callable that PUTs { lastReadMessageId } to the canonical channels read route", async () => {
     vi.useFakeTimers()
     try {
       apiFetchMock.mockResolvedValue(undefined)
@@ -833,7 +1216,7 @@ describe("useAdvanceDmWatermark", () => {
         (c) => (c[1] as { method?: string })?.method === "PUT",
       )
       expect(put).toBeDefined()
-      expect(put![0] as string).toBe("/api/community/dm/dm_1/read")
+      expect(put![0] as string).toBe("/api/community/channels/dm_1/read")
       expect((put![1] as RequestInit).body).toBe(
         JSON.stringify({ lastReadMessageId: "m_42" }),
       )
@@ -861,19 +1244,17 @@ describe("useAdvanceDmWatermark", () => {
       const puts = apiFetchMock.mock.calls.filter(
         (c) => (c[1] as { method?: string })?.method === "PUT",
       )
+      // DM and channel now share the canonical /channels/{id}/read URL, so the
+      // two schedules are distinguished by BODY, not path — the point is the
+      // shared debounce map (keyed `dm:x` vs the channel's own key) does NOT
+      // alias them into one PUT.
       expect(puts).toHaveLength(2)
-      const dmPut = puts.find((c) => (c[0] as string).startsWith("/api/community/dm/"))
-      const chPut = puts.find((c) =>
-        (c[0] as string).startsWith("/api/community/channels/"),
-      )
-      expect(dmPut).toBeDefined()
-      expect(chPut).toBeDefined()
-      expect((dmPut![1] as RequestInit).body).toBe(
-        JSON.stringify({ lastReadMessageId: "m_dm" }),
-      )
-      expect((chPut![1] as RequestInit).body).toBe(
-        JSON.stringify({ lastReadMessageId: "m_ch" }),
-      )
+      const bodies = puts.map((c) => (c[1] as RequestInit).body)
+      expect(bodies).toContain(JSON.stringify({ lastReadMessageId: "m_dm" }))
+      expect(bodies).toContain(JSON.stringify({ lastReadMessageId: "m_ch" }))
+      for (const c of puts) {
+        expect(c[0] as string).toBe("/api/community/channels/x/read")
+      }
     } finally {
       vi.useRealTimers()
     }
@@ -936,9 +1317,9 @@ describe("useMarkAllInboxRead", () => {
     expect(posts).toHaveLength(3)
     const paths = posts.map((c) => c[0] as string).sort()
     expect(paths).toEqual([
-      "/api/community/inbox/dms/read-all",
-      "/api/community/inbox/mentions/read-all",
-      "/api/community/inbox/unreads/read-all",
+      "/api/community/users/me/inbox/dms/read-all",
+      "/api/community/users/me/inbox/mentions/read-all",
+      "/api/community/users/me/inbox/unreads/read-all",
     ])
   })
 

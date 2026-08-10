@@ -7,8 +7,13 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 const mockResolveChannelAccessContext = vi.fn()
 const mockRemoveThreadParticipant = vi.fn()
+const mockListThreadParticipantUserIds = vi.fn()
+const mockBroadcastToUserSafe = vi.fn()
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
+vi.mock("@/lib/community/fanout", () => ({
+  broadcastToUserSafe: (...args: unknown[]) => mockBroadcastToUserSafe(...args),
+}))
 
 vi.mock("@alook/shared", async () => {
   const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
@@ -20,6 +25,7 @@ vi.mock("@alook/shared", async () => {
       },
       communityThread: {
         removeThreadParticipant: (...a: unknown[]) => mockRemoveThreadParticipant(...a),
+        listThreadParticipantUserIds: (...a: unknown[]) => mockListThreadParticipantUserIds(...a),
       },
     },
   }
@@ -63,12 +69,23 @@ describe("DELETE /channels/[id]/participants/[userId] — leave", () => {
     vi.clearAllMocks()
     mockResolveChannelAccessContext.mockResolvedValue(threadCtx())
     mockRemoveThreadParticipant.mockResolvedValue({ id: "tp1" })
+    mockListThreadParticipantUserIds.mockResolvedValue(["u2", "u3"])
   })
 
   it("viewer leaves the thread (removes own row)", async () => {
     const res = await DELETE(delReq(), { params: { id: "t1", userId: "u1" } } as any)
     expect(res.status).toBe(204)
     expect(mockRemoveThreadParticipant).toHaveBeenCalledWith(expect.anything(), "t1", "u1")
+    expect(mockBroadcastToUserSafe).toHaveBeenCalledWith("u1", {
+      type: "community:channel.member_remove",
+      serverId: "s1",
+      channelId: "t1",
+      userId: "u1",
+    })
+    expect(mockBroadcastToUserSafe).toHaveBeenCalledWith("u3", expect.objectContaining({
+      type: "community:channel.member_remove",
+      userId: "u1",
+    }))
   })
 
   it("thread creator can remove another participant", async () => {

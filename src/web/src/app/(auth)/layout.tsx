@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Sign In",
-  description: "Sign in to manage your Your Personal Company on Alook.",
+  description: "Rooms for people and agents.",
   openGraph: {
     images: [{ url: "/og?title=Sign In", width: 1200, height: 630 }],
   },
@@ -16,7 +16,9 @@ export default async function AuthLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (session) redirect("/workspaces?auto");
+  // Already signed in → community home. `/workspaces` was the retired legacy
+  // (v0) surface.
+  if (session) redirect("/c/me");
 
   return <>{children}</>;
 }

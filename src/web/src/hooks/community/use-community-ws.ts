@@ -1,60 +1,64 @@
 "use client"
 
 import { useCallback, useEffect, useRef } from "react"
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { useUserWs } from "@/lib/use-user-ws"
 import { useCommunityStore } from "@/stores/community"
 import { useCommunityWsStore } from "@/stores/community/ws"
 import { communityKeys } from "@/lib/query-keys"
 import {
-  patchCacheJoin,
-  patchCacheLeave,
-  patchCacheUpdate,
-  type MembersEnvelope,
-} from "@/hooks/community/use-server-members"
-import type { MessagesPage } from "@/hooks/community/use-messages"
+  handleMessageCreate,
+  handleMessageEdited,
+  handleMessageUpdated,
+  handlePinEvent,
+  handleReactionEvent,
+} from "@/hooks/community/community-ws/message-events"
+import {
+  handleTypingStart,
+  handleTypingStop,
+} from "@/hooks/community/community-ws/typing-events"
+import {
+  handleCategoryEvent,
+  handleChannelEvent,
+  handleChildChannelCreate,
+  handleChildChannelUpdate,
+  handleInviteCreate,
+  handleServerDelete,
+  handleServerUpdate,
+} from "@/hooks/community/community-ws/structure-tree-events"
+import {
+  handleChannelMemberEvent,
+  handleMemberJoin,
+  handleMemberLeave,
+  handleMemberUpdate,
+} from "@/hooks/community/community-ws/membership-events"
+import {
+  handleFriendEvent,
+  handleMentionCreate,
+  handleUnreadBump,
+} from "@/hooks/community/community-ws/social-events"
+import {
+  handleBotAuditEvent,
+  handleMachineCreated,
+  handleMachineRemoved,
+  handleMachineStatus,
+  handleMachineUpdated,
+  handlePresenceUpdate,
+  handleStatusUpdate,
+} from "@/hooks/community/community-ws/presence-machine-events"
+import { reconcileCommunityWsReconnect } from "@/hooks/community/community-ws/reconnect"
 import type {
-  CommunityWsEvent,
-  CommunityMessageCreate,
-  CommunityReactionAdd,
-  CommunityReactionRemove,
-  CommunityMachineSummary,
-  CommunityTypingStart,
-  CommunityPresenceUpdate,
-  CommunityChildChannelCreate,
-  CommunityChildChannelUpdate,
-  CommunityMemberJoin,
-  CommunityMemberLeave,
-  CommunityMemberUpdate,
-  CommunityChannelCreate,
-  CommunityChannelUpdate,
-  CommunityChannelDelete,
-  CommunityChannelReorder,
-  CommunityPinAdd,
-  CommunityPinRemove,
-  CommunityFriendRequest,
-  CommunityFriendAccept,
-  CommunityFriendReject,
-  CommunityFriendRemove,
-  CommunityFriendBlock,
-  CommunityServerUpdate,
-  CommunityServerDelete,
-  CommunityCategoryCreate,
-  CommunityCategoryUpdate,
-  CommunityCategoryDelete,
-  CommunityCategoryReorder,
-  CommunityMentionCreate,
-  CommunityMachineCreated,
-  CommunityMachineStatus,
-  CommunityMachineUpdated,
-  CommunityMachineRemoved,
-} from "@alook/shared"
-import { isCommunityEvent, TYPING_INDICATOR_TIMEOUT_MS, TYPING_INDICATOR_THROTTLE_MS } from "@alook/shared"
-import type { Msg, Attachment } from "@/components/community/_types"
-import { avatarInitial } from "@/lib/community/avatar"
-import type { MachinesResponse } from "@/hooks/community/use-machines"
-import type { ServersResponse, ServerDetail } from "@/hooks/community/use-servers"
-import { patchChannelUnread } from "@/hooks/community/server-detail-cache"
+  CommunityWsHandlerContext,
+  Subscription,
+  UseCommunityWsOptions,
+} from "@/hooks/community/community-ws/handler-context"
+import type { CommunityWsEvent } from "@alook/shared"
+import { isCommunityEvent, TYPING_INDICATOR_THROTTLE_MS } from "@alook/shared"
+
+export type {
+  Subscription,
+  UseCommunityWsOptions,
+} from "@/hooks/community/community-ws/handler-context"
 
 /**
  * Community WebSocket handler.
@@ -83,250 +87,8 @@ import { patchChannelUnread } from "@/hooks/community/server-detail-cache"
 // message burst.
 const INBOX_INVALIDATE_DEBOUNCE_MS = 500
 
-// Cap on the live (newest) page's message count inside `insertMessageIntoCache`.
-// Without this, a channel that stays open for a long session (or a flood of
-// WS message.create events) grows the first page — and the per-render
-// clustering pass in `message-list.tsx` — without bound. Matches
-// `SEEN_MESSAGE_MAX` (stores/community/ws.ts) for consistency; set generous
-// on purpose — tune down later if memory/render cost is still a problem.
-// Only the live-tail page is capped: pagination-loaded older pages
-// (`fetchOlder`) are left uncapped since they only grow from explicit user
-// "load more" clicks, not an attacker-controlled vector.
-const MAX_LIVE_PAGE_MESSAGES = 500
-
-// ── Types (kept for backwards compat with any lingering imports) ─────────
-
-export type Subscription = {
-  // The focused regular channel/thread.
-  channelId?: string
-  // The focused DM's channel id. A DM is a channel now; this slot keeps its
-  // name only to mark "the focused channel is a DM" so the handler routes its
-  // events into the `dmMessages` cache and the `dm:` typing scope.
-  dmConversationId?: string
-}
-
-/**
- * DEPRECATED callback shape retained until the God-context (`contexts/
- * community/context.tsx`) is deleted in Step 4. The primary integration path
- * now writes state directly into the query cache and Zustand stores; callers
- * subscribe via `useQuery` and receive updates through those channels.
- *
- * Passing callbacks still fires them (in addition to the cache patches) so
- * legacy consumers don't observe silent regressions during the migration.
- */
-export type CommunityWsCallbacks = {
-  onMessage?: (event: CommunityMessageCreate) => void
-  onAnyMessage?: (event: CommunityMessageCreate) => void
-  onReaction?: (event: CommunityReactionAdd | CommunityReactionRemove) => void
-  onTyping?: (event: CommunityTypingStart) => void
-  onPresence?: (event: CommunityPresenceUpdate) => void
-  onChildChannel?: (event: CommunityChildChannelCreate | CommunityChildChannelUpdate) => void
-  onMember?: (event: CommunityMemberJoin | CommunityMemberLeave | CommunityMemberUpdate) => void
-  onChannel?: (event: CommunityChannelCreate | CommunityChannelUpdate | CommunityChannelDelete | CommunityChannelReorder) => void
-  onPin?: (event: CommunityPinAdd | CommunityPinRemove) => void
-  onFriend?: (event: CommunityFriendRequest | CommunityFriendAccept | CommunityFriendReject | CommunityFriendRemove | CommunityFriendBlock) => void
-  onServer?: (event: CommunityServerUpdate | CommunityServerDelete) => void
-  onCategory?: (event: CommunityCategoryCreate | CommunityCategoryUpdate | CommunityCategoryDelete | CommunityCategoryReorder) => void
-  onMention?: (event: CommunityMentionCreate) => void
-  onMachine?: (event: CommunityMachineCreated | CommunityMachineStatus | CommunityMachineUpdated | CommunityMachineRemoved) => void
-}
-
-// ── Cache patch helpers ───────────────────────────────────────────────────
-
-type PageCache = InfiniteData<MessagesPage>
-
-/**
- * Insert a WS-delivered message onto the first (newest) page of the channel
- * or DM stream — the same slot `useSendMessage` writes optimistic rows into,
- * so the two paths converge. Deduplicates by id.
- */
-export function insertMessageIntoCache(
-  cache: PageCache | undefined,
-  msg: CommunityMessageCreate["message"],
-): PageCache | undefined {
-  if (!cache) return cache
-  if (cache.pages.length === 0) return cache
-  const first = cache.pages[0]
-  if (first.messages.some((m) => m.id === msg.id)) return cache
-  const attachments: Attachment[] | undefined = msg.attachments?.map((a) => {
-    const isImage = a.contentType?.startsWith("image/")
-    return isImage
-      ? { kind: "image", name: a.filename, url: a.url, width: a.width ?? undefined, height: a.height ?? undefined }
-      : {
-        kind: "file",
-        name: a.filename,
-        url: a.url,
-        size: a.size ? `${Math.round(a.size / 1024)} KB` : "",
-      }
-  })
-  const isSystem = "type" in msg && (msg as { type?: string }).type === "system"
-  const systemKind = "systemKind" in msg ? (msg as { systemKind?: "thread" }).systemKind : undefined
-  const authorName = "authorName" in msg ? msg.authorName : "Unknown"
-  const authorAvatar = "authorAvatar" in msg ? msg.authorAvatar : undefined
-  const authorId = "authorId" in msg ? msg.authorId : undefined
-  const replyTo = "replyTo" in msg ? (msg.replyTo as Msg["replyTo"]) : undefined
-  const approval = "approval" in msg ? (msg.approval as Msg["approval"]) : undefined
-  const rendered: Msg = {
-    id: msg.id,
-    authorName,
-    authorAvatar: authorAvatar || avatarInitial(authorName ?? ""),
-    content: msg.content,
-    createdAt: msg.createdAt,
-    ...(approval ? { approval } : {}),
-    // Non-system branch is explicit ("chat", not omitted) — `Msg.type` is a
-    // required, exhaustive discriminator (#12); a DM message (the other
-    // union member here) never carries `type` at all, and also renders as
-    // an ordinary chat row, so it gets the same explicit fallback.
-    ...(isSystem ? { type: "system" as const, ...(systemKind ? { systemKind } : {}) } : { type: "chat" as const }),
-    ...(replyTo ? { replyTo } : {}),
-    ...(attachments?.length ? { attachments } : {}),
-    // #3: preserve authorId so `useChannelWatermark` can skip self-authored
-    // messages when advancing the read pointer (avoids a redundant PUT — the
-    // server-side write path already sets the sender's `lastReadMessageId`
-    // on send, see #1).
-    ...(authorId ? { authorId } : {}),
-  }
-  const merged = [...first.messages, rendered]
-  // Drop from the head (oldest end of this page) once the live tail grows
-  // past the cap — keeps the newest messages, sheds the oldest.
-  const trimmed = merged.length > MAX_LIVE_PAGE_MESSAGES
-  const messages = trimmed
-    ? merged.slice(merged.length - MAX_LIVE_PAGE_MESSAGES)
-    : merged
-  // When we drop rows off the head of the live page we've forgotten history
-  // that the server still has. Flip both the anchor-mode and the legacy
-  // `hasMore` flags to `true` so the older-pagination affordance re-arms —
-  // otherwise `hasMoreOlder ?? hasMore ?? false` collapses to `false` for
-  // the trimmed page and the UI stops offering "Load more" even though
-  // there's still history to fetch. Only touch the flags that already
-  // existed on the page so we don't accidentally invent an anchor-mode
-  // envelope on a legacy newest cache (or vice versa).
-  const nextFirst = trimmed
-    ? {
-      ...first,
-      messages,
-      ...(first.hasMoreOlder !== undefined ? { hasMoreOlder: true } : {}),
-      ...(first.hasMore !== undefined ? { hasMore: true } : {}),
-    }
-    : { ...first, messages }
-  return {
-    ...cache,
-    pages: [nextFirst, ...cache.pages.slice(1)],
-  }
-}
-
-/**
- * Patch every cached message authored by `userId` to the renamed
- * `authorName` — `authorName` is a snapshot field written at send time
- * (`communityMessage` doesn't store it; the live JOIN is `message.ts`'s
- * `authorName: user.name`), so nothing else updates already-loaded message
- * rows after a self-rename. Only touches rows that are actually cached in
- * this client (open/previously-open channels & DMs) — a channel never
- * loaded this session picks up the new name for free on its first real
- * fetch, since that IS the live JOIN.
- */
-function patchAuthorNameInCache(cache: PageCache | undefined, userId: string, newName: string): PageCache | undefined {
-  if (!cache) return cache
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    if (!p.messages.some((m) => m.authorId === userId)) return p
-    touched = true
-    return {
-      ...p,
-      messages: p.messages.map((m) => (m.authorId === userId ? { ...m, authorName: newName } : m)),
-    }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
-}
-
-/**
- * Patch the `approval` payload of a single cached message — the client-side
- * effect of a `MESSAGE_UPDATED` event. The card re-renders in its new
- * state (approved/denied/superseded/waiting) without a refetch.
- */
-function patchApprovalInCache(
-  cache: PageCache | undefined,
-  messageId: string,
-  approval: Msg["approval"],
-): PageCache | undefined {
-  if (!cache) return cache
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    if (!p.messages.some((m) => m.id === messageId)) return p
-    touched = true
-    return {
-      ...p,
-      messages: p.messages.map((m) => (m.id === messageId ? { ...m, approval } : m)),
-    }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
-}
-
-function applyReactionToCache(
-  cache: PageCache | undefined,
-  event: CommunityReactionAdd | CommunityReactionRemove,
-  viewerUserId: string | null,
-): PageCache | undefined {
-  if (!cache) return cache
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    if (!p.messages.some((m) => m.id === event.messageId)) return p
-    touched = true
-    return {
-      ...p,
-      messages: p.messages.map((m) => {
-        if (m.id !== event.messageId) return m
-        const reactions = (m.reactions ?? []).map((r) => ({ ...r, userIds: [...(r.userIds ?? [])] }))
-        if (event.type === "community:reaction.add") {
-          const existing = reactions.find((r) => r.emoji === event.emoji)
-          if (existing) {
-            if (!existing.userIds.includes(event.userId)) {
-              existing.userIds.push(event.userId)
-              existing.count = existing.userIds.length
-            }
-            if (viewerUserId && event.userId === viewerUserId) existing.me = true
-          } else {
-            reactions.push({
-              emoji: event.emoji,
-              count: 1,
-              me: !!viewerUserId && event.userId === viewerUserId,
-              userIds: [event.userId],
-            })
-          }
-        } else {
-          const idx = reactions.findIndex((r) => r.emoji === event.emoji)
-          if (idx !== -1) {
-            reactions[idx].userIds = reactions[idx].userIds.filter((id) => id !== event.userId)
-            reactions[idx].count = reactions[idx].userIds.length
-            if (viewerUserId && event.userId === viewerUserId) reactions[idx].me = false
-            if (reactions[idx].count <= 0) reactions.splice(idx, 1)
-          }
-        }
-        return { ...m, reactions }
-      }),
-    }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
-}
-
 // ── Public hook ────────────────────────────────────────────────────────────
 
-/**
- * Optional args — the community feature needs to know the viewer's userId so
- * reactions from that user light up the "me" flag. Passing null keeps the
- * hook usable in places where the viewer identity isn't yet loaded.
- */
-export type UseCommunityWsOptions = CommunityWsCallbacks & {
-  viewerUserId?: string | null
-}
-
-// Overload for the new call-site: `useCommunityWs()` with no args — the hook
-// runs cache reconciliation and returns `{ subscribe, unsubscribe, sendTyping }`.
-// The legacy signature `useCommunityWs({ onMessage, ... })` still works during
-// the God-context migration; callbacks fire in addition to cache patches.
 // Module-level slot for the currently-active WS `send`. The root-mounted
 // `useCommunityWs` writes into this on connect so free helpers below can
 // dispatch typing events without needing to re-mount the hook (which would
@@ -382,13 +144,11 @@ export function communityWsResetTypingThrottle(target: { channelId: string }) {
   useCommunityStore.getState().lastTypingSent.delete(key)
 }
 
-export function useCommunityWs(options?: UseCommunityWsOptions) {
+export function useCommunityWs(options?: UseCommunityWsOptions): void {
   const queryClient = useQueryClient()
   const viewerUserIdRef = useRef<string | null>(options?.viewerUserId ?? null)
-  const callbacksRef = useRef<CommunityWsCallbacks>(options ?? {})
   useEffect(() => {
     viewerUserIdRef.current = options?.viewerUserId ?? null
-    callbacksRef.current = options ?? {}
   })
 
   // #3: the previous WS-driven auto-mark-read (a `useMarkChannelRead()` call
@@ -421,9 +181,9 @@ export function useCommunityWs(options?: UseCommunityWsOptions) {
     (msg: { type: string;[key: string]: unknown }) => {
       if (!isCommunityEvent(msg)) return
       const event = msg as CommunityWsEvent
-      const sub = useCommunityStore.getState().subscription
+      const communityStore = useCommunityStore.getState()
+      const sub = communityStore.subscription
       const wsStore = useCommunityWsStore.getState()
-      const cbs = callbacksRef.current
       // A DM is a channel now — every message/typing/reaction event carries a
       // single `channelId`. The subscription still tracks two slots so the
       // handler can route a DM channel's events into the `dmMessages` cache vs
@@ -434,701 +194,104 @@ export function useCommunityWs(options?: UseCommunityWsOptions) {
         if (!e.channelId) return false
         return e.channelId === sub.channelId || e.channelId === sub.dmConversationId
       }
+      const context: CommunityWsHandlerContext = {
+        queryClient,
+        communityStore,
+        wsStore,
+        sub,
+        viewerUserIdRef,
+        matchesFocus,
+        scheduleInboxInvalidate,
+      }
 
       switch (event.type) {
-        // ── Message create ──────────────────────────────────────────────
-        case "community:message.create": {
-          if (wsStore.hasSeenMessage(event.message.id)) return
-          wsStore.markSeenMessage(event.message.id)
-          // Sending a message is an implicit typing.stop for its author —
-          // clear once we know this is a fresh message. Clearing before dedup
-          // would also clear on WS-reconnect replays of stale messages,
-          // briefly wiping a still-active heartbeat pill. Derive the scope
-          // from whether this channelId is the focused DM channel (`dm:`) or a
-          // regular channel (`ch:`) so the pill clears in the right bucket.
-          clearTypingIndicator(typingScopeKey(event, sub), event.message.authorId)
-
-          // 1) Patch the focused channel/dm page cache if the event matches.
-          //    A DM is a channel, distinguished only by which subscription slot
-          //    its channelId lands in.
-          if (event.channelId === sub.dmConversationId) {
-            queryClient.setQueryData<PageCache>(
-              communityKeys.dmMessages(event.channelId),
-              (c) => insertMessageIntoCache(c, event.message),
-            )
-          } else if (event.channelId === sub.channelId) {
-            queryClient.setQueryData<PageCache>(
-              communityKeys.channelMessages(event.channelId),
-              (c) => insertMessageIntoCache(c, event.message),
-            )
-            // A thread/forum_post enrolls its sender + mentioned users as
-            // participants server-side on send. That set IS its Members panel,
-            // so refetch it live — otherwise a new speaker/mention only appears
-            // after a manual refresh. No-op for a plain channel (whose panel is
-            // the access roster, not participants); the query is disabled there.
-            void queryClient.invalidateQueries({
-              queryKey: communityKeys.threadParticipants(event.channelId),
-            })
-          }
-
-          // 2) Every message.create — regardless of focus — schedules a
-          //    debounced inbox invalidation. Skip messages authored by the
-          //    viewer since they never affect their own unreads.
-          const viewerId = viewerUserIdRef.current
-          if (event.message.authorId !== viewerId) {
-            scheduleInboxInvalidate()
-          }
-
-          // 3) Live channel-sidebar unread dot is NO LONGER flipped here.
-          //    Unread is per-recipient and mute-gated on the server now, so it
-          //    rides the dedicated `community:unread.bump` event (below) — a
-          //    muted (`nothing`/unmentioned-`mentions`) channel must NOT light
-          //    an unread dot even though its `message.create` still arrives
-          //    (mute ≠ blindness: content syncs, the badge does not).
-
-          // Note: no auto-mark-read here. See #3 — the
-          // IntersectionObserver in `useChannelWatermark` advances the
-          // read pointer when a message actually becomes visible in the
-          // viewport. If the user is scrolled up reading history, their
-          // pointer must stay put; the WS handler cannot know whether the
-          // incoming message is on screen.
-
-          // Legacy callback fanout — cache patches above are authoritative.
-          cbs.onAnyMessage?.(event)
-          if (matchesFocus(event)) cbs.onMessage?.(event)
-          return
-        }
-
-        // ── Per-user unread/badge signal ─────────────────────────────────
-        // Mute-gated on the server (only recipients whose effective level
-        // delivers get this), so the sidebar unread dot flips ONLY here — a
-        // muted channel's `message.create` no longer lights it. Skip the
-        // currently-subscribed channel (dot suppressed there anyway) and never
-        // for the viewer's own sends (the server excludes the author, but guard
-        // defensively).
-        case "community:unread.bump": {
-          const viewerId = viewerUserIdRef.current
-          // The sidebar row to light: a thread/forum-post message has no
-          // independent tree row, so its dot lights the PARENT channel
-          // (`railChannelId`); a plain channel is its own row. Fall back to
-          // `channelId` for older frames that predate `railChannelId`.
-          const railChannelId = event.railChannelId ?? event.channelId
-          // Suppress the dot for the channel the viewer is actually looking at
-          // (its unread clears on read anyway) — compare against the ROW being
-          // lit, so a thread bump whose parent is open still suppresses.
-          if (event.userId === viewerId && railChannelId !== sub.channelId) {
-            // Channel-tree dot: patch the RIGHT server's detail. `serverId`
-            // (inbox-dot-ws-driven) lets an other-server message light its dot
-            // — previously only the open server was patched, so cross-server
-            // bumps never lit. Absent serverId (DM bump / older frame) → fall
-            // back to the currently-open server (backward-compatible).
-            const targetServerId =
-              event.serverId ?? useCommunityStore.getState().currentServerId
-            if (targetServerId) {
-              queryClient.setQueryData<ServerDetail | undefined>(
-                communityKeys.server(targetServerId),
-                (cache) => patchChannelUnread(cache, railChannelId, true),
-              )
-            }
-            // Rail mention badge: the rail row carries only a `mentions` count
-            // (no separate unread dot — plain unread lives on the tree dot
-            // above). So bump the rail badge ONLY for a mention, on the right
-            // server row. Needs `serverId`; a DM/older frame without it can't
-            // locate a rail row, so skip (the tree dot / inbox still reflect it).
-            if (event.isMention && event.serverId) {
-              const bumpServerId = event.serverId
-              queryClient.setQueryData<ServersResponse | undefined>(
-                communityKeys.servers(),
-                (prev) =>
-                  prev
-                    ? {
-                      ...prev,
-                      servers: prev.servers.map((s) =>
-                        s.id === bumpServerId
-                          ? { ...s, mentions: s.mentions + 1 }
-                          : s,
-                      ),
-                    }
-                    : prev,
-              )
-            }
-          }
-          return
-        }
-
-        // ── Reactions ───────────────────────────────────────────────────
+        case "community:message.create":
+          return handleMessageCreate(event, context)
+        case "community:unread.bump":
+          return handleUnreadBump(event, context)
         case "community:reaction.add":
-        case "community:reaction.remove": {
-          const viewerId = viewerUserIdRef.current
-          // A reaction event carries only `channelId` with no channel-vs-DM
-          // discriminator. A regular channel's cache lives under
-          // `channelMessages(id)`, a DM channel's under `dmMessages(id)` — patch
-          // both keys; the one that doesn't exist receives `undefined` and the
-          // updater returns it, a harmless no-op.
-          queryClient.setQueryData<PageCache>(
-            communityKeys.channelMessages(event.channelId),
-            (c) => applyReactionToCache(c, event, viewerId),
-          )
-          queryClient.setQueryData<PageCache>(
-            communityKeys.dmMessages(event.channelId),
-            (c) => applyReactionToCache(c, event, viewerId),
-          )
-          if (matchesFocus(event)) cbs.onReaction?.(event)
-          return
-        }
-
-        // ── Pins ────────────────────────────────────────────────────────
+        case "community:reaction.remove":
+          return handleReactionEvent(event, context)
         case "community:pin.add":
-        case "community:pin.remove": {
-          void queryClient.invalidateQueries({ queryKey: communityKeys.pins(event.channelId) })
-          if (matchesFocus(event)) cbs.onPin?.(event)
-          return
-        }
-
-        // ── Typing (channel / thread / DM — all keyed by channelId) ──────
-        case "community:typing.start": {
-          const userId = event.userId
-          const viewerId = viewerUserIdRef.current
-          if (viewerId && userId === viewerId) return
-          // Focus check: only surface typing for the currently-viewed target.
-          if (!matchesFocus(event)) return
-          applyTypingIndicator(typingScopeKey(event, sub), userId, event.name ?? null)
-          cbs.onTyping?.(event)
-          return
-        }
-
-        // ── Typing stop — explicit clear (bot turn-end path) ────────────
-        // Symmetric with typing.start: only clear when focused on the same
-        // target so a stop for a different DM doesn't wipe the local pill.
-        case "community:typing.stop": {
-          const userId = event.userId
-          const viewerId = viewerUserIdRef.current
-          if (viewerId && userId === viewerId) return
-          if (!matchesFocus(event)) return
-          clearTypingIndicator(typingScopeKey(event, sub), userId)
-          return
-        }
-
-        // ── Child channels (threads + forum posts) ──────────────────────
+        case "community:pin.remove":
+          return handlePinEvent(event, context)
+        case "community:typing.start":
+          return handleTypingStart(event, context)
+        case "community:typing.stop":
+          return handleTypingStop(event, context)
         case "community:channel.child_create":
-        case "community:channel.child_update": {
-          // Cheap invalidate for the thread + forum-post lists. The parent
-          // messages list also needs an update because the parent message's
-          // thread indicator (`msg.thread`) changes — do a targeted
-          // setQueryData patch when we know parentMessageId.
-          void queryClient.invalidateQueries({
-            queryKey: communityKeys.threads(event.parentChannelId),
-          })
-          void queryClient.invalidateQueries({
-            queryKey: communityKeys.forumPosts(event.parentChannelId),
-          })
-          if (event.type === "community:channel.child_create") {
-            if (event.parentMessageId) {
-              queryClient.setQueryData<PageCache>(
-                communityKeys.channelMessages(event.parentChannelId),
-                (cache) => {
-                  if (!cache) return cache
-                  let touched = false
-                  const pages = cache.pages.map((p) => {
-                    if (!p.messages.some((m) => m.id === event.parentMessageId)) return p
-                    touched = true
-                    return {
-                      ...p,
-                      messages: p.messages.map((m) =>
-                        m.id === event.parentMessageId
-                          ? {
-                            ...m,
-                            thread: {
-                              id: event.channel.id,
-                              name: event.channel.name,
-                              // #4: a freshly-created child channel has no
-                              // messages yet — `1` was a false claim that
-                              // the create event carried the first message
-                              // (it doesn't; the message arrives separately).
-                              messageCount: 0,
-                            },
-                          }
-                          : m,
-                      ),
-                    }
-                  })
-                  if (!touched) return cache
-                  return { ...cache, pages }
-                },
-              )
-            }
-          } else {
-            // child_update — sync counts/name on the parent message's thread
-            // indicator if the update carries them.
-            const changes = event.changes
-            if (changes.messageCount !== undefined || changes.name !== undefined) {
-              queryClient.setQueryData<PageCache>(
-                communityKeys.channelMessages(event.parentChannelId),
-                (cache) => {
-                  if (!cache) return cache
-                  let touched = false
-                  const pages = cache.pages.map((p) => {
-                    if (!p.messages.some((m) => m.thread?.id === event.channelId)) return p
-                    touched = true
-                    return {
-                      ...p,
-                      messages: p.messages.map((m) =>
-                        m.thread?.id === event.channelId
-                          ? {
-                            ...m,
-                            thread: {
-                              ...m.thread,
-                              ...(changes.name !== undefined ? { name: changes.name } : {}),
-                              ...(changes.messageCount !== undefined
-                                ? { messageCount: changes.messageCount }
-                                : {}),
-                            },
-                          }
-                          : m,
-                      ),
-                    }
-                  })
-                  if (!touched) return cache
-                  return { ...cache, pages }
-                },
-              )
-            }
-          }
-          cbs.onChildChannel?.(event)
-          return
-        }
-
-        // ── Server ──────────────────────────────────────────────────────
+          return handleChildChannelCreate(event, context)
+        case "community:channel.child_update":
+          return handleChildChannelUpdate(event, context)
         case "community:server.update":
-        case "community:server.delete": {
-          if (event.type === "community:server.update") {
-            queryClient.setQueryData<ServerDetail | undefined>(
-              communityKeys.server(event.serverId),
-              (prev) =>
-                prev
-                  ? {
-                    ...prev,
-                    name: event.changes.name ?? prev.name,
-                    description: event.changes.description ?? prev.description,
-                    // #8: icon can be explicitly cleared (null). `??` treats
-                    // null the same as undefined, which would keep the old
-                    // icon after a removal — check `undefined` explicitly.
-                    icon:
-                      event.changes.icon !== undefined
-                        ? event.changes.icon
-                        : prev.icon,
-                  }
-                  : prev,
-            )
-            queryClient.setQueryData<ServersResponse | undefined>(
-              communityKeys.servers(),
-              (prev) =>
-                prev
-                  ? {
-                    ...prev,
-                    servers: prev.servers.map((s) =>
-                      s.id === event.serverId
-                        ? {
-                          ...s,
-                          ...(event.changes.name ? { name: event.changes.name, initial: avatarInitial(event.changes.name) } : {}),
-                          ...(event.changes.icon !== undefined ? { icon: event.changes.icon ?? null } : {}),
-                        }
-                        : s,
-                    ),
-                  }
-                  : prev,
-            )
-          } else {
-            // Refresh the rail LIST only (drop the deleted server). `exact`
-            // so this doesn't cascade-refetch every other server's nested
-            // detail subtree; the deleted server's own subtree is cleared by
-            // the removeQueries below.
-            void queryClient.invalidateQueries({ queryKey: communityKeys.servers(), exact: true })
-            queryClient.removeQueries({ queryKey: communityKeys.server(event.serverId) })
-            // #10: if the deleted server is the one the viewer is looking at,
-            // the store pointers now dangle — reset them so the UI drops back
-            // to a safe default instead of rendering a ghost server/channel.
-            const store = useCommunityStore.getState()
-            if (store.currentServerId === event.serverId) {
-              store.setCurrentServerId(null)
-              store.setCurrentChannelId(null)
-            }
-          }
-          cbs.onServer?.(event)
-          return
-        }
-
-        // ── Channels / categories → refetch the server detail ───────────
+          return handleServerUpdate(event, context)
+        case "community:server.delete":
+          return handleServerDelete(event, context)
         case "community:channel.create":
         case "community:channel.update":
         case "community:channel.delete":
         case "community:channel.reorder":
+          return handleChannelEvent(event, context)
         case "community:category.create":
         case "community:category.update":
         case "community:category.delete":
-        case "community:category.reorder": {
-          // #3: on channel.delete, evict every channel-scoped cache before
-          // invalidating the server. Without this the messages/pins/threads/
-          // forum-posts caches for the dead channel linger forever — a
-          // subsequent same-id revive (rare, but the server can reuse ids)
-          // would surface stale rows.
-          if (event.type === "community:channel.delete") {
-            queryClient.removeQueries({
-              queryKey: communityKeys.channelMessages(event.channelId),
-            })
-            queryClient.removeQueries({
-              queryKey: communityKeys.pins(event.channelId),
-            })
-            queryClient.removeQueries({
-              queryKey: communityKeys.threads(event.channelId),
-            })
-            queryClient.removeQueries({
-              queryKey: communityKeys.forumPosts(event.channelId),
-            })
-            // When a child (forum_post / thread) is deleted, refresh the
-            // PARENT's list so the deleted card disappears from the feed on
-            // every client. Absent on older events / top-level channels.
-            if (event.parentChannelId) {
-              void queryClient.invalidateQueries({
-                queryKey: communityKeys.forumPosts(event.parentChannelId),
-              })
-              void queryClient.invalidateQueries({
-                queryKey: communityKeys.threads(event.parentChannelId),
-              })
-            }
-          }
-          if ("serverId" in event) {
-            void queryClient.invalidateQueries({ queryKey: communityKeys.server(event.serverId) })
-          }
-          if (event.type.startsWith("community:channel.")) {
-            cbs.onChannel?.(event as CommunityChannelCreate | CommunityChannelUpdate | CommunityChannelDelete | CommunityChannelReorder)
-          } else {
-            cbs.onCategory?.(event as CommunityCategoryCreate | CommunityCategoryUpdate | CommunityCategoryDelete | CommunityCategoryReorder)
-          }
-          return
-        }
-
-        // ── Channel membership (private channels) ────────────────────────
-        // Re-run the viewer-scoped server tree so the sidebar gains/loses the
-        // private channel. On REMOVE for the viewer, evict that channel's
-        // scoped caches so no private content lingers locally (mirrors the
-        // channel.delete eviction above).
+        case "community:category.reorder":
+          return handleCategoryEvent(event, context)
         case "community:channel.member_add":
-        case "community:channel.member_remove": {
-          if (
-            event.type === "community:channel.member_remove" &&
-            event.userId === viewerUserIdRef.current
-          ) {
-            queryClient.removeQueries({ queryKey: communityKeys.channelMessages(event.channelId) })
-            queryClient.removeQueries({ queryKey: communityKeys.pins(event.channelId) })
-            queryClient.removeQueries({ queryKey: communityKeys.threads(event.channelId) })
-            queryClient.removeQueries({ queryKey: communityKeys.forumPosts(event.channelId) })
-          }
-          void queryClient.invalidateQueries({ queryKey: communityKeys.server(event.serverId) })
-          // Refetch the channel roster so an open private-channel Members drawer
-          // (and the manage-members dialog) reflect the add/remove live.
-          void queryClient.invalidateQueries({ queryKey: communityKeys.channelMembers(event.channelId) })
-          // The addable-members candidate pool is the complement of the roster —
-          // a peer's add/remove changes it too, so an open add dialog doesn't
-          // offer a just-added member (whose Add would 400) or hide a removed one.
-          void queryClient.invalidateQueries({ queryKey: communityKeys.channelAddableMembers(event.channelId) })
-          // A forum_post's "Add participant" emits this same MEMBER_ADD event —
-          // its Members panel is the participant set, so refetch it too. No-op
-          // for a plain channel (participants query disabled there).
-          void queryClient.invalidateQueries({ queryKey: communityKeys.threadParticipants(event.channelId) })
-          return
-        }
-
-        // ── Members ─────────────────────────────────────────────────────
+        case "community:channel.member_remove":
+          return handleChannelMemberEvent(event, context)
         case "community:member.join":
+          return handleMemberJoin(event, context)
         case "community:member.leave":
-        case "community:member.update": {
-          const key = communityKeys.members(event.serverId)
-          if (event.type === "community:member.join") {
-            queryClient.setQueryData<InfiniteData<MembersEnvelope> | undefined>(
-              key,
-              (cache) => patchCacheJoin(cache, event),
-            )
-          } else if (event.type === "community:member.leave") {
-            queryClient.setQueryData<InfiniteData<MembersEnvelope> | undefined>(
-              key,
-              (cache) => patchCacheLeave(cache, event),
-            )
-            // If the leaver is the viewer (kick from another tab / owner
-            // cascade), the viewer's server rail is stale — invalidate it
-            // so the layout's eject effect can detect the drop and route
-            // the user away from the now-forbidden URL.
-            if (event.userId === viewerUserIdRef.current) {
-              // Rail LIST only (the layout's eject effect reads it to route the
-              // kicked viewer away). `exact` so a kick doesn't cascade-refetch
-              // every server's nested detail subtree.
-              void queryClient.invalidateQueries({ queryKey: communityKeys.servers(), exact: true })
-            }
-          } else {
-            queryClient.setQueryData<InfiniteData<MembersEnvelope> | undefined>(
-              key,
-              (cache) => patchCacheUpdate(cache, event),
-            )
-            // A self-rename carries `userId` + `changes.nickname` — patch
-            // every cached message list's `authorName` snapshot for that
-            // author. A role-only change has no `userId`/`nickname`, so
-            // this is a no-op for that case.
-            if (event.userId && event.changes.nickname) {
-              const userId = event.userId
-              const newName = event.changes.nickname
-              for (const cacheEntry of queryClient.getQueryCache().findAll({
-                predicate: (q) =>
-                  q.queryKey[0] === "community"
-                  && (q.queryKey[1] === "channel" || q.queryKey[1] === "dm")
-                  && q.queryKey[3] === "messages",
-              })) {
-                queryClient.setQueryData<PageCache | undefined>(
-                  cacheEntry.queryKey,
-                  (cache) => patchAuthorNameInCache(cache, userId, newName),
-                )
-              }
-            }
-          }
-          // Membership just changed → the invite dialog's "friends who aren't
-          // in this server" list is stale. Cheap invalidation because the
-          // query is disabled unless the dialog is actually open.
-          if (event.type !== "community:member.update") {
-            void queryClient.invalidateQueries({
-              queryKey: communityKeys.invitableFriends(event.serverId),
-            })
-          }
-          cbs.onMember?.(event)
-          return
-        }
-
-        // ── Friends ─────────────────────────────────────────────────────
+          return handleMemberLeave(event, context)
+        case "community:member.update":
+          return handleMemberUpdate(event, context)
+        case "community:invite.create":
+          return handleInviteCreate(event, context)
         case "community:friend.request":
         case "community:friend.accept":
         case "community:friend.reject":
         case "community:friend.remove":
-        case "community:friend.block": {
-          void queryClient.invalidateQueries({ queryKey: communityKeys.friends() })
-          cbs.onFriend?.(event)
-          return
-        }
-
-        // ── Message updated (friend-approval card state change) ──────────
-        // Folded from the old `dm.message_updated` — keyed by `channelId` (the
-        // DM's channel id). Patch the card's approval payload in the focused
-        // DM cache so it re-renders in its new state without a refetch.
-        case "community:message.updated": {
-          if (event.channelId === sub.dmConversationId || event.channelId === sub.channelId) {
-            queryClient.setQueryData<PageCache>(
-              communityKeys.dmMessages(event.channelId),
-              (c) => patchApprovalInCache(c, event.messageId, event.approval),
-            )
-            queryClient.setQueryData<PageCache>(
-              communityKeys.channelMessages(event.channelId),
-              (c) => patchApprovalInCache(c, event.messageId, event.approval),
-            )
-          }
-          // When a card resolves (accepted/denied/superseded), the friend graph
-          // changed — invalidate friends + pending so the owner's lists reflect
-          // it. This is the owner's only signal in the J2 tail (Alice's accept
-          // dead-letters FRIEND_ACCEPT to the bot).
-          if (event.approval.status !== "pending" || event.approval.waitingOn !== "you") {
-            void queryClient.invalidateQueries({ queryKey: communityKeys.friends() })
-          }
-          return
-        }
-
-        // ── Presence — no cache; write to WS store ──────────────────────
-        case "community:presence.update": {
-          useCommunityWsStore.getState().setPresence(event.userId, event.online)
-          cbs.onPresence?.(event)
-          return
-        }
-
-        // ── Status — no cache; write to WS store (same overlay pattern as
-        // presence above, see plans/profile-card.md) ────────────────────
-        case "community:status.update": {
-          useCommunityWsStore.getState().setUserStatus(event.userId, event.statusEmoji, event.statusText)
-          return
-        }
-
-        // ── Bot audit event — push into the bounded ring; the audit-log
-        // hook filters + prepends into its React Query cache. ────────────
-        case "community:bot.audit_event": {
-          useCommunityWsStore.getState().pushBotAuditEvent({
-            id: event.id,
-            botId: event.botId,
-            kind: event.kind,
-            payload: event.payload,
-            sessionId: event.sessionId ?? null,
-            launchId: event.launchId ?? null,
-            createdAt: event.createdAt,
-          })
-          return
-        }
-
-        // ── Mentions ────────────────────────────────────────────────────
-        case "community:mention.create": {
-          void queryClient.invalidateQueries({ queryKey: communityKeys.inbox() })
-          // The server rail badge counts unread mentions per server; refresh
-          // it on every new mention. `exact: true` is essential: the mention
-          // count lives in the `servers()` LIST query, but members/presence/
-          // invites/audit-log/server(id) are all nested UNDER `servers()` in
-          // the key hierarchy — a non-exact invalidate prefix-matches and
-          // force-refetches that whole subtree (and invalidate overrides the
-          // staleTime: Infinity those carry). With an active bot in the server,
-          // every mention.create would otherwise storm-refetch all of them.
-          void queryClient.invalidateQueries({ queryKey: communityKeys.servers(), exact: true })
-          cbs.onMention?.(event)
-          return
-        }
-
-        // ── Machines ────────────────────────────────────────────────────
-        case "community:machine.created": {
-          queryClient.setQueryData<MachinesResponse | undefined>(
-            communityKeys.machines(),
-            (prev) => {
-              if (!prev) return { machines: [event.machine] }
-              const idx = prev.machines.findIndex((m) => m.id === event.machine.id)
-              if (idx === -1) return { ...prev, machines: [event.machine, ...prev.machines] }
-              const next = prev.machines.slice()
-              next[idx] = event.machine
-              return { ...prev, machines: next }
-            },
-          )
-          useCommunityStore.getState().setPendingMachineTokenId(event.tokenId)
-          cbs.onMachine?.(event)
-          return
-        }
-        case "community:machine.status": {
-          queryClient.setQueryData<MachinesResponse | undefined>(
-            communityKeys.machines(),
-            (prev) =>
-              prev
-                ? {
-                  ...prev,
-                  machines: prev.machines.map((m) =>
-                    m.id === event.machineId
-                      ? { ...m, lastSeenAt: event.lastSeenAt, status: event.status }
-                      : m,
-                  ),
-                }
-                : prev,
-          )
-          cbs.onMachine?.(event)
-          return
-        }
-        case "community:machine.updated": {
-          queryClient.setQueryData<MachinesResponse | undefined>(
-            communityKeys.machines(),
-            (prev) => {
-              if (!prev) return { machines: [event.machine] }
-              const idx = prev.machines.findIndex((m) => m.id === event.machine.id)
-              if (idx === -1) return { ...prev, machines: [event.machine, ...prev.machines] }
-              const next: CommunityMachineSummary[] = prev.machines.slice()
-              next[idx] = event.machine
-              return { ...prev, machines: next }
-            },
-          )
-          cbs.onMachine?.(event)
-          return
-        }
-        case "community:machine.removed": {
-          queryClient.setQueryData<MachinesResponse | undefined>(
-            communityKeys.machines(),
-            (prev) =>
-              prev ? { ...prev, machines: prev.machines.filter((m) => m.id !== event.machineId) } : prev,
-          )
-          cbs.onMachine?.(event)
-          return
+        case "community:friend.block":
+          return handleFriendEvent(event, context)
+        case "community:message.updated":
+          return handleMessageUpdated(event, context)
+        case "community:message.edited":
+          return handleMessageEdited(event, context)
+        case "community:presence.update":
+          return handlePresenceUpdate(event)
+        case "community:status.update":
+          return handleStatusUpdate(event)
+        case "community:bot.audit_event":
+          return handleBotAuditEvent(event)
+        case "community:mention.create":
+          return handleMentionCreate(event, context)
+        case "community:machine.created":
+          return handleMachineCreated(event, context)
+        case "community:machine.status":
+          return handleMachineStatus(event, context)
+        case "community:machine.updated":
+          return handleMachineUpdated(event, context)
+        case "community:machine.removed":
+          return handleMachineRemoved(event, context)
+        default: {
+          const unhandledEvent: never = event
+          return unhandledEvent
         }
       }
     },
     [queryClient, scheduleInboxInvalidate],
   )
 
-  // Machines are WS-live-patched with no query refetch (see `use-machines.ts`)
-  // — but that only works while THIS browser tab's own socket stays connected.
-  // If the socket drops and an offline→online transition happens while it's
-  // down, the event never arrives and the card is stuck stale until a full
-  // page reload. Mirror `AgentProvider`'s reconnect pattern
-  // (`contexts/agent-context.tsx`): resync the machines query on every
-  // reconnect so a missed transition self-corrects within the reconnect
-  // window instead of requiring a manual reload.
-  //
-  // Same rationale for the focused channel/DM message stream after Commit C:
-  // the IDB persister rehydrates the cache from the last session, but the
-  // socket may have dropped WS `message.create` events while we were offline
-  // (or the tab was suspended). Invalidating the focused scope's message
-  // query on reconnect fires a top-up refetch — TanStack re-runs every
-  // page's `pageParam`, so anchor windows and newest-tail windows both
-  // catch up without any client-side `?since` bookkeeping.
-  //
-  // Do NOT invalidate the read-state SNAPSHOT here. The snapshot hook
-  // (`useChannelReadStateSnapshot`, `gcTime: 0`) latches its first resolved
-  // value in a ref and deliberately never updates it during a mount — that
-  // freeze is what keeps the "New" divider pinned while the watermark
-  // advances. Re-fetching it can't move the divider (the ref ignores the new
-  // value), but it DOES flip the hook's `isFetching` back to true, which the
-  // channel/DM pages read as `lastReadMessageId: undefined` →
-  // `useMessages.isLoading: true` → the whole view drops back to the loading
-  // skeleton. Because `onReconnect` fires once even on a fresh page load (a
-  // StrictMode / refresh double-connect makes the socket's second open run
-  // it ~1.5s in), that surfaced as a SECOND skeleton flash mid-mount —
-  // "skeleton → content → skeleton → scroll to the top hero" (the empty
-  // round-trip also burned the message list's one-shot mount-scroll gate;
-  // see `use-scroll-anchor.ts`'s re-arm-on-empty branch). Verified via live
-  // Playwright page-level trace: the second skeleton window lines up exactly
-  // with `readSnapshotFetching` going true at t≈1.75s. The message-query
-  // invalidation below is the legitimate top-up and keeps its data on
-  // screen; the divider is already correct from the first (frozen) snapshot,
-  // so nothing here needs the snapshot refetched.
   const handleReconnect = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: communityKeys.machines() })
-    const sub = useCommunityStore.getState().subscription
-    if (sub.channelId) {
-      void queryClient.invalidateQueries({
-        queryKey: communityKeys.channelMessages(sub.channelId),
-      })
-    }
-    if (sub.dmConversationId) {
-      void queryClient.invalidateQueries({
-        queryKey: communityKeys.dmMessages(sub.dmConversationId),
-      })
-      // A DM message may have arrived while offline; the DM sidebar preview /
-      // unread flag is only reconciled on `message.create`, none of which land
-      // during the gap. Top it up on reconnect.
-      void queryClient.invalidateQueries({ queryKey: communityKeys.dms() })
-    }
-    // Inbox counts also need a refetch — unreads and mentions could have
-    // grown while offline and the live invalidator only fires on incoming
-    // `message.create` events, none of which arrive while the socket is
-    // down.
-    void queryClient.invalidateQueries({ queryKey: communityKeys.inbox() })
-    // Sidebar unread dots + rail mention badges are now driven by the live
-    // `unread.bump` patch (inbox-dot-ws-driven plan) — no switch-refetch backs
-    // them anymore. A bump dropped during the socket gap would leave the dot /
-    // rail badge stale forever, so re-seed both on reconnect: the rail LIST
-    // (`servers()`, mention counts) and the open server's detail tree
-    // (`server(currentServerId)`, channel dots). `exact` on the list so it
-    // doesn't cascade-refetch every server's nested detail subtree.
-    void queryClient.invalidateQueries({ queryKey: communityKeys.servers(), exact: true })
-    const currentServerId = useCommunityStore.getState().currentServerId
-    if (currentServerId) {
-      void queryClient.invalidateQueries({
-        queryKey: communityKeys.server(currentServerId),
-      })
-    }
-    // Bot audit logs are WS-live-patched into the React Query cache; if
-    // the socket dropped, any events emitted during the gap never entered
-    // the store's ring and so never made it into the cache. Invalidating
-    // all bot audit-log pages on reconnect lets an open modal catch up.
-    void queryClient.invalidateQueries({
-      queryKey: [...communityKeys.all, "bot"],
-      // Fuzzy prefix match — communityKeys.botAuditLog is [all, "bot", botId, "audit-log"].
-      exact: false,
-    })
+    reconcileCommunityWsReconnect(queryClient)
   }, [queryClient])
-  const { send } = useUserWs(handleMessage, { onReconnect: handleReconnect })
+  const { send } = useUserWs(handleMessage, {
+    onReconnect: handleReconnect,
+    onDisconnect: useCommunityWsStore.getState().markAccessDisconnected,
+    onAuthenticated: useCommunityWsStore.getState().markAccessConnected,
+    requestDaemonStatusOnAuth: false,
+  })
 
   // Publish the send binding so free helpers (`communityWsSendTyping`) can
   // dispatch without holding a hook reference. Single-instance assumption
@@ -1152,40 +315,6 @@ export function useCommunityWs(options?: UseCommunityWsOptions) {
     }
   }, [send])
 
-  // ── Public methods ───────────────────────────────────────────────────────
-
-  /** Subscribe to a channel/thread/DM (writes to the Zustand store). */
-  const subscribe = useCallback((target: Subscription) => {
-    useCommunityStore.getState().subscribe(target)
-  }, [])
-
-  const unsubscribe = useCallback(() => {
-    useCommunityStore.getState().unsubscribe()
-  }, [])
-
-  /**
-   * Send a typing indicator. Client-side throttled per channelId (a DM is a
-   * channel now). The DO also applies server-side dedup.
-   */
-  const sendTyping = useCallback(
-    (target: { channelId: string }) => {
-      const key = target.channelId
-      if (!key) return
-
-      const now = Date.now()
-      const map = useCommunityStore.getState().lastTypingSent
-      const lastSent = map.get(key) || 0
-      if (now - lastSent < TYPING_INDICATOR_THROTTLE_MS) return
-
-      // Mutate the map in place — no equality change, no re-render (nothing
-      // subscribes to it). Keeping it in the store keeps the lifetime tied
-      // to `reset()` on sign-out.
-      map.set(key, now)
-      send({ type: "community:typing.start", channelId: key })
-    },
-    [send],
-  )
-
   // Cleanup: flush the inbox debounce if the hook unmounts mid-window so the
   // parent surface doesn't leave a scheduled fetch dangling.
   useEffect(() => {
@@ -1196,100 +325,4 @@ export function useCommunityWs(options?: UseCommunityWsOptions) {
       }
     }
   }, [])
-
-  return {
-    subscribe,
-    unsubscribe,
-    sendTyping,
-  }
 }
-
-// ── Typing indicator helpers ─────────────────────────────────────────────────
-
-/**
- * The conversation scope key an event belongs to. Every event carries a single
- * `channelId` now (a DM is a channel), so the `dm:` / `ch:` prefix — which the
- * DM page (`dm:<id>`) and channel page (`ch:<id>`) read via
- * `useTypingUsersForScope` — is derived from the subscription: if the event's
- * channelId is the focused DM channel, it's a `dm:` scope; otherwise `ch:`.
- * Threads collapse to `ch:<channelId>`.
- */
-function typingScopeKey(
-  e: { channelId: string },
-  sub: { channelId?: string; dmConversationId?: string },
-): string {
-  return e.channelId === sub.dmConversationId ? `dm:${e.channelId}` : `ch:${e.channelId}`
-}
-
-// Timer map key: one auto-expire timer per (scope, user) pair.
-const timerKey = (scopeKey: string, userId: string) => `${scopeKey}|${userId}`
-
-/**
- * Add userId to a conversation scope's typing set and start (or extend) an
- * auto-expire timer. The timer removes the user from THAT scope after
- * `TYPING_INDICATOR_TIMEOUT_MS` if no follow-up typing event arrives.
- * No-ops the set write when the user is already typing in the scope (rule 2 —
- * typing.start re-fires every ~3s).
- */
-function applyTypingIndicator(scopeKey: string, userId: string, name: string | null) {
-  useCommunityStore.setState((state) => {
-    const tKey = timerKey(scopeKey, userId)
-    const existing = state.typingTimers.get(tKey)
-    if (existing) clearTimeout(existing)
-    const timer = setTimeout(() => {
-      useCommunityStore.setState((s) => removeTypingUser(s, scopeKey, userId))
-    }, TYPING_INDICATOR_TIMEOUT_MS)
-    const nextTimers = new Map(state.typingTimers)
-    nextTimers.set(tKey, timer)
-
-    const current = state.typingByScope.get(scopeKey)
-    // Already typing here with the same known name — only the timer refreshed,
-    // leave the name map alone (avoids a needless re-render). Otherwise (new
-    // typer, or a name we didn't have before) write the entry.
-    if (current?.has(userId) && current.get(userId) === name) {
-      return { typingTimers: nextTimers }
-    }
-    const nextByScope = new Map(state.typingByScope)
-    nextByScope.set(scopeKey, new Map(current ?? []).set(userId, name))
-    return { typingByScope: nextByScope, typingTimers: nextTimers }
-  })
-}
-
-/**
- * Immediately remove userId from a scope's typing set and cancel its pending
- * timer. Called when the user sends a message — sending is an implicit
- * typing.stop, and waiting for the 8s timeout leaves a ghost indicator hanging
- * under the message that just arrived.
- */
-function clearTypingIndicator(scopeKey: string, userId: string) {
-  useCommunityStore.setState((state) => {
-    const tKey = timerKey(scopeKey, userId)
-    const existing = state.typingTimers.get(tKey)
-    if (!existing && !state.typingByScope.get(scopeKey)?.has(userId)) return {}
-    if (existing) clearTimeout(existing)
-    return removeTypingUser(state, scopeKey, userId)
-  })
-}
-
-/**
- * Pure state patch: drop userId from `scopeKey`'s typing map (deleting the
- * scope key when it empties, to avoid unbounded Map growth) and its
- * `(scope, user)` timer. Shared by the auto-expire timer and the explicit clear.
- */
-function removeTypingUser(
-  state: { typingByScope: Map<string, Map<string, string | null>>; typingTimers: Map<string, ReturnType<typeof setTimeout>> },
-  scopeKey: string,
-  userId: string,
-): Partial<{ typingByScope: Map<string, Map<string, string | null>>; typingTimers: Map<string, ReturnType<typeof setTimeout>> }> {
-  const nextTimers = new Map(state.typingTimers)
-  nextTimers.delete(timerKey(scopeKey, userId))
-  const current = state.typingByScope.get(scopeKey)
-  if (!current?.has(userId)) return { typingTimers: nextTimers }
-  const nextMap = new Map(current)
-  nextMap.delete(userId)
-  const nextByScope = new Map(state.typingByScope)
-  if (nextMap.size === 0) nextByScope.delete(scopeKey)
-  else nextByScope.set(scopeKey, nextMap)
-  return { typingByScope: nextByScope, typingTimers: nextTimers }
-}
-

@@ -14,7 +14,12 @@ import { AppSurface } from "@/components/ui/app-surface"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { useBreakpoint } from "@/hooks/use-mobile"
 import { Shell } from "./shell"
+import {
+  COMMUNITY_RAIL_WIDTH,
+  desktopUserBarOverlayWidth,
+} from "./shell-frame-geometry"
 import { ServerRail } from "./server-rail"
+import { resolveServerRailOverlayAction } from "./server-rail-actions"
 import { UserBar } from "./user-bar"
 import { markVoluntaryLeave, pickPostEjectDestination } from "./eject-server"
 import { InboxPopover } from "./community-inbox-popover"
@@ -23,7 +28,7 @@ import { ProfileCard } from "./profile-card"
 import { ImageLightbox } from "./image-lightbox"
 import { ImageCropDialog } from "./image-crop-dialog"
 import { validateIconSourceFile } from "@/lib/community/image-crop"
-import type { MobileZone, Profile, View } from "./_types"
+import type { Marked, MobileZone, Profile, View } from "./_types"
 import { resolveProfileTarget, buildSelfProfile } from "./profile-lookup"
 import { resolveProfilePresence } from "@/lib/community/presence"
 import { avatarInitial } from "@/lib/community/avatar"
@@ -31,16 +36,17 @@ import { signOut } from "@/lib/auth-client"
 import { clearPersistedCache } from "@/lib/query-persister"
 import { useCommunityStore } from "@/stores/community"
 import { useCommunityWsStore, useOnlineUserIds } from "@/stores/community/ws"
+import { useMessageStreamStore } from "@/stores/community/message-stream"
 import { useCurrentUser, useSetCurrentUser } from "@/contexts/community/current-user"
 import { useServers } from "@/hooks/community/use-servers"
 import { useFolders } from "@/hooks/community/use-folders"
 import { useFriends } from "@/hooks/community/use-friends"
 import { useServerMembers } from "@/hooks/community/use-server-members"
-import { useInboxUnreads, useInboxMentions } from "@/hooks/community/use-inbox"
+import { useInboxUnreads, useInboxMentions, useInboxMarked } from "@/hooks/community/use-inbox"
 import { useInboxAutoCollapse } from "@/hooks/community/use-inbox-auto-collapse"
+import { useCommunityOnboarding } from "@/lib/community-onboarding"
 import {
   useCreateServer,
-  useJoinServer,
   useLeaveServer,
   useUploadServerIcon,
   useDeleteServerFolder,
@@ -51,10 +57,12 @@ import {
   useCreateOrGetDm,
   useMarkAllInboxRead,
   useDeleteMention,
+  useUnmarkMessage,
   useUpdateProfile,
-  useSendDmMessage,
+  useReadForumThreadFromInbox,
   useUploadUserAvatar,
 } from "@/hooks/community/mutations"
+import { useDmMessageSender } from "@/hooks/community/use-dm-message-sender"
 
 /**
  * Shared community shell — ServerRail on the left, sidebar column with the
@@ -76,6 +84,8 @@ export function ShellFrame({
   sidebar,
   children,
   extraDialogs,
+  onOpenActiveServerSettings,
+  onOpenActiveServerInvite,
   goHome,
   goServer,
 }: {
@@ -86,6 +96,8 @@ export function ShellFrame({
   sidebar: (opts?: { noHeader?: boolean }) => ReactNode
   children: ReactNode
   extraDialogs?: ReactNode
+  onOpenActiveServerSettings?: () => void
+  onOpenActiveServerInvite?: () => void
   goHome: () => void
   goServer: () => void
 }) {
@@ -95,6 +107,13 @@ export function ShellFrame({
   const currentUser = useCurrentUser()
   const setCurrentUser = useSetCurrentUser()
   const onlineUserIds = useOnlineUserIds()
+  const onboardingState = useCommunityOnboarding()
+
+  useEffect(() => {
+    if (onboardingState?.status === "active") {
+      setMobileZone(onboardingState.stage === "server" ? "nav" : "messages")
+    }
+  }, [onboardingState, setMobileZone])
 
   // Server list + folders drive the rail. Members + friends feed the profile
   // popover's mutual-server count when the user opens a member card.
@@ -113,6 +132,13 @@ export function ShellFrame({
   const unreadDms = inboxUnreads.dms
   const mentions = inboxMentions.mentions
   const inboxLoading = inboxUnreads.isLoading || inboxMentions.isLoading
+  // Marked feed is lazy: it has no bell badge, so it only fetches once the
+  // viewer opens the Marked tab. `markedTabOpened` latches true on first open
+  // (the query then lives normally under communityKeys.inboxMarked()).
+  const [markedTabOpened, setMarkedTabOpened] = useState(false)
+  const inboxMarked = useInboxMarked(markedTabOpened)
+  const marked = inboxMarked.marked
+  const { mutate: unmarkMessageMutate } = useUnmarkMessage()
   // Popover open-state + auto-collapse: the inbox closes itself once the row
   // the viewer clicked leaves the list. See use-inbox-auto-collapse.
   const inbox = useInboxAutoCollapse({ unreads: unreadFeed, unreadDms, mentions })
@@ -126,7 +152,6 @@ export function ShellFrame({
   // re-rendering the whole shell (children included) on any shell re-render.
   // Mirrors the message-side fix (see page.tsx messageActions deps note).
   const { mutateAsync: createServerAsync } = useCreateServer()
-  const { mutateAsync: joinServerAsync } = useJoinServer()
   const { mutate: leaveServerMutate } = useLeaveServer()
   const { mutate: uploadServerIconMutate } = useUploadServerIcon()
   const { mutate: deleteFolderMutate } = useDeleteServerFolder()
@@ -135,9 +160,10 @@ export function ShellFrame({
   const { mutate: updateFolderItemsMutate } = useUpdateFolderItems()
   const { mutate: createFolderWithMutate } = useCreateServerFolderWith()
   const createOrGetDm = useCreateOrGetDm()
-  const sendDmMessage = useSendDmMessage()
+  const { accept: acceptDmMessage } = useDmMessageSender()
   const markAllInboxRead = useMarkAllInboxRead()
   const deleteMention = useDeleteMention()
+  const { mutate: readForumThreadFromInbox } = useReadForumThreadFromInbox()
   const updateProfile = useUpdateProfile()
   const uploadUserAvatar = useUploadUserAvatar()
 
@@ -193,18 +219,6 @@ export function ShellFrame({
     },
     [createServerAsync, uploadServerIconMutate, router],
   )
-  const onRailJoinServer = useCallback(
-    async (invite: string) => {
-      try {
-        const data = await joinServerAsync({ inviteCode: invite })
-        toast("Joined server")
-        router.push(`/c/channels/${data.serverId}`)
-      } catch (e) {
-        toastApiError(e, "Failed to join server")
-      }
-    },
-    [joinServerAsync, router],
-  )
   const onRailLeaveServer = useCallback(
     (id: string) => {
       // Mark BEFORE mutate — the WS `member.leave` fanout / servers-list
@@ -229,15 +243,31 @@ export function ShellFrame({
   )
   const onRailOpenSettings = useCallback(
     (id?: string) => {
-      if (id) router.push(`/c/channels/${id}?settings=1`)
+      if (!id) return
+      const action = resolveServerRailOverlayAction({
+        targetServerId: id,
+        activeServerId,
+        overlay: "settings",
+        hasActiveOpener: !!onOpenActiveServerSettings,
+      })
+      if (action.kind === "open-active") onOpenActiveServerSettings?.()
+      else router.push(action.href)
     },
-    [router],
+    [activeServerId, onOpenActiveServerSettings, router],
   )
   const onRailOpenInvitePopover = useCallback(
     (id?: string) => {
-      if (id) router.push(`/c/channels/${id}?invite=1`)
+      if (!id) return
+      const action = resolveServerRailOverlayAction({
+        targetServerId: id,
+        activeServerId,
+        overlay: "invite",
+        hasActiveOpener: !!onOpenActiveServerInvite,
+      })
+      if (action.kind === "open-active") onOpenActiveServerInvite?.()
+      else router.push(action.href)
     },
-    [router],
+    [activeServerId, onOpenActiveServerInvite, router],
   )
   const onRailUngroupFolder = useCallback(
     (fId: string) => {
@@ -293,18 +323,12 @@ export function ShellFrame({
     folders,
     activeServerId,
     serversLoading: serversQuery.isLoading,
-    // `serversReady` gates the ServerRail auto-open — true only after the
-    // very first fetch settles AND the query isn't refetching. Using
-    // `isLoading` alone would let post-invalidate races (WS member.leave,
-    // reconnect) with `servers=[]` re-fire the "Create a Server" dialog.
-    serversReady: serversQuery.isFetched && !serversQuery.isFetching,
     setMobileZone,
     view,
     onHome: goHome,
     onServer: goServer,
     onServerNavigate: onRailServerNavigate,
     onCreateServer: onRailCreateServer,
-    onJoinServer: onRailJoinServer,
     onLeaveServer: onRailLeaveServer,
     onOpenSettings: onRailOpenSettings,
     onOpenInvitePopover: onRailOpenInvitePopover,
@@ -453,27 +477,22 @@ export function ShellFrame({
       toastApiError(e, "Failed to open DM")
       return
     }
-    // Await the send BEFORE navigating so the server row exists by the time
-    // the DM page mounts and fires its initial `GET /messages`. Otherwise
-    // the fresh-mount fetch races the send: it returns [], overwrites the
-    // optimistic cache, and the first message silently vanishes. Failure
-    // surfaces as a toast + `failed: true` pill; we still navigate so the
-    // user has the composer to retry.
     const trimmed = text.trim()
     if (trimmed) {
-      try {
-        await sendDmMessage.mutateAsync({
-          dmId,
-          content: trimmed,
-          author: {
-            id: currentUser.id,
-            name: currentUser.name,
-            avatar: currentUser.avatar,
-          },
-        })
-      } catch (e) {
-        toastApiError(e, "Failed to send message")
+      const receipt = acceptDmMessage({
+        dmId,
+        content: trimmed,
+        author: {
+          id: currentUser.id,
+          name: currentUser.name,
+          avatar: currentUser.avatar,
+        },
+      })
+      if (!receipt.accepted) {
+        toast("Failed to send message")
+        return
       }
+      void receipt.committed
     }
     router.push(`/c/me/${dmId}`)
   }
@@ -488,6 +507,40 @@ export function ShellFrame({
       // channel, which may persist to host unread children) drives the collapse.
       watchInboxItem(watchKey)
       router.push(`/c/channels/${sid}/${cid}`)
+    },
+    [router, watchInboxItem],
+  )
+
+  const openForumThreadFromInbox = useCallback(
+    (sid: string, parentChannelId: string, childChannelId: string, openerMessageId: string) => {
+      // Start the parent progressive read first, but never gate opening the
+      // child on network success. The mutation has no optimistic trim: success
+      // refreshes Inbox/server aggregates, while failure toasts and leaves the
+      // opener unread for a later retry.
+      watchInboxItem(`channel:${childChannelId}`)
+      readForumThreadFromInbox({ parentChannelId, openerMessageId })
+      router.push(`/c/channels/${sid}/${childChannelId}`)
+    },
+    [readForumThreadFromInbox, router, watchInboxItem],
+  )
+
+  // A Marked row is cross-channel — clicking one navigates to the message's
+  // channel AND opens the context sheet on it (Gus: always land on the channel
+  // so you see WHERE the message lives, then the sheet shows it + its context;
+  // same feel as a DM row). Both surfaces use the same `?seq=<n>` deep-link the
+  // destination page reads to open its sheet — server rows go to
+  // `/c/channels/<s>/<c>`, DM rows to `/c/me/<channelId>` (a DM channel's id IS
+  // its `/c/me/<id>` route param). serverId (null ⇒ DM) picks the route only.
+  // `watchInboxItem` collapses the popover once the destination opens.
+  const openMarked = useCallback(
+    (mk: Marked) => {
+      watchInboxItem(`marked:${mk.id}`)
+      const seqQuery = mk.m.seq != null ? `?seq=${mk.m.seq}` : ""
+      if (mk.serverId) {
+        router.push(`/c/channels/${mk.serverId}/${mk.channelId}${seqQuery}`)
+      } else {
+        router.push(`/c/me/${mk.channelId}${seqQuery}`)
+      }
     },
     [router, watchInboxItem],
   )
@@ -517,14 +570,20 @@ export function ShellFrame({
       unreads={unreadFeed}
       unreadDms={unreadDms}
       mentions={mentions}
+      marked={marked}
+      markedLoading={inboxMarked.isLoading}
       loading={inboxLoading}
       onOpenChannel={openServerChannel}
+      onOpenForumThread={openForumThreadFromInbox}
       onOpenDm={openInboxDm}
       onOpenMention={(mention) => {
         if (mention.serverId && mention.channelId) openServerChannel(mention.serverId, mention.channelId, `mention:${mention.id}`)
       }}
+      onOpenMarked={openMarked}
+      onMarkedTabSelected={() => setMarkedTabOpened(true)}
       onMarkAllRead={() => { markAllInboxRead.mutate() }}
       onDeleteMention={(id) => deleteMention.mutate({ mentionId: id })}
+      onUnmark={(messageId) => unmarkMessageMutate({ messageId })}
     />
   )
   const inboxHasUnread =
@@ -587,6 +646,7 @@ export function ShellFrame({
             // the debounce window — covers every sign-out path uniformly.
             useCommunityStore.getState().reset()
             useCommunityWsStore.getState().reset()
+            useMessageStreamStore.getState().resetAll()
             // Drop the persisted IDB blob so the next user on this machine
             // doesn't see the previous session's cached message rows.
             await clearPersistedCache(currentUser.id).catch(() => { })
@@ -662,7 +722,13 @@ export function ShellFrame({
               </ResizablePanel>
             </ResizablePanelGroup>
           </AppSurface>
-          <div className="absolute bottom-0 left-0 z-10" style={{ width: sidebarW + 56, marginLeft: -56 }}>
+          <div
+            className="absolute bottom-0 left-0 z-10"
+            style={{
+              width: desktopUserBarOverlayWidth(sidebarW),
+              marginLeft: -COMMUNITY_RAIL_WIDTH,
+            }}
+          >
             <UserBar user={{ id: currentUser.id, name: currentUser.name, avatar: currentUser.avatar }} onOpenProfile={openProfile} onEditProfile={() => setEditingProfile(true)} inbox={inboxElement} hasUnread={inboxHasUnread} inboxOpen={inbox.open} onInboxOpenChange={inbox.onOpenChange} />
           </div>
         </div>
@@ -687,7 +753,7 @@ export function ShellFrame({
         </>
       )}
       {mobileZone === "messages" && (
-        <div className="flex min-h-0 flex-1 flex-col bg-background">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
           {children}
         </div>
       )}

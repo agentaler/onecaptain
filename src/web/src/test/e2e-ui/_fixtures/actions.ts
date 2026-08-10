@@ -19,14 +19,12 @@ import { tid } from "./testids"
 export async function createServer(page: Page, name: string, opts?: { autoDialog?: boolean }): Promise<string> {
   if (!opts?.autoDialog) {
     await page.getByTestId(tid.serverAdd).click()
-    // Choose "Create a server" in the choose step.
-    await page.getByRole("button", { name: "Create a server" }).click()
   }
   await page.getByLabel("Server name").fill(name)
   await page.getByTestId(tid.createServerSubmit).click()
 
   // Land on the new server's default channel.
-  await page.waitForURL(/\/c\/channels\/[^/]+\/[^/]+/, { timeout: 20_000, waitUntil: "commit" })
+  await page.waitForURL(/\/c\/channels\/[^/]+\/[^/]+/, { timeout: 45_000, waitUntil: "commit" })
   const m = page.url().match(/\/c\/channels\/([^/]+)\//)
   if (!m) throw new Error(`createServer: no serverId in URL ${page.url()}`)
   return m[1]

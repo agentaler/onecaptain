@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { EventEmitter } from "events";
+import type { ChildProcess } from "child_process";
+import { PassThrough } from "stream";
 import {
   AgentProcessManager,
   truncateThinking,
@@ -49,6 +52,27 @@ function fakeDriver(id: string): Driver {
   } as unknown as Driver;
 }
 
+function controllableChildDriver(id: string): { driver: Driver; stdout: PassThrough; parseLine: ReturnType<typeof vi.fn> } {
+  const stdout = new PassThrough();
+  const proc = Object.assign(new EventEmitter(), {
+    stdout,
+    stderr: new PassThrough(),
+    stdin: new PassThrough(),
+    pid: undefined,
+    exitCode: null,
+    signalCode: null,
+    kill: () => true,
+  }) as unknown as ChildProcess;
+  const parseLine = vi.fn(() => []);
+  const driver = {
+    ...fakeDriver(id),
+    lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" },
+    spawn: async () => ({ process: proc }),
+    parseLine,
+  } as unknown as Driver;
+  return { driver, stdout, parseLine };
+}
+
 // Fake session with manual EE that we can emit into from tests.
 interface FakeSession extends ManagedSession {
   fire(evt: string, ...args: unknown[]): void;
@@ -82,7 +106,7 @@ function fakeSession(): FakeSession {
   return s;
 }
 
-function makeManager(opts: { logger?: Logger; tickIntervalMs?: number; idleTimeoutMs?: number; staleThresholdMs?: number; handshakeTimeoutMs?: number; now?: () => number; onBotAuditEvent?: (agentId: string, event: unknown, context: { sessionId: string | null; launchId: string | null }) => void } = {}) {
+function makeManager(opts: { logger?: Logger; tickIntervalMs?: number; idleTimeoutMs?: number; staleThresholdMs?: number; resetStuckThresholdMs?: number; handshakeTimeoutMs?: number; now?: () => number; onBotAuditEvent?: (agentId: string, event: unknown, context: { sessionId: string | null; launchId: string | null }) => void } = {}) {
   const session = fakeSession();
   const factory: SessionFactory = () => session;
   const onRuntimeSpawnFailed = vi.fn();
@@ -164,6 +188,55 @@ describe("AgentProcessManager — runtime health callbacks", () => {
 
     // Called on every event — router idempotence collapses to one wire frame.
     expect(onRuntimeSessionEstablished).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("AgentProcessManager — raw runtime line tap (P0-1)", () => {
+  it("adds agent identity before the default child-process session parses the line", async () => {
+    const { driver, stdout, parseLine } = controllableChildDriver("codex");
+    const onRuntimeRawLine = vi.fn();
+    const mgr = new AgentProcessManager({
+      driverFor: () => driver,
+      baseContextFor: () => ({
+        workingDirectory: "/tmp",
+        agentId: "agent_a",
+        standingPrompt: "",
+        config: {} as LaunchContext["config"],
+        credentialProxy: {} as LaunchContext["credentialProxy"],
+      }),
+      onRuntimeRawLine,
+    });
+    mgr.register("agent_a");
+    mgr.deliver("agent_a", { seq: 1, text: "hello" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    stdout.write('{"vendor":"field"}\n');
+
+    expect(onRuntimeRawLine).toHaveBeenCalledWith("agent_a", '{"vendor":"field"}');
+    expect(parseLine).toHaveBeenCalledWith('{"vendor":"field"}');
+  });
+
+  it("does not attach the child stdout tap to a custom session factory", () => {
+    const session = fakeSession();
+    const sessionFactory = vi.fn(() => session);
+    const onRuntimeRawLine = vi.fn();
+    const mgr = new AgentProcessManager({
+      driverFor: () => fakeDriver("custom"),
+      baseContextFor: () => ({
+        workingDirectory: "/tmp",
+        agentId: "agent_a",
+        standingPrompt: "",
+        config: {} as LaunchContext["config"],
+        credentialProxy: {} as LaunchContext["credentialProxy"],
+      }),
+      sessionFactory,
+      onRuntimeRawLine,
+    });
+    mgr.register("agent_a");
+    mgr.deliver("agent_a", { seq: 1, text: "hello" });
+
+    expect(sessionFactory).toHaveBeenCalledTimes(1);
+    expect(onRuntimeRawLine).not.toHaveBeenCalled();
   });
 });
 
@@ -522,6 +595,142 @@ describe("AgentProcessManager — session race conditions", () => {
       vi.useRealTimers();
     }
   });
+
+  it("force_exits an agent wedged in `stopping` when its stop produced no exit (batch L3 black-hole escape)", async () => {
+    vi.useFakeTimers();
+    try {
+      let currentTime = 0;
+      const stopSpy = vi.fn();
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      session.stop = stopSpy; // spy: was the process asked to die?
+      // A live session handle is present → force_exit takes the kill path
+      // (session.stop), not the orphan-warn path.
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => currentTime,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50,
+        stoppingStuckThresholdMs: 100,
+      });
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hello" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" });
+      mgr.start();
+
+      // Idle-timeout tick → status=stopping, issues a stop. Crucially we DO NOT
+      // fire the session's `exit` — the wedge: stop was requested, exit never came.
+      currentTime = 100;
+      await vi.advanceTimersByTimeAsync(10);
+      const stopCallsAfterIdle = stopSpy.mock.calls.length; // idle-timeout stop
+
+      // Now sit in `stopping` past the stopping-stuck threshold with NO exit.
+      currentTime = 300; // 300 - 100(stoppingSince) = 200 >= 100
+      await vi.advanceTimersByTimeAsync(10);
+
+      // force_exit fired: the handler force-killed (a 2nd stop) AND dispatched a
+      // synthetic exit that drove the FSM out of `stopping`.
+      expect(stopSpy.mock.calls.length).toBeGreaterThan(stopCallsAfterIdle);
+      expect(mgr.snapshot().agents["a1"]?.status).not.toBe("stopping");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("force_exit reaps the orphan via the recorded pid when the session handle is gone (batch F, Hypothesis A)", async () => {
+    vi.useFakeTimers();
+    try {
+      let currentTime = 0;
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      // A dead/never-existed pid: killProcessTree self-guards (isAlive → false),
+      // so this exercises the pid-kill BRANCH without signalling a real process.
+      (session as unknown as { pid: number }).pid = 2147483646;
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => currentTime,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50,
+        stoppingStuckThresholdMs: 100,
+      });
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hello" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      // pid recorded at spawn.
+      expect((mgr as unknown as { activeSpawnState: Map<string, { pid: number | null }> }).activeSpawnState.get("a1")?.pid).toBe(2147483646);
+      session.fire("runtime_event", { kind: "turn_end" });
+      mgr.start();
+      currentTime = 100;
+      await vi.advanceTimersByTimeAsync(10); // → stopping
+
+      // Simulate Hypothesis A: the session handle is gone from the map (the wedge
+      // cause) while force_exit is about to fire. The recorded pid must be the
+      // fallback kill target — no crash, and the FSM still escapes stopping.
+      (mgr as unknown as { sessions: Map<string, unknown> }).sessions.delete("a1");
+      currentTime = 300;
+      await vi.advanceTimersByTimeAsync(10); // → force_exit (no session, pid present)
+
+      expect(mgr.snapshot().agents["a1"]?.status).not.toBe("stopping"); // escaped via synthetic exit
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("force_exit with neither session handle nor recorded pid warns and does not crash (SDK-style)", async () => {
+    vi.useFakeTimers();
+    try {
+      let currentTime = 0;
+      const logger = stubLogger();
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession(); // no pid set → getter returns undefined → recorded pid stays null
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        logger,
+        now: () => currentTime,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50,
+        stoppingStuckThresholdMs: 100,
+      });
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hello" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" });
+      mgr.start();
+      currentTime = 100;
+      await vi.advanceTimersByTimeAsync(10); // → stopping
+      (mgr as unknown as { sessions: Map<string, unknown> }).sessions.delete("a1"); // no handle
+      currentTime = 300;
+      await vi.advanceTimersByTimeAsync(10); // → force_exit: no session, no pid
+
+      // Warned about the unkillable orphan, and still escaped stopping (no crash).
+      expect(logger.calls.warn.some(([m]) => typeof m === "string" && m.includes("no session handle AND no recorded pid"))).toBe(true);
+      expect(mgr.snapshot().agents["a1"]?.status).not.toBe("stopping");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("AgentProcessManager — onAgentActivity (derived activity reporting)", () => {
@@ -782,6 +991,7 @@ describe("AgentProcessManager — in-process SDK driver dispatch (Driver.createS
   it("dispatches through SdkManagedSession (not a child process) when sdkDriverDepsFor is configured, and streams runtime_events normally", async () => {
     const { driver, createSession } = fakeSdkDriver("pi");
     const onRuntimeSessionEstablished = vi.fn();
+    const onRuntimeRawLine = vi.fn();
     const sdkDeps: SdkDriverDeps = {
       buildSpawnEnv: vi.fn().mockResolvedValue({}),
       createAgentSession: vi.fn(),
@@ -796,6 +1006,7 @@ describe("AgentProcessManager — in-process SDK driver dispatch (Driver.createS
       }),
       sdkDriverDepsFor: () => sdkDeps,
       onRuntimeSessionEstablished,
+      onRuntimeRawLine,
     });
     mgr.register("a1");
     mgr.deliver("a1", { seq: 1, text: "hello" });
@@ -804,6 +1015,7 @@ describe("AgentProcessManager — in-process SDK driver dispatch (Driver.createS
 
     expect(createSession).toHaveBeenCalledTimes(1);
     expect(onRuntimeSessionEstablished).toHaveBeenCalledWith("pi");
+    expect(onRuntimeRawLine).not.toHaveBeenCalled();
   });
 
   it("does NOT require a credentialProxy for an in-process SDK driver (that guard is child-process-only)", () => {
@@ -1166,6 +1378,57 @@ describe("AgentProcessManager — error audit emission", () => {
     expect(errCalls).toHaveLength(0);
   });
 
+  it("adds a stuck-reset correlation trace for a reborn error while the reset window is wedged — WITHOUT suppressing the error (batch D)", () => {
+    // Batch D: the stuck-reset trace is purely additive. A reborn (non-
+    // superseded) session's genuine error must STILL surface as an audit row
+    // (batch C's 命门, unchanged); on top of that, if the agent's reset window
+    // has been stuck past the reconcile threshold, a diagnostic `warn` line
+    // correlates the error with the wedged reset. The gate judge is untouched.
+    let clock = 0;
+    const onBotAuditEvent = vi.fn();
+    const logger = stubLogger();
+    const { mgr } = makeManager({ onBotAuditEvent, logger, now: () => clock, resetStuckThresholdMs: 100 });
+
+    // Put the agent into a reset window that has aged past the threshold.
+    mgr.deliver("a1", { seq: 1, text: "hello" });
+    clock = 10;
+    mgr.markResetting("a1"); // resetting=true, resettingSince=10
+    clock = 200; // now - resettingSince = 190 >= 100 → stuck
+
+    // Reborn (superseded=false) error fires while the window is wedged.
+    (mgr as unknown as {
+      onRuntimeEvent: (a: string, e: unknown, r: string, superseded: boolean) => void;
+    }).onRuntimeEvent("a1", { kind: "error", message: "reborn hit a rate limit" }, "codex", false);
+
+    // 命门: the error STILL surfaces (additive trace never suppresses).
+    const errCalls = onBotAuditEvent.mock.calls.filter(
+      ([, ev]) => (ev as { kind?: string })?.kind === "error",
+    );
+    expect(errCalls).toHaveLength(1);
+    // AND the correlation trace fired.
+    expect(logger.calls.warn.some(([m]) => m === "runtime error during a stuck reset window")).toBe(true);
+  });
+
+  it("does NOT add the stuck-reset trace for a reborn error when the reset window is NOT stuck (batch D)", () => {
+    let clock = 0;
+    const onBotAuditEvent = vi.fn();
+    const logger = stubLogger();
+    const { mgr } = makeManager({ onBotAuditEvent, logger, now: () => clock, resetStuckThresholdMs: 100 });
+
+    mgr.deliver("a1", { seq: 1, text: "hello" });
+    clock = 10;
+    mgr.markResetting("a1"); // resettingSince=10
+    clock = 50; // now - resettingSince = 40 < 100 → NOT stuck
+
+    (mgr as unknown as {
+      onRuntimeEvent: (a: string, e: unknown, r: string, superseded: boolean) => void;
+    }).onRuntimeEvent("a1", { kind: "error", message: "reborn hit a rate limit" }, "codex", false);
+
+    // Error still surfaces (it's a real reborn error), but no stuck-reset trace.
+    expect(onBotAuditEvent.mock.calls.filter(([, ev]) => (ev as { kind?: string })?.kind === "error")).toHaveLength(1);
+    expect(logger.calls.warn.some(([m]) => m === "runtime error during a stuck reset window")).toBe(false);
+  });
+
   it("scrubs secrets out of an error message before it becomes an audit row", () => {
     const onBotAuditEvent = vi.fn();
     const { mgr, session } = makeManager({ onBotAuditEvent });
@@ -1405,10 +1668,10 @@ describe("extractToolAudit — file-target class", () => {
       suppressed: false,
     });
   });
-  it("codex file_change → edit + path (already-unwrapped params.item)", () => {
-    expect(extractToolAudit("file_change", { path: "src/x.ts" })).toEqual({
+  it("codex file_change → edit + adapter-flattened ordered paths", () => {
+    expect(extractToolAudit("file_change", { path: "a.ts, b.ts" })).toEqual({
       name: "edit",
-      target: "src/x.ts",
+      target: "a.ts, b.ts",
       suppressed: false,
     });
   });
@@ -1520,10 +1783,18 @@ describe("isAlookShellInvocation", () => {
     expect(isAlookShellInvocation("alook inbox pull")).toBe(true);
     expect(isAlookShellInvocation("  alook message send")).toBe(true);
   });
+  it("matches the `$ALOOK_CLI` env-var form the system prompt now teaches", () => {
+    expect(isAlookShellInvocation("$ALOOK_CLI inbox pull")).toBe(true);
+    expect(isAlookShellInvocation("${ALOOK_CLI} message send")).toBe(true);
+    expect(isAlookShellInvocation("$ALOOK_CLI")).toBe(true);
+    expect(isAlookShellInvocation("  $ALOOK_CLI nap")).toBe(true);
+  });
   it("does NOT match commands that merely mention alook", () => {
     expect(isAlookShellInvocation("rm alook.log")).toBe(false);
     expect(isAlookShellInvocation("echo alook")).toBe(false);
     expect(isAlookShellInvocation("alookalike")).toBe(false);
+    // A different env var that merely starts with the same prefix must not match.
+    expect(isAlookShellInvocation("$ALOOK_CLIENT foo")).toBe(false);
   });
   it("returns false for missing input", () => {
     expect(isAlookShellInvocation(undefined)).toBe(false);
@@ -1558,7 +1829,7 @@ describe("extractToolAudit — driver coverage matrix", () => {
 
     { driver: "codex", rawName: "shell", rawInput: { command: "pnpm test" }, expected: { name: "bash", target: "pnpm test", suppressed: false } },
     { driver: "codex", rawName: "shell", rawInput: { command: ["bash", "-lc", "rm tmp"] }, expected: { name: "bash", target: "bash -lc rm tmp", suppressed: false } },
-    { driver: "codex", rawName: "file_change", rawInput: { path: "/x" }, expected: { name: "edit", target: "/x", suppressed: false } },
+    { driver: "codex", rawName: "file_change", rawInput: { path: "a.ts, b.ts" }, expected: { name: "edit", target: "a.ts, b.ts", suppressed: false } },
     { driver: "codex", rawName: "web_search", rawInput: { query: "cats" }, expected: { name: "web_search", target: "cats", suppressed: false } },
     { driver: "codex", rawName: "mcp_search", rawInput: { query: "foo" }, expected: { name: "mcp_search", target: "foo", suppressed: false } },
     { driver: "codex", rawName: "collab_tool_call", rawInput: { name: "x" }, expected: { name: "collab_tool_call", target: "x", suppressed: false } },
@@ -1608,7 +1879,7 @@ describe("onBotAuditEvent — integration through onRuntimeEvent (T9/T10)", () =
       { name: "edit", input: { path: "x" }, expect: { name: "edit", target: "x" } },
       { name: "Grep", input: { pattern: "TODO" }, expect: { name: "grep", target: "TODO" } },
       { name: "shell", input: { command: "pnpm test" }, expect: { name: "bash", target: "pnpm test" } },
-      { name: "file_change", input: { path: "src/x.ts" }, expect: { name: "edit", target: "src/x.ts" } },
+      { name: "file_change", input: { path: "a.ts, b.ts" }, expect: { name: "edit", target: "a.ts, b.ts" } },
     ];
 
     for (const c of combos) {
@@ -1634,5 +1905,714 @@ describe("onBotAuditEvent — integration through onRuntimeEvent (T9/T10)", () =
       ([, ev]) => (ev as { kind?: string })?.kind === "tool_call"
     );
     expect(toolCalls).toHaveLength(0);
+  });
+});
+
+// FSM transition trace (plans/daemon-fsm-desync.md): pure-observability hook
+// used to make a wedge that logs nothing else reconstructable. Two guarantees:
+// it fires per dispatch with the fields the wedge-triage needs, and it does NOT
+// change behavior (effects identical whether or not the hook is wired).
+describe("AgentProcessManager — onFsmTransition trace (observability, zero behavior change)", () => {
+  function makeWithTrace(trace?: (rec: Record<string, unknown>) => void) {
+    const session = fakeSession();
+    const mgr = new AgentProcessManager({
+      driverFor: () => fakeDriver("codex"),
+      baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+      sessionFactory: () => session,
+      onFsmTransition: trace as never,
+    });
+    mgr.register("a1");
+    return { mgr, session };
+  }
+
+  it("fires once per agent-scoped dispatch with the wedge-triage fields", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hello" });
+    expect(recs.length).toBeGreaterThan(0);
+    const wake = recs.find((r) => r.event === "wake");
+    expect(wake).toBeTruthy();
+    // Every field the triage needs to split the three "why no watchdog" exits.
+    for (const k of ["agentId", "event", "status", "turnActive", "inbox", "lastDeliverAt", "lastProgressAt", "resetting", "resettingSince", "apmPhase", "effects", "nowMs"]) {
+      expect(wake).toHaveProperty(k);
+    }
+    expect(wake!.agentId).toBe("a1");
+    expect(Array.isArray(wake!.effects)).toBe(true);
+  });
+
+  it("does NOT change behavior — the observed effect sequence is identical with and without the hook", () => {
+    // deliver() returns a boolean (produced-effect), so compare the effect
+    // SEQUENCE the trace observed instead: it reflects exactly what the reducer
+    // emitted. A wired hook must not perturb that sequence.
+    const seq: string[][] = [];
+    const withHook = makeWithTrace((r) => seq.push(r.effects as string[]));
+    const produced1 = withHook.mgr.deliver("a1", { seq: 1, text: "hi" });
+    const without = makeWithTrace(undefined);
+    const produced2 = without.mgr.deliver("a1", { seq: 1, text: "hi" });
+    // Same producedEffect result …
+    expect(produced1).toBe(produced2);
+    // … and the wake dispatch emitted a spawn (single-flight from idle),
+    // observed identically through the trace.
+    expect(seq.some((effs) => effs.includes("spawn"))).toBe(true);
+  });
+
+  it("fans out a per-agent record on every TICK with derived watchdog inputs (so 'why no watchdog fired' is answerable)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => fakeDriver("codex"),
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        staleThresholdMs: 100,
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start(); // arm the tick timer
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      recs.length = 0;
+      now = 50;
+      await vi.advanceTimersByTimeAsync(10); // fires ticks
+      const tickRecs = recs.filter((r) => r.event === "tick" && r.agentId === "a1");
+      expect(tickRecs.length).toBeGreaterThan(0);
+      // The derived inputs that let triage judge WHY a watchdog didn't fire.
+      const t = tickRecs[0];
+      expect(t).toHaveProperty("sinceProgressMs");
+      expect(t).toHaveProperty("sinceDeliverMs");
+      expect(typeof t.sinceProgressMs).toBe("number");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("carries stoppingSince + sinceStoppingMs — null while not stopping, populated once in `stopping` (batch H)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50, // drive into `stopping` via idle-timeout
+        stoppingStuckThresholdMs: 1_000_000, // huge so it does NOT force_exit during this test — we just want the stopping snapshot
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" });
+
+      // While running/idle-not-stopping, the field is null.
+      const runningRec = recs.find((r) => r.status === "running");
+      expect(runningRec).toBeTruthy();
+      expect(runningRec!.stoppingSince).toBeNull();
+      expect(runningRec!.sinceStoppingMs).toBeNull();
+
+      recs.length = 0;
+      now = 100; // past idleTimeout=50 → idle-hibernation tick sets status=stopping, stoppingSince=100
+      await vi.advanceTimersByTimeAsync(10);
+      const stoppingRec = recs.find((r) => r.status === "stopping" && r.agentId === "a1");
+      expect(stoppingRec).toBeTruthy();
+      expect(stoppingRec!.stoppingSince).toBe(100);
+      expect(typeof stoppingRec!.sinceStoppingMs).toBe("number"); // now - 100, populated
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ---- B1: crashed-turn tag (plans/daemon-runtime-error-rewake.md) ----------
+  // The trailing turn_end after a mid-turn `error` carries `endReason:"errored"`
+  // + `errorDetail` into the trace, so a crashed turn is externally
+  // distinguishable from a clean nap/idle (red line 7). B1 only RECORDS it —
+  // onTurnEnd behavior is unchanged (verified in the "clean" case below).
+
+  it("a mid-turn error then turn_end stamps endReason=errored + terminationCause=runtime_error + errorDetail (red line 6/7)", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    // Genuinely interrupt the turn: an `error` event (as the normalizer emits
+    // from an is_error result) FOLLOWED by the trailing turn_end.
+    session.fire("runtime_event", { kind: "error", message: "boom: model overloaded" });
+    session.fire("runtime_event", { kind: "turn_end" });
+
+    const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+    expect(turnEnd).toBeTruthy();
+    expect(turnEnd!.endReason).toBe("errored");
+    expect(turnEnd!.terminationCause).toBe("runtime_error");
+    expect(turnEnd!.errorDetail).toBe("boom: model overloaded");
+  });
+
+  it("a CLEAN turn_end (no preceding error/kill) carries no endReason/terminationCause/errorDetail (byte-for-byte the old row)", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    session.fire("runtime_event", { kind: "turn_end" });
+
+    const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+    expect(turnEnd).toBeTruthy();
+    expect(turnEnd!.endReason).toBeUndefined();
+    expect(turnEnd!.terminationCause).toBeUndefined();
+    expect(turnEnd!.errorDetail).toBeUndefined();
+  });
+
+  it("an intentional-kill (superseded) death-rattle error does NOT tag its turn_end errored (red line 5 — reset/nap is not a crash)", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    // Enter the reset/nap kill window, THEN the dying process rattles. The
+    // marker is gated by the same `!sessionSuperseded` as the audit, so it must
+    // NOT set — a nap must stay indistinguishable-from-clean, not read as crash.
+    mgr.markResetting("a1");
+    session.fire("runtime_event", { kind: "error", message: "turn interrupted" });
+    session.fire("runtime_event", { kind: "turn_end" });
+
+    const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+    expect(turnEnd).toBeTruthy();
+    expect(turnEnd!.endReason).toBeUndefined();
+    expect(turnEnd!.terminationCause).toBeUndefined();
+  });
+
+  it("a mid-turn error followed by a hard exit (no turn_end) clears the marker so the NEXT turn is not mis-tagged (3a marker-leak guard)", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    // Error with NO trailing turn_end, then a hard process exit (bypasses the
+    // normalizer) — the marker would otherwise leak in the map.
+    session.fire("runtime_event", { kind: "error", message: "crashed hard" });
+    session.fire("exit");
+
+    // A fresh wake spawns a new session; its clean turn_end must NOT inherit the
+    // stale marker.
+    recs.length = 0;
+    mgr.deliver("a1", { seq: 2, text: "again" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s2" });
+    session.fire("runtime_event", { kind: "turn_end" });
+
+    const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+    expect(turnEnd).toBeTruthy();
+    expect(turnEnd!.endReason).toBeUndefined();
+    expect(turnEnd!.terminationCause).toBeUndefined();
+  });
+
+  it("red line 6 — a REAL stall (no progress past threshold → terminate_stalled) tags the turn_end killed_stalled, NOT injected error (Blair's actual case)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      // Default fakeDriver (per_turn) satisfies the `stalled` predicate's first
+      // sub-clause — the same setup the proven "terminate_stalled from the stall
+      // watchdog" test uses. We only add the trace sink.
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => fakeDriver("codex"),
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        staleThresholdMs: 100, // wedge → terminate_stalled after 100ms of no progress
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      // Turn is in flight (turnActive) and makes NO progress. No error injected —
+      // this is a genuine hang, exactly Blair's case.
+      now = 200; // past staleThreshold=100 → stalled watchdog fires terminate_stalled
+      await vi.advanceTimersByTimeAsync(10);
+      const killTick = recs.find((r) => Array.isArray(r.effects) && (r.effects as string[]).includes("terminate_stalled"));
+      expect(killTick).toBeTruthy(); // the stall kill actually fired
+
+      // The SIGKILL makes the process emit its trailing turn_end (no error
+      // rattle needed — that's the whole point of keying on cause, not rattle).
+      recs.length = 0;
+      session.fire("runtime_event", { kind: "turn_end" });
+      const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+      expect(turnEnd).toBeTruthy();
+      expect(turnEnd!.endReason).toBe("errored");
+      expect(turnEnd!.terminationCause).toBe("killed_stalled");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("force_exit clears the killed_stalled marker so it does NOT leak onto the next reborn turn's turn_end", async () => {
+    // Regression: terminate_stalled sets nonCleanEndMarker=killed_stalled. If the
+    // kill's stop() produces no exit, stoppingStuck escalates force_exit — whose
+    // teardown must clear the marker. Otherwise the leaked marker is consumed by
+    // the NEXT (healthy, reborn) turn's turn_end and mislabels it killed_stalled
+    // (a forensic lie that corrupted our codex-wedge trace read).
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      // stop() never drives an exit → the terminate_stalled kill wedges in
+      // `stopping` → stoppingStuck escalates force_exit (the path that leaks).
+      const stopSpy = vi.fn();
+      const session = fakeSession();
+      session.stop = stopSpy;
+      const mgr = new AgentProcessManager({
+        driverFor: () => fakeDriver("codex"), // per_turn — same stall setup as the killed_stalled test above
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        staleThresholdMs: 100,
+        stoppingStuckThresholdMs: 100,
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      // Turn is in flight (turnActive) and makes NO progress → terminate_stalled
+      // sets killed_stalled marker. (Same trigger as the killed_stalled test.)
+      now = 200;
+      await vi.advanceTimersByTimeAsync(10);
+      expect(recs.find((r) => Array.isArray(r.effects) && (r.effects as string[]).includes("terminate_stalled"))).toBeTruthy();
+      // stop() produced no exit → sit in stopping past stoppingStuck → force_exit.
+      now = 500;
+      await vi.advanceTimersByTimeAsync(10);
+      expect(recs.find((r) => Array.isArray(r.effects) && (r.effects as string[]).includes("force_exit"))).toBeTruthy();
+
+      // force_exit dispatched a synthetic exit → respawn. The reborn turn runs
+      // and ends CLEANLY. Its turn_end must NOT inherit the leaked marker.
+      session.startResolver?.();
+      await Promise.resolve();
+      recs.length = 0;
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s2" });
+      session.fire("runtime_event", { kind: "turn_end" });
+      const turnEnd = recs.find((r) => r.event === "turn_end" && r.agentId === "a1");
+      expect(turnEnd).toBeTruthy();
+      // The whole point: marker was cleared at force_exit, so this healthy turn
+      // is a CLEAN end — no leaked killed_stalled.
+      expect(turnEnd!.terminationCause).toBeUndefined();
+      expect(turnEnd!.endReason).not.toBe("errored");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a VOLUNTARY idle-timeout stop (which also flips status→stopping) does NOT produce a tagged turn_end (red line 2 — cause, not bare status)", async () => {
+    // Cecilia's "don't treat 'not seen' as 'won't happen'": idle-hibernation's
+    // `stop(idle_timeout)` flips status→stopping too, but it is a CLEAN end. We
+    // key on the terminate_stalled EFFECT, not on status, so no marker is set →
+    // any turn_end around a voluntary stop stays untagged.
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50, // idle → voluntary stop(idle_timeout), flips stopping
+        stoppingStuckThresholdMs: 1_000_000, // don't force_exit during the test
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" }); // clean end → idle
+      recs.length = 0;
+      now = 100; // past idleTimeout=50 → idle-hibernation issues a voluntary stop
+      await vi.advanceTimersByTimeAsync(10);
+      const stoppingRec = recs.find((r) => r.status === "stopping" && r.agentId === "a1");
+      expect(stoppingRec).toBeTruthy(); // it DID flip stopping (voluntary)
+      // No terminate_stalled marker was set, so no tagged turn_end can appear.
+      const tagged = recs.find((r) => r.event === "turn_end" && r.endReason === "errored");
+      expect(tagged).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ---- T1: hard-exit physical fact into trace (daemon-trace-completeness-charter) ----
+  // A hard exit (segfault/OOM/external SIGKILL) bypasses the normalizer, emits no
+  // turn_end, and would otherwise be indistinguishable from a clean exit in the
+  // trace. T1 threads the raw physical fact (exitCode/exitSignal/abnormal) onto
+  // the exit event → trace. Physical fact only; onExit behavior UNCHANGED.
+
+  it("T1 — an established session's exit on a signal records exitSignal + abnormal=true on the trace exit row", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" }); // hasEstablished
+    // Hard death on SIGKILL, NOT a requested stop → abnormal physical fact.
+    session.fire("exit", { signal: "SIGKILL", reason: "runtime_exit" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.exitSignal).toBe("SIGKILL");
+    expect(exitRec!.exitCode).toBeNull();
+    expect(exitRec!.abnormal).toBe(true);
+  });
+
+  it("T1 — an established session's non-zero code exit records exitCode + abnormal=true", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    session.fire("exit", { code: 137, reason: "runtime_exit" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.exitCode).toBe(137);
+    expect(exitRec!.exitSignal).toBeNull();
+    expect(exitRec!.abnormal).toBe(true);
+  });
+
+  it("T1 — a clean code-0 exit records abnormal=false (distinguishable from a crash in the trace)", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    session.fire("exit", { code: 0, reason: "runtime_exit" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.exitCode).toBe(0);
+    expect(exitRec!.abnormal).toBe(false);
+  });
+
+  it("T1 — a deliberate stop (reason=requested) records the physical fact but abnormal=false", () => {
+    // A requested stop that still died on a signal (SIGTERM grace → the process
+    // exits): the physical fact (signal) is recorded, but it's NOT abnormal —
+    // reason==="requested" gates that. So trace shows how it died without
+    // mislabeling an intentional stop as a crash.
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    session.fire("exit", { signal: "SIGTERM", reason: "requested" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.exitSignal).toBe("SIGTERM");
+    expect(exitRec!.abnormal).toBe(false);
+  });
+
+  it("T1 — the exit physical fact is READ-ONLY: abnormal exit and clean exit produce the SAME onExit respawn/idle decision (Claudette #382)", () => {
+    // With a queued inbox, onExit respawns (spawn effect); with empty inbox it
+    // settles idle. That decision keys on inbox.length ONLY — the new
+    // exitCode/exitSignal/abnormal fields must NOT change the branch.
+    function exitEffectsFor(exitInfo: Record<string, unknown>, queueBefore: boolean): string[] {
+      const recs: Record<string, unknown>[] = [];
+      const { mgr, session } = makeWithTrace((r) => recs.push(r));
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      if (queueBefore) mgr.deliver("a1", { seq: 2, text: "queued" }); // inbox non-empty at exit
+      recs.length = 0;
+      session.fire("exit", exitInfo);
+      const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+      return (exitRec!.effects as string[]) ?? [];
+    }
+    // Empty inbox: idle (no spawn), identical for abnormal vs clean.
+    expect(exitEffectsFor({ signal: "SIGKILL", reason: "runtime_exit" }, false)).toEqual(
+      exitEffectsFor({ code: 0, reason: "runtime_exit" }, false),
+    );
+    // Queued inbox: respawn (spawn), identical for abnormal vs clean.
+    expect(exitEffectsFor({ signal: "SIGKILL", reason: "runtime_exit" }, true)).toEqual(
+      exitEffectsFor({ code: 0, reason: "runtime_exit" }, true),
+    );
+  });
+
+  // ---- T2: launch-failure reason into trace (audit↔trace two-skins closure) ----
+  // A spawn that never establishes (ENOENT / pre_handshake_exit / handshake_timeout
+  // / spawn_threw) previously reached the web audit but dispatched a BARE exit —
+  // in the trace it was indistinguishable from a clean exit. T2 carries the
+  // failure reason (same value as the audit) onto the exit event → trace.
+
+  it("T2 — a pre-handshake exit records spawnFailureReason on the trace exit row", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    // Exit with NO prior runtime_event (never established) → pre_handshake_exit.
+    session.fire("exit");
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.spawnFailureReason).toBe("pre_handshake_exit");
+  });
+
+  it("T2 — an ENOENT spawn error carries that exact reason (same string as the web audit) into the trace", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("error", { code: "ENOENT" });
+    session.fire("exit");
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.spawnFailureReason).toBe("ENOENT");
+  });
+
+  it("T2 — a normal established exit carries NO spawnFailureReason", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" }); // established
+    session.fire("exit", { code: 0, reason: "runtime_exit" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.spawnFailureReason).toBeUndefined();
+  });
+
+  it("T2 no-leak (Claudette #398) — a spawn failure then a SUCCESSFUL spawn + clean exit: the clean exit carries NO stale spawnFailureReason", () => {
+    // Guards the per-spawn `state` isolation: the failure reason lives on the
+    // spawn's own `state` object (fresh each doSpawn), so a later spawn's exit
+    // can't inherit it. This assertion would also catch a regression to a
+    // per-agent map that forgot to clear (the B1 3a leak class).
+    const recs: Record<string, unknown>[] = [];
+    // Fresh session per spawn so the second (successful) launch is a real new
+    // session, exercising a real second doSpawn with its own `state`.
+    const sessions: FakeSession[] = [];
+    const mgr = new AgentProcessManager({
+      driverFor: () => fakeDriver("codex"),
+      baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+      sessionFactory: () => {
+        const s = fakeSession();
+        sessions.push(s);
+        return s;
+      },
+      onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+    });
+    mgr.register("a1");
+
+    // Spawn #1: fails pre-handshake.
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    sessions[0]!.fire("exit"); // → pre_handshake_exit, agent back to idle
+
+    // Spawn #2: succeeds (establishes), then exits cleanly.
+    recs.length = 0;
+    mgr.deliver("a1", { seq: 2, text: "again" });
+    sessions[1]!.fire("runtime_event", { kind: "session_init", sessionId: "s2" });
+    sessions[1]!.fire("exit", { code: 0, reason: "runtime_exit" });
+
+    const cleanExit = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(cleanExit).toBeTruthy();
+    expect(cleanExit!.spawnFailureReason).toBeUndefined(); // no stale reason from spawn #1
+  });
+
+  // ---- T3: recovery-transition semantics into trace ----
+  // A stall-kill that exits WITHOUT a turn_end is physically identical to a
+  // clean idle-timeout stop (reason=requested, signal set, abnormal=false); a
+  // force_exit synthetic exit is bare. T3 layers a `terminationSemantics` label
+  // (killed_stalled / idle_stop / force_exit) ON TOP of the physical fact —
+  // never overwriting it, and read by NO policy (kept out of B2's gate).
+
+  it("T3 — terminate_stalled then its real exit records terminationSemantics=killed_stalled", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => fakeDriver("codex"),
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        staleThresholdMs: 100,
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      now = 200; // past staleThreshold → terminate_stalled (sets the semantic marker)
+      await vi.advanceTimersByTimeAsync(10);
+      // The killed process's real exit (via the exit listener, where state lives).
+      recs.length = 0;
+      session.fire("exit", { signal: "SIGKILL", reason: "requested" });
+
+      const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+      expect(exitRec).toBeTruthy();
+      expect(exitRec!.terminationSemantics).toBe("killed_stalled");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("T3 — a VOLUNTARY idle-timeout stop's real exit records idle_stop, NOT killed_stalled (mis-label guard, Claudette #407)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50,
+        stoppingStuckThresholdMs: 1_000_000, // don't force_exit during the test
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" }); // clean end → idle
+      now = 100; // past idleTimeout → voluntary stop (sets idle_stop, NOT killed_stalled)
+      await vi.advanceTimersByTimeAsync(10);
+      recs.length = 0;
+      session.fire("exit", { signal: "SIGTERM", reason: "requested" });
+
+      const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+      expect(exitRec).toBeTruthy();
+      expect(exitRec!.terminationSemantics).toBe("idle_stop");
+      expect(exitRec!.terminationSemantics).not.toBe("killed_stalled");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("T3 — force_exit's synthetic exit records terminationSemantics=force_exit and does NOT pollute the physical fields (Claudette #407)", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const persistentDriver = {
+        ...fakeDriver("codex"),
+        lifecycle: { kind: "persistent", start: "immediate", exit: "natural", inFlightWake: "queue" } as never,
+      } as Driver;
+      const session = fakeSession();
+      session.stop = vi.fn(); // swallow the stop so no real exit fires — force wedge
+      const mgr = new AgentProcessManager({
+        driverFor: () => persistentDriver,
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        idleTimeoutMs: 50,
+        stoppingStuckThresholdMs: 100,
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      session.fire("runtime_event", { kind: "turn_end" });
+      now = 100; // idle-timeout → stopping (stop swallowed, no exit)
+      await vi.advanceTimersByTimeAsync(10);
+      recs.length = 0;
+      now = 300; // stopping-stuck past threshold → force_exit synthetic exit
+      await vi.advanceTimersByTimeAsync(10);
+
+      const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+      expect(exitRec).toBeTruthy();
+      expect(exitRec!.terminationSemantics).toBe("force_exit");
+      // Physical layer NOT polluted by the semantic label (synthetic exit has no
+      // real code/signal): abnormal false, code/signal null.
+      expect(exitRec!.abnormal).toBe(false);
+      expect(exitRec!.exitCode).toBeNull();
+      expect(exitRec!.exitSignal).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("T3 — a plain runtime exit (no recovery) carries NO terminationSemantics", () => {
+    const recs: Record<string, unknown>[] = [];
+    const { mgr, session } = makeWithTrace((r) => recs.push(r));
+    mgr.deliver("a1", { seq: 1, text: "hi" });
+    session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+    session.fire("exit", { code: 0, reason: "runtime_exit" });
+
+    const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+    expect(exitRec).toBeTruthy();
+    expect(exitRec!.terminationSemantics).toBeUndefined();
+  });
+});
+
+describe("T1 — abnormal-exit user audit stays gated (no nap-noise on deliberate kill)", () => {
+  it("a deliberate stop (suppressExitLog) records the physical fact in trace but emits NO user-facing abnormal_exit audit", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = 0;
+      const recs: Record<string, unknown>[] = [];
+      const onBotAuditEvent = vi.fn();
+      const session = fakeSession();
+      const mgr = new AgentProcessManager({
+        driverFor: () => fakeDriver("codex"),
+        baseContextFor: () => ({ workingDirectory: "/tmp", agentId: "a1", standingPrompt: "", config: {} as LaunchContext["config"], credentialProxy: {} as LaunchContext["credentialProxy"] }),
+        sessionFactory: () => session,
+        now: () => now,
+        tickIntervalMs: 5,
+        staleThresholdMs: 100,
+        onFsmTransition: ((r: Record<string, unknown>) => recs.push(r)) as never,
+        onBotAuditEvent: onBotAuditEvent as never,
+      });
+      mgr.start();
+      mgr.register("a1");
+      mgr.deliver("a1", { seq: 1, text: "hi" });
+      session.startResolver?.();
+      await Promise.resolve();
+      session.fire("runtime_event", { kind: "session_init", sessionId: "s1" });
+      // Stall → terminate_stalled sets suppressExitLog before the kill.
+      now = 200;
+      await vi.advanceTimersByTimeAsync(10);
+      // The killed process exits on a signal (a requested/deliberate stop path).
+      session.fire("exit", { signal: "SIGKILL", reason: "requested" });
+
+      // Trace: the physical fact IS recorded (forensics needs it).
+      const exitRec = recs.find((r) => r.event === "exit" && r.agentId === "a1");
+      expect(exitRec).toBeTruthy();
+      expect(exitRec!.exitSignal).toBe("SIGKILL");
+      // User audit: NO abnormal_exit row — a deliberate kill must not look like a
+      // fault in the user's activity (the nap-noise bug must not reappear here).
+      const abnormalAudits = onBotAuditEvent.mock.calls.filter(
+        ([, ev]) => (ev as { kind?: string; payload?: { code?: string } })?.payload?.code === "abnormal_exit",
+      );
+      expect(abnormalAudits).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

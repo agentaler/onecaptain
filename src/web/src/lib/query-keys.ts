@@ -20,6 +20,22 @@ export const communityKeys = {
   servers: () => [...communityKeys.all, "servers"] as const,
   server: (serverId: string) =>
     [...communityKeys.servers(), serverId] as const,
+  forumSidebarThreads: (serverId: string) =>
+    [...communityKeys.server(serverId), "forum-sidebar-base"] as const,
+  forumSidebarRetainedRoot: (serverId: string) =>
+    [...communityKeys.server(serverId), "forum-sidebar-retained"] as const,
+  forumSidebarRetained: (serverId: string, childId: string) =>
+    [...communityKeys.forumSidebarRetainedRoot(serverId), childId] as const,
+  channelMetaRoot: (serverId: string) =>
+    [...communityKeys.server(serverId), "channel-meta"] as const,
+  channelMeta: (serverId: string, channelId: string) =>
+    [...communityKeys.channelMetaRoot(serverId), channelId] as const,
+  forumOpenerHintRoot: (serverId: string) =>
+    [...communityKeys.server(serverId), "forum-opener-hint"] as const,
+  forumOpenerHint: (serverId: string, messageId: string) =>
+    [...communityKeys.forumOpenerHintRoot(serverId), messageId] as const,
+  forumSidebarUnreadFallbacks: (serverId: string) =>
+    [...communityKeys.server(serverId), "forum-sidebar-unread-fallbacks"] as const,
 
   // ── Server-scoped resources ─────────────────────────────────────────────
   members: (serverId: string) =>
@@ -67,19 +83,15 @@ export const communityKeys = {
     [...communityKeys.all, "channel", channelId, "pins"] as const,
   threads: (channelId: string) =>
     [...communityKeys.all, "channel", channelId, "threads"] as const,
-  forumPosts: (channelId: string) =>
-    [...communityKeys.all, "channel", channelId, "posts"] as const,
+  forumActivityFeed: (channelId: string, tag: string | null) =>
+    [...communityKeys.threads(channelId), "activity", tag] as const,
+  forumTags: (channelId: string) =>
+    [...communityKeys.all, "channel", channelId, "forum-tags"] as const,
   // #3: the viewer's `communityReadState` row for a single channel, fetched
   // once per channel mount and frozen thereafter so the "New" divider stays
   // anchored while the watermark advances.
   channelReadStateSnapshot: (channelId: string) =>
     [...communityKeys.all, "channel", channelId, "read-state-snapshot"] as const,
-  // Channel-open bootstrap (read pointer + initial message window in one
-  // request). Frozen per mount like the snapshot; gcTime:0 so a fresh mount
-  // re-fetches. Distinct key so it doesn't collide with the seeded
-  // channelMessages / read-state-snapshot caches it writes.
-  channelBootstrap: (channelId: string) =>
-    [...communityKeys.all, "channel", channelId, "bootstrap"] as const,
   // DM sibling of `channelReadStateSnapshot`. Same freeze semantics — the
   // hook latches the first non-null response so the "New" divider anchor
   // stays put while the progressive watermark advances.
@@ -94,6 +106,15 @@ export const communityKeys = {
   inbox: () => [...communityKeys.all, "inbox"] as const,
   inboxUnreads: () => [...communityKeys.inbox(), "unreads"] as const,
   inboxMentions: () => [...communityKeys.inbox(), "mentions"] as const,
+  // Per-user saved ("marked") messages, cross-channel newest-first. Nested
+  // under inbox() so the WS reconciliation `invalidateQueries({ queryKey:
+  // communityKeys.inbox() })` refreshes it alongside the other feeds.
+  inboxMarked: () => [...communityKeys.inbox(), "marked"] as const,
+  // Whether the viewer has marked a single message — fetched lazily when the
+  // message's ⋯ menu opens (drives the Mark/Unmark label). Keyed per message
+  // so re-opening the same menu reuses the cached answer.
+  messageMarked: (messageId: string) =>
+    [...communityKeys.all, "message", messageId, "marked"] as const,
 
   // ── Social ──────────────────────────────────────────────────────────────
   friends: () => [...communityKeys.all, "friends"] as const,
@@ -117,4 +138,3 @@ export const communityKeys = {
   profile: (userId: string) =>
     [...communityKeys.all, "profile", userId] as const,
 } as const
-

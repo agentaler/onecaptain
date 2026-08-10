@@ -13,6 +13,15 @@ import { useFriends, useFriendsPresence } from "@/hooks/community/use-friends"
 import { communityKeys } from "@/lib/query-keys"
 import { useCommunityWsStore, useOnlineUserIds } from "@/stores/community/ws"
 import { resolveRowPresence } from "@/lib/community/presence"
+import {
+  clearLastMeLocation,
+  getLastMeLeaf,
+  ME_ROOT,
+  meLeafFromPathname,
+  pickMeLandingLocation,
+  resolveMeLocationStatus,
+  setLastMeLocation,
+} from "@/lib/community/last-me-location"
 
 // DM-side layout. The DM subtree has no server settings, no channel sidebar,
 // and no `[serverId]` param — everything is scoped to the current user.
@@ -21,7 +30,7 @@ export default function MeLayout({ children }: { children: ReactNode }) {
   const bp = useBreakpoint()
   const pathname = usePathname()
   const params = useParams<{ dmId?: string }>()
-  const { dms: rawDms, isLoading: dmsLoading } = useDms()
+  const { dms: rawDms, isLoading: dmsLoading, isSuccess: dmsReady } = useDms()
   const onlineUserIds = useOnlineUserIds()
   const dms = useMemo(
     () =>
@@ -59,12 +68,29 @@ export default function MeLayout({ children }: { children: ReactNode }) {
   const botsActive = pathname === "/c/me/bots"
   const friendsActive = !hasDm && !machinesActive && !botsActive
 
+  const meLocationStatus = resolveMeLocationStatus({
+    pathname,
+    dmId: params.dmId,
+    dmsReady,
+    dmIds: rawDms.map((dm) => dm.id),
+  })
+
+  useEffect(() => {
+    if (meLocationStatus === "remember") {
+      setLastMeLocation(pathname)
+      return
+    }
+    if (meLocationStatus !== "stale") return
+    if (getLastMeLeaf() === meLeafFromPathname(pathname)) clearLastMeLocation()
+    router.replace(ME_ROOT)
+  }, [meLocationStatus, pathname, router])
+
   const [mobileZone, setMobileZone] = useState<MobileZone>(() => (hasDm ? "messages" : "nav"))
 
   // Mirror channel sidebar-click behavior (channels/layout.tsx:226-236): do
   // NOT eagerly mark the DM read on click. That fires a bodyless
-  // `PUT /dm/:id/read` which the server aligns to the DM's tail (see
-  // api/community/dm/[id]/read/route.ts) — the read-state snapshot then
+  // `PUT /channels/:id/read` which the server aligns to the DM's tail (see
+  // api/community/channels/[id]/read/route.ts) — the read-state snapshot then
   // resolves at the tail on mount and `newDividerBefore` computes to
   // `undefined`, so unread DMs open at the bottom with no NEW divider.
   //
@@ -106,7 +132,7 @@ export default function MeLayout({ children }: { children: ReactNode }) {
 
   const goHome = useCallback(() => {
     setMobileZone("nav")
-    router.push("/c/me")
+    router.push(pickMeLandingLocation(getLastMeLeaf()))
   }, [router])
   const goServer = useCallback(() => { setMobileZone("nav") }, [])
 

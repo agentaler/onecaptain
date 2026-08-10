@@ -31,6 +31,22 @@ describe("communityKeys", () => {
     expect(communityKeys.presence("s1")).toEqual([...server, "presence"])
     expect(communityKeys.auditLog("s1")).toEqual([...server, "audit-log"])
     expect(communityKeys.invites("s1")).toEqual([...server, "invites"])
+    const sidebar = [...server, "forum-sidebar-base"]
+    expect(communityKeys.forumSidebarThreads("s1")).toEqual(sidebar)
+    expect(communityKeys.forumSidebarRetained("s1", "post_1")).toEqual([
+      ...server, "forum-sidebar-retained", "post_1",
+    ])
+    expect(communityKeys.channelMeta("s1", "post_1")).toEqual([
+      ...server, "channel-meta", "post_1",
+    ])
+    expect(communityKeys.forumOpenerHint("s1", "message_1")).toEqual([
+      ...server, "forum-opener-hint", "message_1",
+    ])
+    expect(communityKeys.forumSidebarRetained("s1", "post_1").slice(0, -2))
+      .toEqual(server)
+    expect(communityKeys.forumSidebarUnreadFallbacks("s1")).toEqual([
+      ...server, "forum-sidebar-unread-fallbacks",
+    ])
   })
 
   it("nests channel-scoped keys under a stable channel prefix", () => {
@@ -60,11 +76,11 @@ describe("communityKeys", () => {
       "c1",
       "threads",
     ])
-    expect(communityKeys.forumPosts("c1")).toEqual([
+    expect(communityKeys.forumTags("c1")).toEqual([
       "community",
       "channel",
       "c1",
-      "posts",
+      "forum-tags",
     ])
   })
 

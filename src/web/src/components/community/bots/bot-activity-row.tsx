@@ -57,7 +57,9 @@ function kindMeta(kind: AuditKind): { label: string; tone: string } {
   if (kind === "tool_call") return { label: "tool", tone: "text-muted-foreground" }
   if (kind === "wake_trigger") return { label: "wake", tone: "text-foreground/70" }
   if (kind === "session_reset") return { label: "reset", tone: "text-foreground/70" }
+  if (kind === "nap") return { label: "nap", tone: "text-foreground/70" }
   if (kind === "model_changed") return { label: "model", tone: "text-foreground/70" }
+  if (kind === "provider_changed") return { label: "provider", tone: "text-foreground/70" }
   if (kind === "error") return { label: "err", tone: "text-destructive" }
   return { label: "think", tone: "text-muted-foreground/70" }
 }
@@ -112,6 +114,19 @@ function RowBody({
       </div>
     )
   }
+  if (event.kind === "nap") {
+    return (
+      <div
+        data-testid="bot-activity-event-nap"
+        className="truncate font-mono text-[13px] text-foreground"
+      >
+        <span>Reset its own session</span>{" "}
+        <span className="text-muted-foreground">
+          — the bot napped and will start fresh on its next message.
+        </span>
+      </div>
+    )
+  }
   if (event.kind === "model_changed") {
     const p = event.payload as { from?: string | null; to?: string | null } | null
     // Developer-facing audit surface — print the RAW stored ids (no card-style
@@ -124,6 +139,17 @@ function RowBody({
         className="truncate font-mono text-[13px] text-foreground"
       >
         {from} <span className="text-muted-foreground/60">→</span> {to}
+      </div>
+    )
+  }
+  if (event.kind === "provider_changed") {
+    const p = event.payload as { from?: string; to?: string } | null
+    return (
+      <div
+        data-testid="bot-activity-event-provider_changed"
+        className="truncate font-mono text-[13px] text-foreground"
+      >
+        {p?.from ?? "?"} <span className="text-muted-foreground/60">→</span> {p?.to ?? "?"}
       </div>
     )
   }

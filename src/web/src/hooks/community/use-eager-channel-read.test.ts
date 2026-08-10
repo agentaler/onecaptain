@@ -50,8 +50,15 @@ vi.mock("@/lib/api/client", () => ({
 let serversCache: ServersResponse | undefined
 const invalidateQueries = vi.fn()
 const getQueryData = vi.fn((_key: unknown) => serversCache)
+const setQueryData = vi.fn()
+const setQueriesData = vi.fn()
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries, getQueryData }),
+  useQueryClient: () => ({
+    invalidateQueries,
+    getQueryData,
+    setQueryData,
+    setQueriesData,
+  }),
 }))
 
 function resetHarness() {
@@ -62,6 +69,8 @@ function resetHarness() {
   apiFetchMock.mockClear()
   invalidateQueries.mockClear()
   getQueryData.mockClear()
+  setQueryData.mockClear()
+  setQueriesData.mockClear()
 }
 
 async function loadHook() {
@@ -106,7 +115,38 @@ describe("useEagerChannelRead — rail-badge fan-out gate", () => {
     })
   })
 
-  it("uses the thread endpoint for a child channel", async () => {
+  it("does not repeat a PUT for the same channel and fires once after a channel switch", async () => {
+    const hook = await loadHook()
+    const render = (channelId: string) => {
+      refCounter = 0
+      pendingEffects = []
+      hook({
+        channelId,
+        serverId: "srv_1",
+        isChildChannel: false,
+        snapshotReady: true,
+      })
+      flushEffects()
+    }
+
+    render("ch_1")
+    await settle()
+    render("ch_1")
+    await settle()
+    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+
+    render("ch_2")
+    await settle()
+    expect(apiFetchMock).toHaveBeenCalledTimes(2)
+    expect(apiFetchMock).toHaveBeenLastCalledWith("/api/community/channels/ch_2/read", {
+      method: "PUT",
+    })
+  })
+
+  it("uses the unified channels/[id]/read trunk for a child channel too (a thread IS a channel)", async () => {
+    // The per-type /threads/:id/read split is retired — all kinds mark read via
+    // channels/[id]/read, which dispatches by surface. isChildChannel no longer
+    // picks the endpoint.
     const useHook = await loadHook()
     useHook({
       channelId: "th_9",
@@ -116,7 +156,7 @@ describe("useEagerChannelRead — rail-badge fan-out gate", () => {
     })
     flushEffects()
     await settle()
-    expect(apiFetchMock).toHaveBeenCalledWith("/api/community/threads/th_9/read", {
+    expect(apiFetchMock).toHaveBeenCalledWith("/api/community/channels/th_9/read", {
       method: "PUT",
     })
   })

@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { toastApiError } from "@/lib/api/client"
 import { useBreakpoint } from "@/hooks/use-mobile"
 import { DmHeader, DmHeaderSkeleton } from "@/components/community/dm-header"
 import { Avatar } from "@/components/community/avatar"
@@ -30,12 +29,11 @@ import { useDmWatermark } from "@/hooks/community/use-dm-watermark"
 import { useEagerDmRead } from "@/hooks/community/use-eager-dm-read"
 import { useChannelRefDirectory } from "@/hooks/community/use-channel-ref-directory"
 import {
-  useSendDmMessage,
   useToggleReactionApi,
-  useUploadFile,
-  zipUploadResultsWithDimensions,
-  sendNonce,
+  useToggleMark,
 } from "@/hooks/community/mutations"
+import { useDmMessageSender } from "@/hooks/community/use-dm-message-sender"
+import { useMessageStreamStore } from "@/stores/community/message-stream"
 import { useCurrentUser } from "@/contexts/community/current-user"
 import {
   communityWsSubscribe,
@@ -43,6 +41,10 @@ import {
   communityWsSendTyping,
   communityWsResetTypingThrottle,
 } from "@/hooks/community/use-community-ws"
+import {
+  advanceCommunityOnboarding,
+  readCommunityOnboardingState,
+} from "@/lib/community-onboarding"
 
 // Thin re-mount wrapper — same reason as the server-side channel view: the
 // dynamic segment reuses the same component instance across DM switches, so
@@ -99,6 +101,7 @@ function DmView() {
     fetchOlder: fetchOlderMessages,
     fetchNewer: fetchNewerMessages,
     jumpToPresent,
+    presentVersion,
     latestSeq,
   } = useDmMessages(dmId, {
     lastReadMessageId: readSnapshotFetching
@@ -106,7 +109,18 @@ function DmView() {
       : (readSnapshot?.lastReadMessageId ?? null),
   })
 
-  const [contextSheetSeq, setContextSheetSeq] = useState<number | null>(null)
+  // Cross-navigation deep-link: a Marked-tab row for a DM message navigates
+  // here with `?seq=<n>` and we open the context sheet on that message. Read
+  // once at mount (frozen), mirroring the channel page's `?msg=` — a
+  // refresh/back doesn't re-trigger it. The DM view has no in-place scroll
+  // anchor, so the context sheet (seq → id + surrounding window) is the jump.
+  const searchParams = useSearchParams()
+  const [initialSeq] = useState<number | null>(() => {
+    const raw = searchParams.get("seq")
+    const n = raw ? Number(raw) : NaN
+    return Number.isFinite(n) ? n : null
+  })
+  const [contextSheetSeq, setContextSheetSeq] = useState<number | null>(initialSeq)
   // DM composer has no "current server" — flatten every member server's
   // channels into one cross-server candidate list so a `/`-ref can be
   // dropped into a DM (see plan community-channel-ref.md §6).
@@ -180,9 +194,9 @@ function DmView() {
 
   const typingUsers = useTypingUsersForScope(`dm:${dmId}`)
   const typingNames = useTypingNamesForScope(`dm:${dmId}`)
-  const sendDmMessage = useSendDmMessage()
+  const { accept: acceptDmMessage, retry: retryDmMessage } = useDmMessageSender()
   const toggleReaction = useToggleReactionApi()
-  const uploadFile = useUploadFile()
+  const toggleMark = useToggleMark()
 
   const goBack = useCallback(() => { uiHandlers.goBackMobile?.() }, [uiHandlers])
 
@@ -241,6 +255,13 @@ function DmView() {
     }
   }, [friends, currentUser.id, currentUser.name, dm])
 
+  const advanceOnboardingAfterSend = useCallback(() => {
+    const state = readCommunityOnboardingState()
+    if (state?.status === "active" && state.stage === "dm" && state.dmId === dmId) {
+      advanceCommunityOnboarding("dm", "server")
+    }
+  }, [dmId])
+
   const messageActions = useMemo(() => ({
     onToggleReaction: (id: string, emoji: string) =>
       toggleReaction({ dmId, messageId: id, emoji, userId: currentUser.id }),
@@ -254,23 +275,22 @@ function DmView() {
       const m = messages.find((x) => x.id === id)
       if (m?.content) { navigator.clipboard?.writeText(m.content); toast("Copied to clipboard") }
     },
+    // A DM is a channel (type='dm'), so its id IS the mark route's channelId.
+    onMark: (id: string) => toggleMark(dmId, id),
     onRetry: (id: string) => {
       const m = messages.find((x) => x.id === id)
-      if (m?.content) {
-        sendDmMessage.mutate({
-          dmId,
-          content: m.content,
-          replyToId: m.replyTo?.id,
-          // Reuse the failed row's nonce so the resend dedupes server-side if
-          // the original committed (`onMutate` drops the stale row first).
-          nonce: m.clientNonce,
-          author: {
-            id: currentUser.id,
-            name: currentUser.name,
-            avatar: currentUser.avatar,
-          },
-        })
-      }
+      if (!m?.clientNonce) return
+      void retryDmMessage(dmId, m.clientNonce).then((result) => {
+        if (result.ok) advanceOnboardingAfterSend()
+      })
+    },
+    onDismiss: (id: string) => {
+      const m = messages.find((x) => x.id === id)
+      if (!m?.clientNonce) return
+      useMessageStreamStore.getState().dispatch(
+        { kind: "dm", id: dmId },
+        { type: "dismissFailed", nonce: m.clientNonce },
+      )
     },
     onPreviewImage: (url: string) => {
       uiHandlers.previewImage?.(url)
@@ -281,41 +301,29 @@ function DmView() {
       a.download = url.split("/").pop() ?? "file"
       a.click()
     },
-  }), [toggleReaction, dmId, currentUser.id, currentUser.name, currentUser.avatar, messages, sendDmMessage, uiHandlers])
+  }), [toggleReaction, toggleMark, dmId, currentUser.id, messages, retryDmMessage, uiHandlers, advanceOnboardingAfterSend])
 
   // DM endpoint ignores mentionType. Replies are supported — the backend
   // persists replyToId for DMs too.
-  const sendDmMsg = async (markdown: string, attachments?: SendAttachment[]) => {
-    if (!markdown && !attachments?.length) return
-    if (!dmId) return
-    let uploadedAttachments: ReturnType<typeof zipUploadResultsWithDimensions> = []
-    if (attachments?.length) {
-      const results = await Promise.all(
-        attachments.map((a) =>
-          uploadFile.mutateAsync({ target: { dmId }, file: a.file }).catch((e) => {
-            toastApiError(e, "Failed to attach file")
-            return null
-          }),
-        ),
-      )
-      uploadedAttachments = zipUploadResultsWithDimensions(results, attachments)
-    }
-    sendDmMessage.mutate({
+  const acceptDmSend = (markdown: string, attachments?: SendAttachment[]): boolean => {
+    const receipt = acceptDmMessage({
       dmId,
-      content: markdown || "",
-      replyToId: replyTo?.id,
-      attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
-      // Fresh send mints an idempotency nonce; a retry reuses the failed row's
-      // (see `onRetry`) so a 500-after-commit resend dedupes server-side.
-      nonce: sendNonce(),
+      content: markdown,
+      replyTo: replyTo ?? undefined,
+      attachments,
       author: {
         id: currentUser.id,
         name: currentUser.name,
         avatar: currentUser.avatar,
       },
     })
+    if (!receipt.accepted) return false
+    void receipt.committed.then((result) => {
+      if (result.ok) advanceOnboardingAfterSend()
+    })
     communityWsResetTypingThrottle({ channelId: dmId })
     setReplyTo(null)
+    return true
   }
 
   const handleTyping = () => { communityWsSendTyping({ channelId: dmId }) }
@@ -371,7 +379,9 @@ function DmView() {
           onReact={dmBlocked ? undefined : messageActions.onReact}
           onReply={dmBlocked ? undefined : messageActions.onReply}
           onCopy={messageActions.onCopy}
+          onMark={dmBlocked ? undefined : messageActions.onMark}
           onRetry={dmBlocked ? undefined : messageActions.onRetry}
+          onDismiss={dmBlocked ? undefined : messageActions.onDismiss}
           onPreviewImage={messageActions.onPreviewImage}
           onDownloadFile={messageActions.onDownloadFile}
           onOpenProfile={openProfile}
@@ -389,8 +399,8 @@ function DmView() {
           isFetchingNewer={isFetchingNewerMessages}
           onLoadNewer={fetchNewerMessages}
           onJumpToPresent={jumpToPresent}
+          presentVersion={presentVersion}
           unreadCount={unreadCount}
-          onOpenContextSheet={setContextSheetSeq}
           hero={
             <>
               <div className="relative mb-3 w-fit"><Avatar label={dm.avatar} seed={dm.userId} size={64} /></div>
@@ -404,21 +414,24 @@ function DmView() {
             You have blocked this user. Unblock to send messages.
           </div>
         ) : (
-          <Composer
-            channel={dm.name}
-            context="dm"
+          <div data-onboarding-target="dm-composer" data-onboarding-name={dm.name} className="shrink-0">
+            <Composer
+              sendContract="accepted"
+              channel={dm.name}
+              context="dm"
             // DM context short-circuits `rankMentionItems` to `[]` — no popup,
             // no candidate pool needed. Passing [] keeps the Member[] typing
             // honest without shimming friends into a member shape.
             members={[]}
             channelRefCandidates={channelRefCandidates}
-            onSend={sendDmMsg}
+            onAcceptSend={acceptDmSend}
             onTyping={handleTyping}
             replyingTo={replyTo?.authorName}
             onCancelReply={() => setReplyTo(null)}
             autoFocus={bp !== "mobile"}
-            draftKey={`dm/${dmId}`}
-          />
+              draftKey={`dm/${dmId}`}
+            />
+          </div>
         )}
       </main>
       <MessageContextSheet
@@ -426,7 +439,6 @@ function DmView() {
         onOpenChange={(v) => { if (!v) setContextSheetSeq(null) }}
         channelId={dmId}
         targetSeq={contextSheetSeq}
-        onOpenContextSheet={setContextSheetSeq}
         type="dm"
         onOpenProfile={openProfile}
         resolveUserName={resolveUserName}

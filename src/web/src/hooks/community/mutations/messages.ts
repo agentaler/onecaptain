@@ -10,21 +10,40 @@ import { toast } from "sonner"
 import { apiFetch, toastApiError } from "@/lib/api/client"
 import { ApiError } from "@/lib/errors"
 import { communityKeys } from "@/lib/query-keys"
+import { isInlineAttachmentContentType } from "@/lib/community/attachment-content-type"
+import {
+  projectPostedMessage,
+  type PostedMessage,
+} from "@/lib/community/message-wire"
 import { useCommunityStore } from "@/stores/community"
+import { useMessageStreamStore } from "@/stores/community/message-stream"
+import { getMessageOverlay } from "@/stores/community/message-stream"
+import {
+  materializeMessageStream,
+  type CanonicalMessage,
+  type MessageScope,
+} from "@/lib/community/message-stream"
 import type { Msg, Attachment } from "@/components/community/_types"
 import type { MessagesPage } from "@/hooks/community/use-messages"
 import type { PinsResponse } from "@/hooks/community/use-channel-panels"
-import type { MentionType } from "@alook/shared"
-import { isBlocked } from "@alook/shared"
+import type { MarkedResponse, MessageMarkedResponse } from "@/hooks/community/use-inbox"
+import {
+  getForumSidebarBase,
+  hasForumSidebarThread,
+  invalidateForumSidebarBaseExact,
+  isForumSidebarParent,
+  patchForumSidebarActivityExact,
+  patchForumSidebarTitleExact,
+} from "@/hooks/community/use-forum-sidebar-threads"
+import { isBlocked, type MentionType } from "@alook/shared"
 
 /**
  * Message-scoped mutation hooks — the split of the God-context's
  * `sendMessage`/`toggleReaction`/`pinMessage`/etc. into standalone
- * `useMutation` hooks. Every hook writes optimistic state into the shared
- * TanStack Query cache (`communityKeys.channelMessages(id)` /
- * `communityKeys.pins(id)` / etc.), performs the fetch inside `mutationFn`,
- * and rolls back via the context returned from `onMutate` when the request
- * fails.
+ * `useMutation` hooks. Message existence is owned by the session overlay;
+ * field-only operations and panel resources may still patch TanStack Query.
+ * Each hook performs its fetch inside `mutationFn` and applies the matching
+ * reducer/cache terminal transition on success or failure.
  *
  * Rules of engagement:
  * - Never invalidate on success unless there's no server-broadcast path — the
@@ -39,119 +58,92 @@ import { isBlocked } from "@alook/shared"
 
 type PageCache = InfiniteData<MessagesPage>
 
-/**
- * Insert an optimistic message into the newest page. Pages carry ASC rows;
- * "newest" is the FIRST page (pageParam=null). Consumers of `useMessages`
- * concatenate in reverse-page order (oldest page first), so appending to
- * page 0 places the new row at the end of the visible list.
- */
-function prependOptimistic(
-  cache: PageCache | undefined,
-  msg: Msg,
-): PageCache | undefined {
-  if (!cache) return cache
-  if (cache.pages.length === 0) return cache
-  const [first, ...rest] = cache.pages
-  return {
-    ...cache,
-    pages: [{ ...first, messages: [...first.messages, msg] }, ...rest],
-  }
-}
-
-/**
- * Swap an optimistic `temp_` id for the server-assigned id after a successful
- * POST. Walks every page since there's no guarantee which page the row lives
- * in (though the newest is the only realistic one for a fresh insert).
- */
-function reconcileServerId(
-  cache: PageCache | undefined,
-  tempId: string,
-  serverId: string,
-): PageCache | undefined {
-  if (!cache) return cache
-  // Dedupe guard: if the server row is already in the cache (e.g. a
-  // deduped-replay whose WS message-create already landed, or a nonce-based WS
-  // reconcile that already healed this send), DROP the temp row instead of
-  // renaming it — renaming would leave two rows sharing `serverId`. Only when
-  // `serverId` is absent do we rename the optimistic row in place. This also
-  // clears the `failed` flag, since a successful reconcile means the send
-  // landed.
-  const alreadyPresent = cache.pages.some((p) =>
-    p.messages.some((m) => m.id === serverId),
-  )
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    if (!p.messages.some((m) => m.id === tempId)) return p
-    touched = true
-    if (alreadyPresent) {
-      return { ...p, messages: p.messages.filter((m) => m.id !== tempId) }
-    }
-    return {
-      ...p,
-      messages: p.messages.map((m) =>
-        m.id === tempId ? { ...m, id: serverId, failed: false } : m,
-      ),
-    }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
-}
-
-function removeById(
-  cache: PageCache | undefined,
-  id: string,
-): PageCache | undefined {
+function patchContentById(cache: PageCache | undefined, id: string, content: string): PageCache | undefined {
   if (!cache) return cache
   let touched = false
-  const pages = cache.pages.map((p) => {
-    const filtered = p.messages.filter((m) => m.id !== id)
-    if (filtered.length === p.messages.length) return p
-    touched = true
-    return { ...p, messages: filtered }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
+  const pages = cache.pages.map((page) => ({
+    ...page,
+    messages: page.messages.map((message) => {
+      if (message.id !== id) return message
+      touched = true
+      return { ...message, content }
+    }),
+  }))
+  return touched ? { ...cache, pages } : cache
 }
 
-// Drop any row carrying `nonce` as its `clientNonce`. Called on a retry-pill
-// resend BEFORE inserting the fresh optimistic row: the retry reuses the failed
-// row's nonce, so without this both the stale failed row and the new row would
-// share one nonce and the WS by-nonce reconcile would match two rows. Removing
-// the stale one first keeps exactly one row per nonce.
-function removeByNonce(
-  cache: PageCache | undefined,
-  nonce: string,
-): PageCache | undefined {
-  if (!cache) return cache
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    const filtered = p.messages.filter((m) => m.clientNonce !== nonce)
-    if (filtered.length === p.messages.length) return p
-    touched = true
-    return { ...p, messages: filtered }
-  })
-  if (!touched) return cache
-  return { ...cache, pages }
+type EditMessageArgs = {
+  serverId: string
+  channelId: string
+  messageId: string
+  content: string
+  forumChannelId?: string
+  forumThreadId?: string
 }
 
-function markFailedById(
-  cache: PageCache | undefined,
-  id: string,
-): PageCache | undefined {
-  if (!cache) return cache
-  let touched = false
-  const pages = cache.pages.map((p) => {
-    if (!p.messages.some((m) => m.id === id)) return p
-    touched = true
-    return {
-      ...p,
-      messages: p.messages.map((m) =>
-        m.id === id ? { ...m, failed: true } : m,
-      ),
-    }
+type EditMessageContext = {
+  previous: PageCache | undefined
+  previousContent: string | undefined
+  key: readonly unknown[]
+  scope: MessageScope
+  previousMessage: { content: string } | undefined
+  messageKey: readonly unknown[]
+}
+
+export function useEditMessage() {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, EditMessageArgs, EditMessageContext>({
+    mutationFn: async ({ messageId, content }) => {
+      await apiFetch(`/api/community/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content }),
+      })
+    },
+    onMutate: async ({ serverId, channelId, messageId, content }) => {
+      const key = communityKeys.channelMessages(channelId)
+      const scope: MessageScope = { kind: "channel", id: channelId, serverId }
+      const messageKey = communityKeys.message(messageId)
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: key }),
+        queryClient.cancelQueries({ queryKey: messageKey }),
+      ])
+      const previous = queryClient.getQueryData<PageCache>(key)
+      const previousMessage = queryClient.getQueryData<{ content: string }>(messageKey)
+      const previousContent = currentMaterializedMessage(previous, scope, messageId)?.content
+      queryClient.setQueryData<PageCache>(key, (cache) => patchContentById(cache, messageId, content))
+      queryClient.setQueryData<{ content: string }>(messageKey, (message) => message ? { ...message, content } : message)
+      useMessageStreamStore.getState().dispatch(scope, {
+        type: "messageEdited",
+        messageId,
+        content,
+      })
+      return { previous, previousContent, key, scope, previousMessage, messageKey }
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return
+      queryClient.setQueryData(context.key, context.previous)
+      if (context.previousContent !== undefined) {
+        useMessageStreamStore.getState().dispatch(context.scope, {
+          type: "messageEdited",
+          messageId: _variables.messageId,
+          content: context.previousContent,
+        })
+      }
+      queryClient.setQueryData(context.messageKey, context.previousMessage)
+    },
+    onSuccess: (_data, variables) => {
+      if (variables.forumChannelId) void queryClient.invalidateQueries({ queryKey: communityKeys.channelMessages(variables.forumChannelId) })
+      if (variables.forumThreadId) {
+        patchForumSidebarTitleExact(
+          queryClient,
+          variables.serverId,
+          variables.forumThreadId,
+          variables.content,
+        )
+      }
+    },
   })
-  if (!touched) return cache
-  return { ...cache, pages }
 }
 
 /**
@@ -160,14 +152,22 @@ function markFailedById(
  * Exported for direct unit testing — see `to-attachment-vm.test.ts`.
  */
 export function toAttachmentVm(
-  a: { url: string; filename: string; contentType: string; size: number; width?: number; height?: number },
+  channelId: string,
+  a: { id: string; filename: string; contentType: string; size: number; width?: number; height?: number },
 ): Attachment {
-  const isImage = a.contentType.startsWith("image/")
-  if (isImage) return { kind: "image", name: a.filename, url: a.url, width: a.width, height: a.height }
+  // Reserve-by-id (route/disc step 2b): the server no longer returns a `url` for
+  // a fresh upload — it returns the attachment `id`. The display URL is
+  // id-addressed (the canonical `channels/{id}/attachments/{attachmentId}` door)
+  // and derived HERE client-side, matching what the server's read path emits via
+  // `attachmentUrl`. This keeps the optimistic row's image src identical to the
+  // reconciled row that arrives over WS.
+  const url = `/api/community/channels/${channelId}/attachments/${a.id}`
+  const isImage = isInlineAttachmentContentType(a.contentType)
+  if (isImage) return { kind: "image", name: a.filename, url, width: a.width, height: a.height }
   return {
     kind: "file",
     name: a.filename,
-    url: a.url,
+    url,
     size: a.size ? `${Math.round(a.size / 1024)} KB` : "",
   }
 }
@@ -192,11 +192,18 @@ export function sendNonce(): string {
 // ── Send message (channel/thread) ──────────────────────────────────────────
 
 export type SendMessageArgs = {
+  serverId: string
   channelId: string
+  forumParentChannelId?: string
   content: string
   replyToId?: string
+  replyTo?: Msg["replyTo"]
   mentionType?: MentionType
-  attachments?: { url: string; filename: string; contentType: string; size: number; width?: number; height?: number }[]
+  // Reserve-by-id: pre-uploaded pending-attachment descriptors. Only `id` is
+  // sent to the server (in an id array); the rest drive the optimistic VM
+  // (whose url is derived client-side from `id`). No `url` field — the upload
+  // no longer returns one.
+  attachments?: { id: string; filename: string; contentType: string; size: number; width?: number; height?: number }[]
   author: { id: string; name: string; avatar: string }
   // Idempotency nonce. Omitted on a fresh send (the hook mints one); the
   // retry-pill caller passes the failed row's nonce back so the resend reuses
@@ -208,7 +215,7 @@ export type SendMessageArgs = {
 // the same nonce — `message` is the canonical (original) row, nothing new was
 // inserted. The caller treats it as success (reconcile the optimistic row,
 // clear the failed pill), never as a failure to resend.
-export type SendMessageResult = { message: { id: string }; deduped?: boolean }
+export type SendMessageResult = { message: PostedMessage; deduped?: boolean }
 
 /**
  * Channel/thread send. The server infers thread-vs-channel routing from the
@@ -220,73 +227,34 @@ export function useSendMessage() {
   return useMutation<
     SendMessageResult,
     Error,
-    SendMessageArgs,
-    { tempId: string; key: readonly unknown[] }
+    SendMessageArgs
   >({
-    mutationFn: async ({ channelId, content, replyToId, mentionType, attachments, nonce }) => {
+    mutationFn: async ({ channelId, content, replyToId, replyTo, mentionType, attachments, nonce }) => {
+      // Server receives only the attachment IDS (reserve-by-id); the rest of the
+      // descriptor is client-only (optimistic VM). Dimensions already rode the
+      // upload, so they are NOT re-sent here (single-source guard).
+      const attachmentIds = attachments?.map((a) => a.id)
       return apiFetch<SendMessageResult>(
         `/api/community/channels/${channelId}/messages`,
         {
           method: "POST",
-          body: JSON.stringify({ content, replyToId, mentionType, attachments, nonce }),
+          body: JSON.stringify({
+            content,
+            replyToId: replyTo?.id ?? replyToId,
+            mentionType,
+            attachments: attachmentIds,
+            nonce,
+          }),
         },
       )
     },
-    onMutate: async (args) => {
-      const key = communityKeys.channelMessages(args.channelId)
-      await queryClient.cancelQueries({ queryKey: key })
-      const tempId = tempMessageId()
-      // Caller supplies the nonce (fresh send mints one, retry reuses the
-      // failed row's). Stamped on the optimistic row so a WS message-create
-      // echoing the same nonce can reconcile this row by nonce — this heals the
-      // no-click phantom (500-after-commit the user never retried).
-      const nonce = args.nonce
-      // Retry reuses the failed row's nonce — drop that stale row first so
-      // exactly one row carries this nonce (else the WS by-nonce reconcile
-      // would match two).
-      if (nonce) {
-        queryClient.setQueryData<PageCache>(key, (c) => removeByNonce(c, nonce))
+    onError: (err, args) => {
+      if (args.nonce) {
+        useMessageStreamStore.getState().dispatch(
+          { kind: "channel", id: args.channelId, serverId: args.serverId },
+          { type: "postFail", nonce: args.nonce },
+        )
       }
-      const cache = queryClient.getQueryData<PageCache>(key)
-      let replyTo: Msg["replyTo"] | undefined
-      if (args.replyToId && cache) {
-        for (const page of cache.pages) {
-          const original = page.messages.find((m) => m.id === args.replyToId)
-          if (original) {
-            replyTo = {
-              id: args.replyToId,
-              authorName: original.authorName ?? "Unknown",
-              text: (original.content ?? "").slice(0, 100),
-            }
-            break
-          }
-        }
-        if (!replyTo) {
-          replyTo = { id: args.replyToId, authorName: "Unknown", text: "" }
-        }
-      }
-      const optimisticAttachments = args.attachments?.map(toAttachmentVm)
-      const msg: Msg = {
-        id: tempId,
-        type: "chat",
-        // #3: stamp the sender's userId onto optimistic rows so
-        // `useChannelWatermark` recognizes them as self-authored (skip
-        // client PUT — server-side write path already writes the sender's
-        // watermark on POST, see #1).
-        authorId: args.author.id,
-        authorName: args.author.name,
-        authorAvatar: args.author.avatar,
-        content: args.content,
-        createdAt: new Date().toISOString(),
-        ...(nonce ? { clientNonce: nonce } : {}),
-        ...(replyTo ? { replyTo } : {}),
-        ...(optimisticAttachments?.length ? { attachments: optimisticAttachments } : {}),
-      }
-      queryClient.setQueryData<PageCache>(key, (c) => prependOptimistic(c, msg))
-      return { tempId, key }
-    },
-    onError: (err, _args, ctx) => {
-      if (!ctx) return
       // 429: server-side rate limit. Fire an explicit toast so the user
       // knows why the send failed — otherwise the only signal is a
       // `failed: true` pill, which reads like a generic error. The row
@@ -300,14 +268,35 @@ export function useSendMessage() {
         // failures outside the 429 case.
         toastApiError(err, "Failed to send message")
       }
-      queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.channelMessages>, (c) =>
-        markFailedById(c, ctx.tempId),
-      )
     },
-    onSuccess: (data, _args, ctx) => {
-      if (!ctx) return
-      queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.channelMessages>, (c) =>
-        reconcileServerId(c, ctx.tempId, data.message.id),
+    onSuccess: (data, args) => {
+      if (
+        args.forumParentChannelId &&
+        isForumSidebarParent(queryClient, args.serverId, args.forumParentChannelId)
+      ) {
+        const canonical = hasForumSidebarThread(
+          getForumSidebarBase(queryClient, args.serverId),
+          args.channelId,
+        )
+        patchForumSidebarActivityExact(
+          queryClient,
+          args.serverId,
+          args.channelId,
+          args.forumParentChannelId,
+          data.message.createdAt,
+        )
+        if (!canonical) {
+          void invalidateForumSidebarBaseExact(queryClient, args.serverId)
+        }
+      }
+      if (!args.nonce) return
+      useMessageStreamStore.getState().dispatch(
+        { kind: "channel", id: args.channelId, serverId: args.serverId },
+        {
+          type: "postAck",
+          nonce: args.nonce,
+          message: projectPostedMessage(data.message, args.nonce),
+        },
       )
     },
   })
@@ -319,90 +308,62 @@ export type SendDmMessageArgs = {
   dmId: string
   content: string
   replyToId?: string
-  attachments?: { url: string; filename: string; contentType: string; size: number; width?: number; height?: number }[]
-  author: { id: string; name: string; avatar: string }
-  // Idempotency nonce — see `SendMessageArgs.nonce`.
-  nonce?: string
+  replyTo?: Msg["replyTo"]
+  // Reserve-by-id (see SendMessageArgs.attachments): id-bearing descriptors;
+  // only `id` reaches the server.
+  attachments?: { id: string; filename: string; contentType: string; size: number; width?: number; height?: number }[]
+  nonce: string
 }
 
 export function useSendDmMessage() {
-  const queryClient = useQueryClient()
   return useMutation<
     SendMessageResult,
     Error,
-    SendDmMessageArgs,
-    { tempId: string; key: readonly unknown[] }
+    SendDmMessageArgs
   >({
-    mutationFn: async ({ dmId, content, replyToId, attachments, nonce }) => {
+    mutationFn: async ({ dmId, content, replyToId, replyTo, attachments, nonce }) => {
+      const attachmentIds = attachments?.map((a) => a.id)
       return apiFetch<SendMessageResult>(
-        `/api/community/dm/${dmId}/messages`,
+        `/api/community/channels/${dmId}/messages`,
         {
           method: "POST",
-          body: JSON.stringify({ content, replyToId, attachments, nonce }),
+          body: JSON.stringify({
+            content,
+            replyToId: replyTo?.id ?? replyToId,
+            attachments: attachmentIds,
+            nonce,
+          }),
         },
       )
     },
-    onMutate: async (args) => {
-      const key = communityKeys.dmMessages(args.dmId)
-      await queryClient.cancelQueries({ queryKey: key })
-      const tempId = tempMessageId()
-      // Idempotency nonce — mirror the channel path. Caller mints on fresh
-      // send / reuses the failed row's on retry; stamp it on the optimistic
-      // row for WS-by-nonce reconcile.
-      const nonce = args.nonce
-      if (nonce) {
-        queryClient.setQueryData<PageCache>(key, (c) => removeByNonce(c, nonce))
-      }
-      const optimisticAttachments = args.attachments?.map(toAttachmentVm)
-      const msg: Msg = {
-        id: tempId,
-        type: "chat",
-        // Mirror the channel path: stamp the sender's userId so the
-        // self-send auto-scroll effect in <MessageList> (gated on
-        // `tail.authorId === viewerUserId`) recognizes the optimistic row
-        // as viewer-authored and pins to bottom on send.
-        authorId: args.author.id,
-        authorName: args.author.name,
-        authorAvatar: args.author.avatar,
-        content: args.content,
-        createdAt: new Date().toISOString(),
-        ...(nonce ? { clientNonce: nonce } : {}),
-        ...(optimisticAttachments?.length ? { attachments: optimisticAttachments } : {}),
-      }
-      queryClient.setQueryData<PageCache>(key, (c) => prependOptimistic(c, msg))
-      return { tempId, key }
-    },
-    onError: (err, _args, ctx) => {
-      if (!ctx) return
-      // 403 "blocked" is a friendly signal (recipient has blocked the sender) —
-      // scrub the optimistic row and show a scoped toast rather than leaving a
-      // `failed: true` bubble in place. Mirrors the old context's `onBlocked`
-      // branch at contexts/community/context.tsx:1021-1027.
+    onError: (err, args) => {
+      const scope = { kind: "dm" as const, id: args.dmId }
       if (err instanceof ApiError && err.status === 403 && isBlocked(err.message)) {
-        queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.dmMessages>, (c) =>
-          removeById(c, ctx.tempId),
-        )
+        useMessageStreamStore.getState().dispatch(scope, {
+          type: "terminalReject",
+          nonce: args.nonce,
+        })
         toast("You cannot send messages to this user")
         return
       }
-      // 429: server-side rate limit. Fire a scoped toast so the user knows
-      // the send was throttled; still mark the row `failed: true` so the
-      // retry pill is available (mirrors the channel path).
+      useMessageStreamStore.getState().dispatch(scope, {
+        type: "postFail",
+        nonce: args.nonce,
+      })
       if (err instanceof ApiError && err.status === 429) {
         toast.error("Rate limited — please wait a moment before trying again")
       } else {
-        // Any other failure besides 429/blocked (handled above) — the
-        // `failed: true` pill is a retry affordance, not a reason.
         toastApiError(err, "Failed to send message")
       }
-      queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.dmMessages>, (c) =>
-        markFailedById(c, ctx.tempId),
-      )
     },
-    onSuccess: (data, _args, ctx) => {
-      if (!ctx) return
-      queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.dmMessages>, (c) =>
-        reconcileServerId(c, ctx.tempId, data.message.id),
+    onSuccess: (data, args) => {
+      useMessageStreamStore.getState().dispatch(
+        { kind: "dm", id: args.dmId },
+        {
+          type: "postAck",
+          nonce: args.nonce,
+          message: projectPostedMessage(data.message, args.nonce),
+        },
       )
     },
   })
@@ -411,16 +372,12 @@ export function useSendDmMessage() {
 // ── Toggle reaction ────────────────────────────────────────────────────────
 
 export type ToggleReactionArgs = {
+  serverId?: string
   channelId?: string
   dmId?: string
   messageId: string
   emoji: string
   userId: string
-}
-
-type ToggleReactionCtx = {
-  key: readonly unknown[]
-  originalMe: boolean
 }
 
 // Apply an optimistic reaction toggle to any page cache that contains the
@@ -437,32 +394,76 @@ function togglePageCacheReaction(
   const pages = cache.pages.map((p) => {
     if (!p.messages.some((m) => m.id === messageId)) return p
     touched = true
-    const nextMessages = p.messages.map((m) => {
-      if (m.id !== messageId) return m
-      const reactions = (m.reactions ?? []).map((r) => ({ ...r, userIds: [...(r.userIds ?? [])] }))
-      const existing = reactions.find((r) => r.emoji === emoji)
-      if (add) {
-        if (existing) {
-          if (!existing.userIds.includes(userId)) {
-            existing.userIds.push(userId)
-            existing.count = existing.userIds.length
-          }
-          existing.me = true
-        } else {
-          reactions.push({ emoji, count: 1, me: true, userIds: [userId] })
-        }
-      } else if (existing) {
-        existing.userIds = existing.userIds.filter((id) => id !== userId)
-        existing.count = existing.userIds.length
-        existing.me = false
-        if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
-      }
-      return { ...m, reactions }
-    })
+    const nextMessages = p.messages.map((m) =>
+      m.id === messageId ? toggleMessageReaction(m, emoji, userId, add) : m)
     return { ...p, messages: nextMessages }
   })
   if (!touched) return cache
   return { ...cache, pages }
+}
+
+function toggleMessageReaction(
+  message: Msg,
+  emoji: string,
+  userId: string,
+  add: boolean,
+): Msg {
+  const reactions = (message.reactions ?? []).map((reaction) => ({
+    ...reaction,
+    userIds: [...(reaction.userIds ?? [])],
+  }))
+  const existing = reactions.find((reaction) => reaction.emoji === emoji)
+  if (add) {
+    if (existing) {
+      if (!existing.userIds.includes(userId)) existing.userIds.push(userId)
+      existing.count = existing.userIds.length
+      existing.me = true
+    } else {
+      reactions.push({ emoji, count: 1, me: true, userIds: [userId] })
+    }
+  } else if (existing) {
+    existing.userIds = existing.userIds.filter((id) => id !== userId)
+    existing.count = existing.userIds.length
+    existing.me = false
+    if (existing.count <= 0) reactions.splice(reactions.indexOf(existing), 1)
+  }
+  return { ...message, reactions }
+}
+
+function messageScope(args: ToggleReactionArgs): MessageScope | undefined {
+  if (args.channelId && args.serverId) {
+    return { kind: "channel", id: args.channelId, serverId: args.serverId }
+  }
+  return args.dmId ? { kind: "dm", id: args.dmId } : undefined
+}
+
+function currentMaterializedMessage(
+  cache: PageCache | undefined,
+  scope: MessageScope,
+  messageId: string,
+): Msg | undefined {
+  const base = cache?.pages.flatMap((page) => page.messages)
+    .filter((message): message is CanonicalMessage => message.seq !== undefined) ?? []
+  return materializeMessageStream(base, getMessageOverlay(scope))
+    .find((message) => message.id === messageId)
+}
+
+function refreshExistingReactionFallback(
+  cache: PageCache | undefined,
+  args: ToggleReactionArgs,
+  add: boolean,
+): void {
+  const scope = messageScope(args)
+  if (!scope) return
+  const overlay = getMessageOverlay(scope)
+  const existing = [...overlay.liveById.values()].find((message) => message.id === args.messageId)
+  if (!existing) return
+  const source = currentMaterializedMessage(cache, scope, args.messageId) ?? existing
+  if (source.seq === undefined) return
+  useMessageStreamStore.getState().dispatch(scope, {
+    type: "liveRefreshed",
+    message: toggleMessageReaction(source, args.emoji, args.userId, add) as CanonicalMessage,
+  })
 }
 
 function currentMeStatus(
@@ -477,63 +478,6 @@ function currentMeStatus(
     return msg.reactions?.find((r) => r.emoji === emoji)?.me ?? false
   }
   return false
-}
-
-/**
- * Toggle a reaction on a message. Optimistic: flips `me` immediately, rolls
- * back on server failure. The HTTP method (`PUT` add vs `DELETE` remove) is
- * derived from the cache read at call-time inside `mutationFn` — capturing
- * the original state before the optimistic flip.
- *
- * Note: consumers usually want `useToggleReactionApi()` below — a
- * fire-and-forget callable — because reactions don't need pending UI.
- */
-export function useToggleReaction() {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, ToggleReactionArgs, ToggleReactionCtx>({
-    mutationFn: async (args, ..._rest) => {
-      // Re-read cache at call time to pick the correct verb. The optimistic
-      // write in onMutate has already flipped `me` in cache, but we captured
-      // `originalMe` in the context — pull it from there via a ref map. In
-      // practice mutationFn doesn't receive ctx, so we re-derive from the
-      // originalMe stashed by `onMutate` in a shared closure via `queryClient
-      // .getMutationCache()`. Simpler: encode the verb into args pre-call.
-      void _rest
-      const key = args.channelId
-        ? communityKeys.channelMessages(args.channelId)
-        : args.dmId
-          ? communityKeys.dmMessages(args.dmId)
-          : communityKeys.channelMessages("__none__")
-      // The cache at this point reflects the optimistic flip. Reverse-derive:
-      // if the current `me` after flip is TRUE, we're adding; ELSE removing.
-      const cache = queryClient.getQueryData<PageCache>(key)
-      const meAfterFlip = currentMeStatus(cache, args.messageId, args.emoji)
-      const method = meAfterFlip ? "PUT" : "DELETE"
-      const url = `/api/community/messages/${args.messageId}/reactions/${encodeURIComponent(args.emoji)}`
-      await apiFetch(url, { method })
-    },
-    onMutate: async (args) => {
-      const key = args.channelId
-        ? communityKeys.channelMessages(args.channelId)
-        : args.dmId
-          ? communityKeys.dmMessages(args.dmId)
-          : communityKeys.channelMessages("__none__")
-      await queryClient.cancelQueries({ queryKey: key })
-      const cache = queryClient.getQueryData<PageCache>(key)
-      const originalMe = currentMeStatus(cache, args.messageId, args.emoji)
-      const nextMe = !originalMe
-      queryClient.setQueryData<PageCache>(key, (c) =>
-        togglePageCacheReaction(c, args.messageId, args.emoji, args.userId, nextMe),
-      )
-      return { key, originalMe }
-    },
-    onError: (_err, args, ctx) => {
-      if (!ctx) return
-      queryClient.setQueryData<PageCache>(ctx.key as ReturnType<typeof communityKeys.channelMessages>, (c) =>
-        togglePageCacheReaction(c, args.messageId, args.emoji, args.userId, ctx.originalMe),
-      )
-    },
-  })
 }
 
 // #9: 300ms coalescing window. A user tapping the same reaction pill in rapid
@@ -571,13 +515,20 @@ export function useToggleReactionApi(): (args: ToggleReactionArgs) => void {
         ? communityKeys.dmMessages(args.dmId)
         : communityKeys.channelMessages("__none__")
     const cache = queryClient.getQueryData<PageCache>(key)
-    const wasMe = currentMeStatus(cache, args.messageId, args.emoji)
+    const scope = messageScope(args)
+    const source = scope
+      ? currentMaterializedMessage(cache, scope, args.messageId)
+      : undefined
+    const wasMe = source
+      ? source.reactions?.find((reaction) => reaction.emoji === args.emoji)?.me ?? false
+      : currentMeStatus(cache, args.messageId, args.emoji)
     const nextMe = !wasMe
     // Optimistic write is always synchronous — the debounce only defers the
     // API call, not the visible UI.
     queryClient.setQueryData<PageCache>(key, (c) =>
       togglePageCacheReaction(c, args.messageId, args.emoji, args.userId, nextMe),
     )
+    refreshExistingReactionFallback(queryClient.getQueryData<PageCache>(key), args, nextMe)
 
     const timerKey = `${args.messageId}:${args.emoji}`
     const reactionTimers = useCommunityStore.getState().reactionTimers
@@ -605,6 +556,7 @@ export function useToggleReactionApi(): (args: ToggleReactionArgs) => void {
         queryClient.setQueryData<PageCache>(key, (c) =>
           togglePageCacheReaction(c, args.messageId, args.emoji, args.userId, originalMe),
         )
+        refreshExistingReactionFallback(queryClient.getQueryData<PageCache>(key), args, originalMe)
       })
     }, REACTION_DEBOUNCE_MS)
     reactionTimers.set(timerKey, { timer, originalMe })
@@ -663,9 +615,113 @@ export function useUnpinMessage() {
   })
 }
 
+// ── Mark / unmark (per-user saved messages) ──────────────────────────────────
+//
+// mark ≠ pin: a pin is channel-scoped and shared; a mark is the viewer's own
+// private saved-messages set. So these hit a distinct per-user route
+// (`/api/community/messages/{id}/marks`, self-scoped by ctx.userId server-side), never the
+// pins route. The ⋯ menu's Mark/Unmark label is driven by `useMessageMarked`
+// (a lazy single-row read on menu-open); these mutations flip that per-message
+// cache optimistically so the label updates instantly, and prune the Marked
+// list on unmark. POST is idempotent server-side (UNIQUE(userId,messageId)).
+
+export type MarkMessageArgs = { channelId: string; messageId: string }
+
+export function useMarkMessage() {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, MarkMessageArgs, { prev: MessageMarkedResponse | undefined }>({
+    mutationFn: async ({ channelId, messageId }) => {
+      // Message-keyed mark door (route/disc marks relocation): messageId in path,
+      // channelId in body (the membership + belongs-to-channel gate). PUT = mark.
+      await apiFetch(`/api/community/messages/${messageId}/marks`, {
+        method: "PUT",
+        body: JSON.stringify({ channelId }),
+      })
+    },
+    onMutate: async ({ messageId }) => {
+      const key = communityKeys.messageMarked(messageId)
+      await queryClient.cancelQueries({ queryKey: key })
+      const prev = queryClient.getQueryData<MessageMarkedResponse>(key)
+      queryClient.setQueryData<MessageMarkedResponse>(key, { marked: true })
+      return { prev }
+    },
+    onSuccess: () => {
+      // The Marked list gains a row — refetch it so the tab reflects the new
+      // save next time it's opened (list carries the enriched snapshot + seq
+      // we don't reconstruct locally).
+      void queryClient.invalidateQueries({ queryKey: communityKeys.inboxMarked() })
+    },
+    onError: (err, args, ctx) => {
+      queryClient.setQueryData(communityKeys.messageMarked(args.messageId), ctx?.prev)
+      toastApiError(err, "Failed to mark message")
+    },
+  })
+}
+
+export type UnmarkMessageArgs = { messageId: string }
+
+export function useUnmarkMessage() {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, UnmarkMessageArgs, {
+    prevMarked: MessageMarkedResponse | undefined
+    prevList: MarkedResponse | undefined
+  }>({
+    mutationFn: async ({ messageId }) => {
+      await apiFetch(`/api/community/messages/${messageId}/marks`, { method: "DELETE" })
+    },
+    onMutate: async ({ messageId }) => {
+      const markedKey = communityKeys.messageMarked(messageId)
+      const listKey = communityKeys.inboxMarked()
+      await queryClient.cancelQueries({ queryKey: markedKey })
+      const prevMarked = queryClient.getQueryData<MessageMarkedResponse>(markedKey)
+      const prevList = queryClient.getQueryData<MarkedResponse>(listKey)
+      queryClient.setQueryData<MessageMarkedResponse>(markedKey, { marked: false })
+      // Drop the row from the Marked list immediately (list rows are keyed by
+      // the message id via `m.id`, mirroring useDeleteMention's optimistic prune).
+      queryClient.setQueryData<MarkedResponse | undefined>(listKey, (prev) =>
+        prev ? { ...prev, marked: prev.marked.filter((mk) => mk.m.id !== messageId) } : prev,
+      )
+      return { prevMarked, prevList }
+    },
+    onError: (err, args, ctx) => {
+      queryClient.setQueryData(communityKeys.messageMarked(args.messageId), ctx?.prevMarked)
+      if (ctx?.prevList) queryClient.setQueryData(communityKeys.inboxMarked(), ctx.prevList)
+      toastApiError(err, "Failed to unmark message")
+    },
+  })
+}
+
+/**
+ * Toggle a message's marked state with one call. Reads the per-message
+ * `messageMarked` cache — populated by `useMessageMarked` when the menu that
+ * fired this action opened — to decide POST (mark) vs DELETE (unmark). If the
+ * read hasn't landed yet (cache miss), defaults to marking, which is safe:
+ * POST is idempotent server-side, so a double-mark is a no-op rather than an
+ * error. Returns a stable callback for the message-actions bundle.
+ */
+export function useToggleMark() {
+  const queryClient = useQueryClient()
+  const { mutate: markMutate } = useMarkMessage()
+  const { mutate: unmarkMutate } = useUnmarkMessage()
+  return useCallback(
+    (channelId: string, messageId: string) => {
+      const cached = queryClient.getQueryData<MessageMarkedResponse>(
+        communityKeys.messageMarked(messageId),
+      )
+      if (cached?.marked) {
+        unmarkMutate({ messageId }, { onSuccess: () => toast("Removed from marked") })
+      } else {
+        markMutate({ channelId, messageId }, { onSuccess: () => toast("Message marked") })
+      }
+    },
+    [queryClient, markMutate, unmarkMutate],
+  )
+}
+
 // ── Create thread ──────────────────────────────────────────────────────────
 
 export type CreateThreadArgs = {
+  serverId: string
   channelId: string // parent channel — used to invalidate the threads list
   messageId: string
   name: string
@@ -677,9 +733,11 @@ export function useCreateThread() {
   const queryClient = useQueryClient()
   return useMutation<CreateThreadResult, Error, CreateThreadArgs>({
     mutationFn: async ({ messageId, name }) => {
+      // Unified create door (route/disc create-door step): POST /channels with
+      // {type:"thread", messageId, name} → get-or-create thread by root message.
       return apiFetch<CreateThreadResult>(
-        `/api/community/messages/${messageId}/threads`,
-        { method: "POST", body: JSON.stringify({ name }) },
+        `/api/community/channels`,
+        { method: "POST", body: JSON.stringify({ type: "thread", messageId, name }) },
       )
     },
     onSuccess: (data, args) => {
@@ -706,6 +764,23 @@ export function useCreateThread() {
           return { ...cache, pages }
         },
       )
+      const scope: MessageScope = { kind: "channel", id: args.channelId, serverId: args.serverId }
+      const fallback = [...getMessageOverlay(scope).liveById.values()]
+        .find((message) => message.id === args.messageId)
+      if (fallback) {
+        const cached = queryClient.getQueryData<PageCache>(communityKeys.channelMessages(args.channelId))
+        const source = currentMaterializedMessage(cached, scope, args.messageId) ?? fallback
+        if (source.seq !== undefined) {
+          useMessageStreamStore.getState().dispatch(scope, {
+            type: "liveRefreshed",
+            message: {
+              ...source,
+              seq: source.seq,
+              thread: { id: data.id, name: args.name, messageCount: 0 },
+            },
+          })
+        }
+      }
       void queryClient.invalidateQueries({ queryKey: communityKeys.threads(args.channelId) })
     },
   })
@@ -783,11 +858,11 @@ export type ScheduleMarkReadOpts = {
  * unique strings without a discriminated-union tag on `PendingRead`.
  */
 function resolveReadEndpoint(key: string): string {
-  if (key.startsWith("dm:")) {
-    const dmId = key.slice(3)
-    return `/api/community/dm/${dmId}/read`
-  }
-  return `/api/community/channels/${key}/read`
+  // DM and channel both resolve through the one canonical read door (a DM is a
+  // channel row in the same id-space); the `dm:` key prefix only strips to the
+  // channelId, no per-type URL fork.
+  const channelId = key.startsWith("dm:") ? key.slice(3) : key
+  return `/api/community/channels/${channelId}/read`
 }
 
 /**
@@ -936,11 +1011,46 @@ export function useAdvanceChannelWatermark(): (
   }
 }
 
+// ── Read a forum opener from Inbox ──────────────────────────────────────
+
+export type ReadForumThreadFromInboxArgs = {
+  parentChannelId: string
+  openerMessageId: string
+}
+
+/**
+ * Immediate progressive read used only by an opener-backed Inbox row.
+ *
+ * Unlike viewport watermarks this is not debounced: the click starts the
+ * parent read and navigation immediately. There is deliberately no onMutate
+ * cache trim. Success refreshes Inbox/server aggregates; failure keeps the
+ * unread row and only reports the error.
+ */
+export function useReadForumThreadFromInbox() {
+  const queryClient = useQueryClient()
+  return useMutation<void, Error, ReadForumThreadFromInboxArgs>({
+    mutationFn: async ({ parentChannelId, openerMessageId }) => {
+      await apiFetch(`/api/community/channels/${parentChannelId}/read`, {
+        method: "PUT",
+        body: JSON.stringify({ lastReadMessageId: openerMessageId }),
+      })
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: communityKeys.inbox() })
+      void queryClient.invalidateQueries({ queryKey: communityKeys.servers() })
+    },
+    onError: (error) => {
+      toastApiError(error, "Failed to mark forum post read")
+    },
+  })
+}
+
 // ── Advance DM watermark (progressive read) ───────────────────────────────
 
 /**
  * DM sibling of `useAdvanceChannelWatermark` — a thin wrapper that PUTs
- * `{ lastReadMessageId }` to `/api/community/dm/:id/read`. Same debounce
+ * `{ lastReadMessageId }` to `/api/community/channels/:id/read` (DM and
+ * channel share the one canonical read door). Same debounce
  * primitive underneath (`scheduleMarkRead`), keyed by `"dm:<dmId>"` so
  * DM and channel schedules never alias each other in the shared pending
  * map.
@@ -974,7 +1084,7 @@ export function useMarkDmRead() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, MarkDmReadArgs, { snapshot: unknown } | undefined>({
     mutationFn: async ({ dmId }) => {
-      await apiFetch(`/api/community/dm/${dmId}/read`, { method: "PUT" })
+      await apiFetch(`/api/community/channels/${dmId}/read`, { method: "PUT" })
     },
     onMutate: async (args) => {
       const key = communityKeys.dms()
@@ -999,9 +1109,9 @@ export function useMarkAllInboxRead() {
   return useMutation<void, Error, void>({
     mutationFn: async () => {
       await Promise.all([
-        apiFetch("/api/community/inbox/mentions/read-all", { method: "POST" }),
-        apiFetch("/api/community/inbox/unreads/read-all", { method: "POST" }),
-        apiFetch("/api/community/inbox/dms/read-all", { method: "POST" }),
+        apiFetch("/api/community/users/me/inbox/mentions/read-all", { method: "POST" }),
+        apiFetch("/api/community/users/me/inbox/unreads/read-all", { method: "POST" }),
+        apiFetch("/api/community/users/me/inbox/dms/read-all", { method: "POST" }),
       ])
     },
     onMutate: async () => {
@@ -1033,7 +1143,7 @@ export function useDeleteMention() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, DeleteMentionArgs, { snapshot: unknown }>({
     mutationFn: async ({ mentionId }) => {
-      await apiFetch(`/api/community/inbox/mentions/${mentionId}`, { method: "DELETE" })
+      await apiFetch(`/api/community/users/me/inbox/mentions/${mentionId}`, { method: "DELETE" })
     },
     onMutate: async (args) => {
       const key = communityKeys.inboxMentions()

@@ -1,5 +1,6 @@
 import { DEFAULT_MESSAGE_PAGE_SIZE, MAX_MESSAGE_PAGE_SIZE } from "@alook/shared"
-import { mediaUrlFromKey } from "./storage"
+import { isInlineAttachmentContentType } from "./attachment-content-type"
+import { attachmentUrl } from "./storage"
 
 // Format file sizes for display
 function formatBytes(bytes: number): string {
@@ -94,16 +95,43 @@ export function buildAnchorResponse<T extends { createdAt: string; id: string }>
 
 // Compose the since-mode response envelope. Rows arrive ASC with `+1` extra
 // probe; slice off the probe and encode `newerCursor` as the newest row.
+//
+// A since response is a FORWARD delta (rows strictly newer than the `since`
+// cursor), designed to MERGE into an existing multi-page cache where the older
+// edge is supplied by the pre-existing oldest page. But a since page can end up
+// being the ONLY / oldest page (reconnect installs it as pages[0] with prior
+// pages gc'd; or the persister rehydrates it standalone). When it does, the
+// client reads the older-side signal off THIS page (`hasMoreOlder ?? hasMore ??
+// false`) — and a since envelope carried none, so scroll-up silently died and
+// all history before the delta became unreachable. Emit the older-side signal
+// too: the delta's oldest row is `since`+1, so the `since` row and everything
+// before it are provably older → `hasMoreOlder: true` + `olderCursor` = the
+// oldest returned row. This is a true statement, not a fabrication, and it's
+// inert on the healthy path (a since page there is pages[0]=newest, never the
+// oldest page the client reads the older-signal from). Empty delta (no rows
+// newer than `since`) fabricates nothing — same `items.length > 0` guard as
+// `newerCursor`. Backward pagination terminates naturally once it reaches the
+// true oldest row (that older fetch returns `hasMore: false`).
 export function buildSinceResponse<T extends { createdAt: string; id: string }>(
   rows: T[],
   pageSize: number,
-): { items: T[]; hasMoreNewer: boolean; newerCursor: string | undefined } {
+): {
+  items: T[]
+  hasMoreNewer: boolean
+  newerCursor: string | undefined
+  hasMoreOlder: boolean
+  olderCursor: string | undefined
+} {
   const hasMoreNewer = rows.length > pageSize
   const items = hasMoreNewer ? rows.slice(0, pageSize) : rows
   const newerCursor = hasMoreNewer && items.length > 0
     ? `${items[items.length - 1].createdAt}|${items[items.length - 1].id}`
     : undefined
-  return { items, hasMoreNewer, newerCursor }
+  const hasMoreOlder = items.length > 0
+  const olderCursor = hasMoreOlder
+    ? `${items[0].createdAt}|${items[0].id}`
+    : undefined
+  return { items, hasMoreNewer, newerCursor, hasMoreOlder, olderCursor }
 }
 
 // Build a paginated member response — same shape as buildPaginatedResponse but
@@ -125,16 +153,16 @@ export function buildMemberPaginatedResponse<T extends { joinedAt: string; id: s
 // with `messageId = null` (pending, not yet linked to a message) are skipped —
 // the read paths never surface them.
 export function groupAttachments(
-  attachments: Array<{ messageId: string | null; filename: string; r2Key: string; contentType: string | null; size: number | null; width?: number | null; height?: number | null }>
+  attachments: Array<{ id: string; messageId: string | null; targetId: string; filename: string; r2Key: string; contentType: string | null; size: number | null; width?: number | null; height?: number | null }>
 ): Record<string, Array<{ kind: "image" | "file"; name: string; url: string; size?: string; width?: number; height?: number }>> {
   const map: Record<string, Array<{ kind: "image" | "file"; name: string; url: string; size?: string; width?: number; height?: number }>> = {}
   for (const a of attachments) {
     if (!a.messageId) continue
-    const kind = a.contentType?.startsWith("image/") ? "image" : "file"
+    const kind = isInlineAttachmentContentType(a.contentType) ? "image" : "file"
     const entry = {
       kind,
       name: a.filename,
-      url: mediaUrlFromKey(a.r2Key),
+      url: attachmentUrl(a.targetId, a.id),
       ...(kind === "file" && a.size ? { size: formatBytes(a.size) } : {}),
       ...(kind === "image" ? { width: a.width ?? undefined, height: a.height ?? undefined } : {}),
     } as { kind: "image" | "file"; name: string; url: string; size?: string; width?: number; height?: number }

@@ -17,7 +17,7 @@ import { formatDateLabel } from "./format-time"
 import { DateDivider } from "./dividers"
 import { useCurrentUser } from "@/contexts/community/current-user"
 import { useUiHandlers } from "@/stores/community"
-import { usePinMessage, useUnpinMessage, useCreateThread } from "@/hooks/community/mutations"
+import { usePinMessage, useUnpinMessage, useCreateThread, useToggleMark } from "@/hooks/community/mutations"
 import type { Msg, OpenProfile, Reaction, RenderMsg } from "./_types"
 import type { MessagesPage } from "@/hooks/community/use-messages"
 
@@ -30,16 +30,15 @@ const CONTEXT_LIMIT = 11
 
 type ScopeType = "channel" | "dm"
 
-function seqLookupUrl(type: ScopeType, id: string, seq: number): string {
-  return type === "dm"
-    ? `/api/community/dm/${id}/messages/seq/${seq}`
-    : `/api/community/channels/${id}/messages/seq/${seq}`
+// A DM (type=dm) and a thread are channel rows in the same id-space, so both
+// resolve through the one canonical door — no per-type URL fork. `type` is kept
+// in the signatures for call-site clarity but no longer branches the path.
+function seqLookupUrl(_type: ScopeType, id: string, seq: number): string {
+  return `/api/community/channels/${id}/messages/seq/${seq}`
 }
 
-function anchorFetchUrl(type: ScopeType, id: string, anchor: string, limit: number): string {
-  const base = type === "dm"
-    ? `/api/community/dm/${id}/messages`
-    : `/api/community/channels/${id}/messages`
+function anchorFetchUrl(_type: ScopeType, id: string, anchor: string, limit: number): string {
+  const base = `/api/community/channels/${id}/messages`
   return `${base}?anchor=${encodeURIComponent(anchor)}&limit=${limit}`
 }
 
@@ -120,7 +119,6 @@ export function MessageContextSheet({
   channelLabel,
   targetSeq,
   pinnedIds,
-  onOpenContextSheet,
   onOpenProfile,
   resolveUserName,
   onReply,
@@ -135,7 +133,6 @@ export function MessageContextSheet({
   channelLabel?: string
   targetSeq: number | null
   pinnedIds?: Set<string>
-  onOpenContextSheet?: (seq: number) => void
   onOpenProfile?: OpenProfile
   resolveUserName?: (userId: string) => string
   // Fired when Reply is clicked in the sheet. Parent should seed its
@@ -158,6 +155,7 @@ export function MessageContextSheet({
   const pinMessageMut = usePinMessage()
   const unpinMessageMut = useUnpinMessage()
   const createThreadMut = useCreateThread()
+  const toggleMark = useToggleMark()
 
   const queryKey = useMemo(
     () => ["messageContext", type, channelId, targetSeq] as const,
@@ -252,6 +250,13 @@ export function MessageContextSheet({
     onReply({ id: m.id, authorName: m.authorName ?? "", text: m.content ?? "" })
   }, [findMessage, onReply])
 
+  // Mark works for both channel and DM (unlike pin) — the sheet's channelId is
+  // the mark route's channelId for either. `useToggleMark` reads the per-message
+  // marked cache (populated when this row's menu opened) to pick POST vs DELETE.
+  const onMarkId = useCallback((id: string) => {
+    toggleMark(channelId, id)
+  }, [toggleMark, channelId])
+
   const onPinId = useCallback((id: string) => {
     if (type === "dm") return
     const isPinned = pinnedIds?.has(id)
@@ -270,10 +275,12 @@ export function MessageContextSheet({
 
   const onCreateThreadId = useCallback(async (id: string) => {
     if (type === "dm") return
+    const serverId = routeParams?.serverId
+    if (!serverId) return
     const m = findMessage(id)
     const name = deriveThreadName(m?.content, "channel")
     try {
-      const data = await createThreadMut.mutateAsync({ channelId, messageId: id, name })
+      const data = await createThreadMut.mutateAsync({ serverId, channelId, messageId: id, name })
       // Match the main-channel UX: after creating a thread the row shows
       // the thread indicator, click it to enter. Don't auto-navigate — we're
       // inside a sidecar preview, silently teleporting the user to the thread
@@ -296,7 +303,7 @@ export function MessageContextSheet({
     } catch (e) {
       toastApiError(e, "Failed to create thread")
     }
-  }, [type, channelId, findMessage, createThreadMut, queryClient, queryKey])
+  }, [type, routeParams, channelId, findMessage, createThreadMut, queryClient, queryKey])
 
   const onOpenThreadId = useCallback((threadId: string) => {
     // Sheet's Reply-style handoff: navigate the main window to the thread and
@@ -420,10 +427,10 @@ export function MessageContextSheet({
               onReply={onReply ? onReplyId : undefined}
               onCopy={onCopyId}
               onPin={type === "channel" ? onPinId : undefined}
+              onMark={onMarkId}
               onCreateThread={type === "channel" ? onCreateThreadId : undefined}
               onPreviewImage={onPreviewImage}
               onDownloadFile={onDownloadFile}
-              onOpenContextSheet={onOpenContextSheet}
             />
           )}
         </div>
@@ -444,10 +451,10 @@ function ContextRows({
   onReply,
   onCopy,
   onPin,
+  onMark,
   onCreateThread,
   onPreviewImage,
   onDownloadFile,
-  onOpenContextSheet,
 }: {
   rows: RenderMsg[]
   anchorId: string | null
@@ -460,10 +467,10 @@ function ContextRows({
   onReply?: (id: string) => void
   onCopy: (id: string) => void
   onPin?: (id: string) => void
+  onMark?: (id: string) => void
   onCreateThread?: (id: string) => void
   onPreviewImage: (url: string) => void
   onDownloadFile: (url: string) => void
-  onOpenContextSheet?: (seq: number) => void
 }) {
   // Single-message share from the peek sheet. The sheet has no select-mode
   // context (it's a read-only preview), so Share opens the dialog directly on
@@ -501,6 +508,7 @@ function ContextRows({
                 onReactId={onReact}
                 onReplyId={onReply}
                 onPinId={onPin}
+                onMarkId={onMark}
                 onCreateThreadId={onCreateThread}
                 onCopyId={onCopy}
                 onPreviewImage={onPreviewImage}
@@ -527,7 +535,7 @@ function ContextSkeleton() {
               <Skeleton className="h-4 w-24 rounded" />
               <Skeleton className="h-3 w-14 rounded" />
             </div>
-            <Skeleton className="h-3.5 w-full max-w-[240px] rounded" />
+            <Skeleton className="h-3.5 w-full max-w-60 rounded" />
           </div>
         </div>
       ))}

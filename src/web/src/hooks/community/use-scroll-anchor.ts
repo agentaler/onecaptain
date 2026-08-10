@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef } from "react"
-import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
+import { useVirtualizer, type ReactVirtualizer, type VirtualItem } from "@tanstack/react-virtual"
+import { COMMUNITY_VIRTUALIZER_REACT_OPTIONS } from "./virtualizer-react-options"
 import { estimateRowHeight, computeBelowCount, type FlatItem } from "@/components/community/message-list-items"
 
 // Virtualized rewrite of message-list's scroll-anchoring logic. The
@@ -38,6 +39,37 @@ import { estimateRowHeight, computeBelowCount, type FlatItem } from "@/component
 // cosmetic: `scrollEndThreshold` independently gates the library's native
 // `resizeItem` above-viewport compensation (defaults to 1px otherwise).
 export const NEAR_BOTTOM_PX = 100
+
+type SizeAdjustmentVirtualizer = Pick<
+  ReactVirtualizer<HTMLDivElement, Element>,
+  "itemSizeCache" | "scrollAdjustments" | "scrollDirection" | "scrollOffset"
+>
+
+/**
+ * Keep TanStack Virtual's normal estimate-to-measurement anchoring except
+ * while the user is actively scrolling upward. Its default first-measure
+ * branch compensates every row whose estimated top is above the fold,
+ * including rows that have just entered the overscan window during a
+ * backward scroll. With variable-height messages that correction pushes
+ * scrollTop downward by the estimate delta and repeatedly cancels wheel
+ * input — visible as the NEW-divider view shuddering and refusing to move.
+ *
+ * Re-measurements retain the library's narrower "entirely above the fold"
+ * rule, and forward/idle first measurements retain the original rule, so
+ * image growth, prepend anchoring, and normal downward navigation keep their
+ * existing compensation behavior.
+ */
+export function shouldAdjustMessageScrollPosition(
+  item: VirtualItem,
+  _delta: number,
+  instance: SizeAdjustmentVirtualizer,
+): boolean {
+  if (instance.scrollDirection === "backward") return false
+
+  const offset = (instance.scrollOffset ?? 0) + instance.scrollAdjustments
+  const isFirstMeasure = !instance.itemSizeCache.has(item.key)
+  return isFirstMeasure ? item.start < offset : item.end <= offset
+}
 
 export interface ScrollAnchorMessage {
   id: string
@@ -224,11 +256,10 @@ export function decideScrollAction(input: DecideScrollActionInput): DecideScroll
     const tail = messages[messages.length - 1]
     const isSelfSend = !!viewerUserId && tail?.authorId === viewerUserId
     if (isSelfSend) {
-      // Always follow — handles the composer path and, incidentally, the
-      // optimistic temp-id → server-id reconcile (the tail id string
-      // changes via `reconcileServerId` on send success, but the author is
-      // still the viewer, so this branch still catches it as an idempotent
-      // self-send snap, not a misclassified no-op).
+      // Always follow — handles the composer path and the overlay identity
+      // advance on postAck (temp id → canonical server id). The author remains
+      // the viewer, so this branch treats that id change as an idempotent
+      // self-send snap rather than a peer append.
       return { action: { type: "scrollToEnd" }, nextState: liveState }
     }
     // Peer send: only follow if the loaded window is tail-attached to the
@@ -327,6 +358,7 @@ export function useScrollAnchor({
   newDividerBefore,
   initialScrollReady,
   hasMoreNewer,
+  presentVersion,
   viewerUserId,
   heroHeight,
   heroMeasured,
@@ -335,6 +367,7 @@ export function useScrollAnchor({
   newDividerBefore?: string
   initialScrollReady: boolean
   hasMoreNewer?: boolean
+  presentVersion?: number
   viewerUserId?: string
   // Current measured height (px) of the non-virtualized hero block that
   // renders above the virtualized range (the "Beginning of the channel…"
@@ -350,18 +383,20 @@ export function useScrollAnchor({
   heroMeasured: boolean
 }): {
   scrollRef: React.RefObject<HTMLDivElement | null>
-  virtualizer: Virtualizer<HTMLDivElement, Element>
+  virtualizer: ReactVirtualizer<HTMLDivElement, Element>
   belowCount: number
   scrollToBottom: () => void
-  jumpTo: (messageId: string) => void
+  jumpTo: (messageId: string, behavior?: ScrollBehavior) => void
   onImageLoad: () => void
 } {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stateRef = useRef<ScrollAnchorState>(createScrollAnchorState())
   const messages = extractScrollAnchorMessages(items)
+  const tailId = messages[messages.length - 1]?.id ?? null
 
   // eslint-disable-next-line react-hooks/incompatible-library -- library limitation, same as member-list.tsx
   const virtualizer = useVirtualizer({
+    ...COMMUNITY_VIRTUALIZER_REACT_OPTIONS,
     count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) => estimateRowHeight(items[index]),
@@ -380,6 +415,10 @@ export function useScrollAnchor({
     scrollMargin: heroHeight,
     overscan: 8,
   })
+  // virtual-core exposes this predicate on the instance (and `resizeItem`
+  // reads it there), not through VirtualizerOptions. Assign during render so
+  // it is already installed when React attaches row refs in the commit.
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = shouldAdjustMessageScrollPosition
 
   // Whether the viewer was within NEAR_BOTTOM_PX of the end BEFORE this
   // commit's append — the semantics `decideScrollAction` documents for its
@@ -435,6 +474,20 @@ export function useScrollAnchor({
     // secondary `messages` dep, avoiding a re-derivation-triggered re-fire.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, newDividerBefore, initialScrollReady, heroMeasured, hasMoreNewer, viewerUserId, virtualizer])
+
+  const consumedPresentVersionRef = useRef(0)
+  useLayoutEffect(() => {
+    if (!presentVersion || !tailId || hasMoreNewer) return
+    if (consumedPresentVersionRef.current === presentVersion) return
+    consumedPresentVersionRef.current = presentVersion
+    stateRef.current = {
+      didInitialScroll: true,
+      didDividerConverge: true,
+      lastTailId: tailId,
+    }
+    wasAtEndRef.current = true
+    virtualizer.scrollToEnd()
+  }, [hasMoreNewer, presentVersion, tailId, virtualizer])
 
   // Hero-swap compensation — NOT delegated to `scrollMargin` (verified it
   // never triggers a `scrollOffset` write on its own). Tracks the hero's
@@ -518,13 +571,13 @@ export function useScrollAnchor({
     if (virtualizer.isAtEnd(NEAR_BOTTOM_PX)) virtualizer.scrollToEnd()
   }, [virtualizer])
 
-  const jumpTo = useCallback((messageId: string) => {
+  const jumpTo = useCallback((messageId: string, behavior: ScrollBehavior = "smooth") => {
     const idx = findMessageIndex(items, messageId)
     // Target not in the currently loaded page window — same limitation the
     // pre-virtualization `querySelector` lookup had (it also required the
     // row to be loaded); documented no-op, not a new failure mode.
     if (idx === null) return
-    virtualizer.scrollToIndex(idx, { align: "center", behavior: "smooth" })
+    virtualizer.scrollToIndex(idx, { align: "center", behavior })
   }, [items, virtualizer])
 
   return { scrollRef, virtualizer, belowCount, scrollToBottom, jumpTo, onImageLoad }
