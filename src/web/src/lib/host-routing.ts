@@ -1,8 +1,8 @@
 /**
- * Host-based routing for the SaaS domain split (plans/domain-split-landing.md):
- * the marketing site lives on the apex (`onecaptain.ai`), the product on
- * `app.onecaptain.ai`, one Next app serves both. Pure decision function so the
- * matrix is unit-testable without a Next server.
+ * Host-based routing for the SaaS domain split (plans/landing-service-db-service.md):
+ * the marketing site is its own Railway service on the apex (`onecaptain.ai`,
+ * see `src/landing/`), the product runs here on `app.onecaptain.ai`. Pure
+ * decision function so the matrix is unit-testable without a Next server.
  *
  * Any host that is neither the landing nor the app host (localhost, CI,
  * *.railway.app, tenant previews) passes through untouched — dev, e2e, and
@@ -13,15 +13,8 @@
 const LANDING_HOST = process.env.LANDING_HOST || "onecaptain.ai";
 const APP_HOST = process.env.APP_HOST || "app.onecaptain.ai";
 
-/** Marketing surfaces served on the landing host (prefix match). */
-const LANDING_PREFIXES = ["/blog", "/templates", "/privacy", "/og"];
-
-/** Marketing-only prefixes bounced off the app host back to the landing host. */
-const APP_HOST_BOUNCE_PREFIXES = ["/blog", "/templates"];
-
 export type HostRoute =
   | { kind: "pass" }
-  | { kind: "rewrite"; path: string }
   | { kind: "redirect"; url: string };
 
 export function resolveHostRoute(
@@ -36,21 +29,16 @@ export function resolveHostRoute(
   // Health must answer on every host — platform probes don't send our domains.
   if (pathname === "/api/health") return { kind: "pass" };
 
-  if (h === landingHost || h === `www.${landingHost}`) {
-    if (pathname === "/") return { kind: "rewrite", path: "/landing.html" };
-    if (LANDING_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-      return { kind: "pass" };
-    }
-    // Everything else (sign-in, /c, workspaces, /api) belongs to the app host.
-    return { kind: "redirect", url: `https://${appHost}${pathname}${search}` };
-  }
-
   if (h === appHost) {
     if (pathname === "/") return { kind: "redirect", url: `https://${appHost}/c/me` };
-    if (APP_HOST_BOUNCE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-      return { kind: "redirect", url: `https://${landingHost}${pathname}${search}` };
-    }
     return { kind: "pass" };
+  }
+
+  // The landing domain is served by the dedicated `landing` service; if its
+  // traffic reaches the app anyway (stale DNS), hand it to the app host rather
+  // than exposing the product UI on the marketing domain.
+  if (h === landingHost || h === `www.${landingHost}`) {
+    return { kind: "redirect", url: `https://${appHost}${pathname}${search}` };
   }
 
   return { kind: "pass" };

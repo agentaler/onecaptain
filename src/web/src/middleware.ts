@@ -38,16 +38,14 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Domain split: landing on the apex, product on the app host. Hosts outside
-  // the two configured domains (localhost, CI, *.railway.app) fall through.
+  // Domain split: the landing service owns the apex; here only the app host
+  // gets special treatment. Hosts outside the two configured domains
+  // (localhost, CI, *.railway.app) fall through.
   const hostRoute = resolveHostRoute(
     request.headers.get("host"),
     pathname,
     request.nextUrl.search,
   )
-  if (hostRoute.kind === "rewrite") {
-    return NextResponse.rewrite(new URL(hostRoute.path, request.url))
-  }
   if (hostRoute.kind === "redirect") {
     return NextResponse.redirect(hostRoute.url, 308)
   }

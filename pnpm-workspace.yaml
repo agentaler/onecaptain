@@ -8,4 +8,5 @@ packages:
   - "src/wake-worker"
   - "src/app"
   - "src/desktop"
+  - "src/landing"
   - "tests/utils"

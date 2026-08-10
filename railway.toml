@@ -1,14 +1,14 @@
-# Railway service config for `web` (the only service until Phase 2).
-# Phase 0 runtime: the dev-parity stack via scripts/railway-phase0.sh —
-# replaced by `next build && next start` when the Phase 1 Node port lands.
-# See RAILWAY.md.
+# Railway config shared by every service deployed from this repo. Each service
+# sets SERVICE_ROLE (web | landing) and the build/start scripts branch on it.
+# The `db` service is not built from this repo — it runs the
+# ghcr.io/tursodatabase/libsql-server image with a volume. See RAILWAY.md.
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "pnpm install --frozen-lockfile"
+buildCommand = "bash scripts/railway-build.sh"
 
 [deploy]
-startCommand = "bash scripts/railway-phase0.sh"
+startCommand = "bash scripts/railway-start.sh"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
