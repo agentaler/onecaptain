@@ -14,21 +14,21 @@ Every repo-built service deploys from the monorepo root with the shared
 | --- | --- | --- | --- | --- |
 | `web` | `web` (default) | `src/web` | Next.js app (`ONECAPTAIN_PLATFORM=node`) | public domain `app.onecaptain.ai` |
 | `landing` | `landing` | `src/landing` | `node src/landing/server.mjs` — static waitlist page, zero deps, no install/build | public domain `onecaptain.ai` (+`www`); non-landing paths 308 to the app host (`APP_URL`) |
-| `db` | — | image `ghcr.io/tursodatabase/libsql-server` | sqld (libSQL server) | volume at `/var/lib/sqld`; **private networking only, no public domain** |
+| `Postgres` | — | Railway managed Postgres | the production database | own volume; **private networking only, no public domain** |
 | `ws` | `ws` (Phase 2) | `src/ws-node` | WebSocket + daemon forward routes | public domain (wss) |
 | `email` | `email` (Phase 3) | — | Inbound-email webhook receiver + IMAP poll cron | |
 | — | — | wake-worker | none | retired on Railway: wakes dispatch inline from `web` via the existing HTTP transport |
 
 **Volumes**
-- `db-volume` mounted on `db` at `/var/lib/sqld` — the database lives with the `db`
-  service, not inside the app container. The app reaches it over Railway private
-  networking (`DATABASE_URL=http://db.railway.internal:8080`).
+- `postgres-volume` — owned by the managed `Postgres` service; the database lives
+  outside the app container. The app reaches it over Railway private networking via
+  `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
 - `web-volume` mounted on `web` at `/data` — file storage (`/data/storage/…`
   replacing R2 buckets) and, during Phase 0 only, the interim wrangler state.
 
 **Scaling constraint:** `web` and `ws` are single-instance until Phase 3 hardening
-(WS presence and rate limits are in-process). `db` is single-instance by design
-(sqld primary). `landing` is stateless and may scale freely.
+(WS presence and rate limits are in-process). `landing` is stateless and may scale
+freely; Postgres removes the single-writer constraint once the Phase 1 port lands.
 
 ## Environment variables
 
@@ -39,7 +39,7 @@ Shared secrets (set on every service):
 | `BETTER_AUTH_SECRET` | session signing secret (32+ random bytes) |
 | `BETTER_AUTH_URL` | public URL of `web`, e.g. `https://app.onecaptain.ai` |
 | `ENCRYPTION_KEY` | AES-256-GCM key for stored credentials (bot cloud-LLM keys, email accounts) — same value everywhere it's read |
-| `DATABASE_URL` | `http://db.railway.internal:8080` — the `db` service (sqld) over private networking |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — the managed Postgres service over private networking |
 | `ONECAPTAIN_PLATFORM` | `node` — selects the Node platform seam instead of Cloudflare bindings |
 
 Service wiring (replaces Cloudflare service bindings):
@@ -67,22 +67,23 @@ OAuth + integrations (web):
 2. **Domains + DNS**: `onecaptain.ai` (+`www`) points at the `landing` service,
    `app.onecaptain.ai` at the `web` service (canonical auth URL is
    `https://app.onecaptain.ai`), and `ws.onecaptain.ai` at the `ws` service (Phase 2).
-   Railway issues TLS. The `db` service gets **no** public domain.
+   Railway issues TLS. The `Postgres` service gets **no** public domain.
 3. **Secrets** above generated and set (`openssl rand -base64 32` for the two keys).
 4. **OAuth apps** (GitHub + Google) with callback URLs on the new web domain.
 5. **Inbound email provider** (Phase 3): a Postmark (or Mailgun/SES) account with an
    inbound domain (`onecaptain.ai` MX) pointing its webhook at
    `https://app.onecaptain.ai/api/email/inbound`. Cloudflare Email Routing is not used.
-6. **Decision already taken**: SQLite-compatible libSQL served by a dedicated `db`
-   service (sqld) over private networking, single writer. Moving to Postgres/Redis/S3
-   later is covered by migration-plan Phase 3.
+6. **Decision already taken**: Railway managed **Postgres** is the production
+   database (no SQLite anywhere in production). The Phase 1 port targets
+   drizzle-orm `pg-core` + `node-postgres`; the earlier libSQL layer is superseded.
 
 ## Phase status
 
 - **Phase 0 (available now, staging only):** the stack can run in containers exactly as
   CI's E2E job runs it (`next dev` + `wrangler dev` with `--persist-to /data/wrangler`).
   Functional but uses dev servers — do not treat as production.
-- **Phase 1 (in progress):** web on plain Node + libSQL via the platform seam.
+- **Phase 1 (in progress):** web on plain Node + Postgres via the platform seam
+  (drizzle `pg-core` schema port, transaction-based batch, tsvector search).
 - **Phase 2:** `ws-node` service replaces the WebSocket Durable Object.
 - **Phase 3:** inbound email webhook + IMAP cron; optional S3/Redis for multi-instance.
 
@@ -90,6 +91,8 @@ OAuth + integrations (web):
 
 - The daemon/CLI (`@onecaptain/cli`, `@onecaptain/daemon`) — they talk HTTP/WS to whatever
   `ONECAPTAIN_SERVER_URL` points at.
-- The shared schema/queries, migrations 0001–0086, cloud-LLM provider encryption, tenancy
-  (roles, quotas, audit log).
+- The shared query modules' logic, cloud-LLM provider encryption, tenancy (roles,
+  quotas, audit log). (The schema itself is ported to `pg-core` with a fresh Postgres
+  baseline migration — the SQLite migration history 0001–0086 stays for the legacy
+  Cloudflare/dev path only until Phase 1 completes.)
 - Desktop/mobile shells (they target the web app's URL).

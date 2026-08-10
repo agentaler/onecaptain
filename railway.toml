@@ -1,7 +1,7 @@
 # Railway config shared by every service deployed from this repo. Each service
 # sets SERVICE_ROLE (web | landing) and the build/start scripts branch on it.
-# The `db` service is not built from this repo — it runs the
-# ghcr.io/tursodatabase/libsql-server image with a volume. See RAILWAY.md.
+# The database is Railway managed Postgres (own service + volume, private
+# networking only). See RAILWAY.md.
 
 [build]
 builder = "NIXPACKS"
