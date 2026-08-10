@@ -12,7 +12,8 @@
     "./utils/community-roles": "./src/utils/community-roles.ts",
     "./lib/discriminator": "./src/lib/discriminator.ts",
     "./lib/invite-link": "./src/lib/invite-link.ts",
-    "./db/resilience-testing": "./src/db/resilience-testing.ts"
+    "./db/resilience-testing": "./src/db/resilience-testing.ts",
+    "./db-node": "./src/db/node.ts"
   },
   "scripts": {
     "knip": "knip",
@@ -20,6 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "drizzle-orm": "^0.45.2",
     "nanoid": "^5.1.16",
     "zod": "^4.4"

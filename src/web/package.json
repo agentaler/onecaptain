@@ -21,7 +21,8 @@
     "seed:stress": "tsx scripts/seed-stress.ts",
     "perf:switch": "playwright test --config playwright.perf.config.ts; tsx scripts/perf-report.ts",
     "typecheck": "tsc --noEmit",
-    "seo:check": "lhci autorun --config=lighthouserc.json && node scripts/print-lighthouse-scores.mjs"
+    "seo:check": "lhci autorun --config=lighthouserc.json && node scripts/print-lighthouse-scores.mjs",
+    "db:migrate:node": "tsx scripts/migrate-node.ts"
   },
   "dependencies": {
     "@onecaptain/shared": "workspace:*",
