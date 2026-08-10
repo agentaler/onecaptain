@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createAuth } from "@/lib/auth"
+import { resolveHostRoute } from "@/lib/host-routing"
 
 function isSafeRedirect(path: string): boolean {
   // Must be a relative path. Reject scheme-relative ("//evil.com") and
@@ -36,6 +37,21 @@ export async function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl
+
+  // Domain split: landing on the apex, product on the app host. Hosts outside
+  // the two configured domains (localhost, CI, *.railway.app) fall through.
+  const hostRoute = resolveHostRoute(
+    request.headers.get("host"),
+    pathname,
+    request.nextUrl.search,
+  )
+  if (hostRoute.kind === "rewrite") {
+    return NextResponse.rewrite(new URL(hostRoute.path, request.url))
+  }
+  if (hostRoute.kind === "redirect") {
+    return NextResponse.redirect(hostRoute.url, 308)
+  }
+
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
   const needsAuth = !isPublic && (pathname === "/c" || AUTH_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p)))
 
