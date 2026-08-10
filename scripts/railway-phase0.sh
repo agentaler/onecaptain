@@ -35,6 +35,9 @@ EOF
 
 export BETTER_AUTH_URL="$PUBLIC_URL"
 export BETTER_AUTH_SECRET ENCRYPTION_KEY
+# Keep wrangler quiet — Railway drops logs above 500 lines/sec, hiding real
+# signal behind dev-server debug spew.
+export WRANGLER_LOG=warn
 
 pnpm run db:migrate
 

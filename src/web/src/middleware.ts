@@ -22,6 +22,10 @@ const PUBLIC_PREFIXES = ["/c/invite/"]
 
 export async function middleware(request: NextRequest) {
   if (
+    // The health endpoint must answer on the scheme it was probed on —
+    // platform-internal healthchecks (e.g. Railway's) arrive over plain HTTP
+    // and treat a 301 as unhealthy.
+    request.nextUrl.pathname !== "/api/health" &&
     request.headers.get("x-forwarded-proto") === "http" &&
     !request.nextUrl.hostname.startsWith("localhost") &&
     !request.nextUrl.hostname.startsWith("127.")
