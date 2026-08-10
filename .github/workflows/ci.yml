@@ -152,34 +152,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build --filter=@onecaptain/shared --filter=@onecaptain/web --filter=@onecaptain/cli --filter=@onecaptain/email-worker --filter=@onecaptain/ws-do --filter=@onecaptain/wake-worker
 
-  coverage:
-    name: Coverage
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release:'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --coverage --coverage.reporter=json --coverage.reporter=text
-      # Upload only when the repo has a Codecov token configured — without one
-      # (e.g. this closed-source repo until a Codecov project is set up) the
-      # coverage run itself is still the gate and the upload is skipped instead
-      # of failing the job.
-      - uses: codecov/codecov-action@v7
-        if: ${{ env.CODECOV_TOKEN != '' }}
-        with:
-          token: ${{ env.CODECOV_TOKEN }}
-          files: ./coverage/coverage-final.json
-          fail_ci_if_error: true
-
   desktop-rust:
     name: Desktop Rust (test + machete)
     runs-on: ubuntu-latest

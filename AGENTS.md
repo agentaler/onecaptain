@@ -43,7 +43,7 @@ git push origin main
 ```
 
 This triggers:
-- **CI** — typecheck, lint, tests, coverage (uploaded to Codecov)
+- **CI** — typecheck, lint, tests
 - **Auto-Tag & Release** — CI detects the `release: vX.Y.Z` commit message, creates the git tag, and creates a GitHub Release with generated changelog (`auto-tag-release.yml`)
 - **@onecaptain/cli** → auto-published to npm via `publish-cli.yml` (watches `src/cli/package.json`)
 - **@onecaptain/app** → auto-published to npm via `publish-app.yml` (watches `src/app/package.json`)
