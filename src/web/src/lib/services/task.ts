@@ -1,5 +1,5 @@
-import type { Database } from "@alook/shared";
-import { queries, TASK_TYPES, MAX_TASKS_PER_TRACE } from "@alook/shared";
+import type { Database } from "@onecaptain/shared";
+import { queries, TASK_TYPES, MAX_TASKS_PER_TRACE } from "@onecaptain/shared";
 import { log } from "@/lib/logger";
 import { broadcastToUser, broadcastToDaemon } from "@/lib/broadcast";
 import { messageToResponse } from "@/lib/api/responses";
@@ -158,7 +158,7 @@ export class TaskService {
     }
 
     // The agent owns its voice: the success reply bubble is now authored
-    // explicitly via `alook sync send-dm` (the agent-DM endpoint), NOT extracted
+    // explicitly via `onecaptain sync send-dm` (the agent-DM endpoint), NOT extracted
     // from the task's final `output`. So completeTask no longer creates a
     // `role:"assistant"` message — it only settles the task lifecycle. `output`
     // is still persisted on the task row (in `result`) for debugging.
@@ -185,7 +185,7 @@ export class TaskService {
     let errorMessageId: string | null = null;
     if (error) {
       // Attribute the error to the agent runtime (Claude Code / Codex /
-      // OpenCode) so the chat UI can make clear it did NOT come from Alook.
+      // OpenCode) so the chat UI can make clear it did NOT come from OneCaptain.
       // Resolve the provider from the task's runtime; never let this block the
       // task lifecycle (issue #236).
       let provider: string | null = null;

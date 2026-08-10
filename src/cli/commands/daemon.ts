@@ -111,7 +111,7 @@ async function stopCommand(profile: string | undefined): Promise<void> {
   }
 
   const shutdownMs =
-    Number(process.env.ALOOK_SHUTDOWN_TIMEOUT_MS) || 5000;
+    Number(process.env.ONECAPTAIN_SHUTDOWN_TIMEOUT_MS) || 5000;
   const deadline = Date.now() + shutdownMs;
   while (Date.now() < deadline) {
     if (!isProcessAlive(pid)) {
@@ -136,7 +136,7 @@ async function stopCommand(profile: string | undefined): Promise<void> {
 }
 
 export function daemonCommand(): Command {
-  const cmd = new Command("daemon").description("Manage the Alook daemon");
+  const cmd = new Command("daemon").description("Manage the OneCaptain daemon");
 
   cmd
     .command("start")

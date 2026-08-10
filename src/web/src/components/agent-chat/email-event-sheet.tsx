@@ -14,7 +14,7 @@ import { X, Mail, Loader2, Paperclip, File as FileIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getEmail, getEmailBody } from "@/lib/api";
 import { EmailBodyFrame } from "@/components/email-body-frame";
-import type { Email } from "@alook/shared";
+import type { Email } from "@onecaptain/shared";
 
 interface EmailEventSheetProps {
   open: boolean;

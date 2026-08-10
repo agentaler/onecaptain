@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { queries, withD1Retry, createLogger } from "@alook/shared"
-import type { Database } from "@alook/shared"
+import { queries, withD1Retry, createLogger } from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 
 const log = createLogger({ service: "community-agent-runner-auth" })
 

@@ -11,7 +11,7 @@
  * identity otherwise, which would leave attribution half-wrong.
  *
  * NAME is the plain display name (`Claudette`) and EMAIL is
- * `<name-slug>.<discriminator>@alook.ai` (`claudette.9873@alook.ai`) — kept
+ * `<name-slug>.<discriminator>@onecaptain.ai` (`claudette.9873@onecaptain.ai`) — kept
  * clean/readable per owner preference. The discriminator is FNV-1a(user.id)
  * mod 10000, so two agents that share a name AND a discriminator would produce
  * the same identity; that collision is accepted (name#disc is already the
@@ -22,14 +22,14 @@
 
 import { execFileSync } from "child_process";
 
-const GIT_IDENTITY_DOMAIN = "alook.ai";
+const GIT_IDENTITY_DOMAIN = "onecaptain.ai";
 
 /** Timeout for the `git config` read of the host owner's identity. */
 const HOST_GIT_READ_TIMEOUT_MS = 2000;
 
 /** Generic identity when an agent's name/handle is unavailable (degraded spawn). */
-const FALLBACK_NAME = "Alook Agent";
-const FALLBACK_LOCAL_PART = "alook-agent";
+const FALLBACK_NAME = "OneCaptain Agent";
+const FALLBACK_LOCAL_PART = "onecaptain-agent";
 
 /**
  * Strip characters illegal in a git author/committer NAME. The name is a single
@@ -83,10 +83,10 @@ export interface GitIdentityInput {
  * missing.
  *
  * The agent's own identity: name = the plain display name (`Claudette`),
- * email = `<name-slug>.<discriminator>@alook.ai` (`claudette.9873@alook.ai`);
+ * email = `<name-slug>.<discriminator>@onecaptain.ai` (`claudette.9873@onecaptain.ai`);
  * if the name has no ASCII-alphanumeric characters (all CJK/emoji) the
- * local-part is just the discriminator (`9873@alook.ai`), and if neither is
- * available it falls back to `alook-agent@alook.ai`.
+ * local-part is just the discriminator (`9873@onecaptain.ai`), and if neither is
+ * available it falls back to `onecaptain-agent@onecaptain.ai`.
  *
  * Two-author attribution: when `hostUser` carries a legible name AND email,
  * AUTHOR is set to the human owner and COMMITTER to the agent (git's native

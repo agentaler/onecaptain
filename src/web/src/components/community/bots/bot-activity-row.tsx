@@ -81,7 +81,7 @@ function RowBody({
     const sub = p?.subcommand ?? "?"
     return (
       <span className="font-mono text-[13px] text-foreground">
-        alook <span className="text-muted-foreground">{sub}</span>
+        onecaptain <span className="text-muted-foreground">{sub}</span>
       </span>
     )
   }

@@ -28,7 +28,7 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   CreateIssueCommentBodySchema: { parse: vi.fn((data: any) => data) },
   TASK_TYPES: { ISSUE_EVENT: "issue_event" },
   isTerminalIssueStatus: (...args: unknown[]) => mockIsTerminalIssueStatus(...args),

@@ -2,7 +2,7 @@ export const metadata = {
   slug: "multiple-ai-agents-edit-same-repository",
   title: "What Happens When Multiple AI Agents Edit the Same Repository?",
   date: "2026-07-30",
-  author: "Alook Team",
+  author: "OneCaptain Team",
   excerpt:
     "When several coding agents edit one repo, problems usually come from path ownership, who goes first, and whether changes stay reviewable, not model IQ.",
   readingTime: "6 min read",
@@ -40,10 +40,10 @@ export const jsonLd = [
       },
       {
         "@type": "Question",
-        name: "Does Alook handle git merges?",
+        name: "Does OneCaptain handle git merges?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "No. Alook coordinates which agent works on what. Git handles the merge. You approve what lands.",
+          text: "No. OneCaptain coordinates which agent works on what. Git handles the merge. You approve what lands.",
         },
       },
     ],
@@ -124,11 +124,11 @@ Day-to-day operating rules for briefs and approval gates live in [How to Run an 
 
 ## When it helps to see who owns which work
 
-These rules do not require Alook. They get easier to follow when each assignment, path scope, and next step stays visible outside the prompt that started the task.
+These rules do not require OneCaptain. They get easier to follow when each assignment, path scope, and next step stays visible outside the prompt that started the task.
 
-**Alook keeps agent roles, threads, and task assignments visible while the agents continue to run on your machine.** A path scope such as `src/auth/` can stay in the task record instead of living only in a temporary prompt. Review can move to another agent, while merge approval stays with you.
+**OneCaptain keeps agent roles, threads, and task assignments visible while the agents continue to run on your machine.** A path scope such as `src/auth/` can stay in the task record instead of living only in a temporary prompt. Review can move to another agent, while merge approval stays with you.
 
-You can self-host Alook from [GitHub](https://github.com/alookai/alook), or register at [alook.ai](https://alook.ai) and connect your local runtime. **Alook helps show who is assigned to the work. Git still records and merges the code.** It does not resolve merge conflicts or replace your editor.
+You can self-host OneCaptain from [GitHub](https://github.com/agentaler/onecaptain), or register at [onecaptain.ai](https://onecaptain.ai) and connect your local runtime. **OneCaptain helps show who is assigned to the work. Git still records and merges the code.** It does not resolve merge conflicts or replace your editor.
 
 ## Keep the repo readable
 
@@ -160,5 +160,5 @@ No. Separate worktrees on the same machine give each task its own working direct
 **Should a reviewer agent edit the author’s branch?**  
 Usually no. The reviewer should leave comments or suggested changes. If it must take over the code, transfer ownership clearly and keep the new changes visible in a separate commit or branch.
 
-**Does Alook handle git merges?**  
-No. Alook coordinates which agent works on what. Git handles the merge. You approve what lands.
+**Does OneCaptain handle git merges?**  
+No. OneCaptain coordinates which agent works on what. Git handles the merge. You approve what lands.

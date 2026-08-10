@@ -47,7 +47,7 @@ import { emailCommand } from "./email.js";
 // Test the PostalMime parsing and file writing logic in isolation
 // (CLI commands themselves depend on network + config which we don't mock here)
 
-const TMP_DIR = "/tmp/alook-emails-test";
+const TMP_DIR = "/tmp/onecaptain-emails-test";
 
 describe("email pull output structure", () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe("email pull output structure", () => {
     const metadata = {
       id: "test-email-1",
       from: "sender@example.com",
-      to: "agent@alook.ai",
+      to: "agent@onecaptain.ai",
       subject: "Test Subject",
       date: "2024-01-01T00:00:00Z",
       status: "unread",
@@ -75,14 +75,14 @@ describe("email pull output structure", () => {
     const written = JSON.parse(readFileSync(join(emailDir, "metadata.json"), "utf-8"));
     expect(written.id).toBe("test-email-1");
     expect(written.from).toBe("sender@example.com");
-    expect(written.to).toBe("agent@alook.ai");
+    expect(written.to).toBe("agent@onecaptain.ai");
     expect(written.subject).toBe("Test Subject");
     expect(written.status).toBe("unread");
     expect(written.date).toBe("2024-01-01T00:00:00Z");
   });
 
   it("writes body.txt from parsed MIME text body", async () => {
-    const rawMime = "From: test@example.com\r\nTo: agent@alook.ai\r\nSubject: Hello\r\nContent-Type: text/plain\r\n\r\nHello world";
+    const rawMime = "From: test@example.com\r\nTo: agent@onecaptain.ai\r\nSubject: Hello\r\nContent-Type: text/plain\r\n\r\nHello world";
     const parsed = await new PostalMime().parse(rawMime);
 
     const emailDir = join(TMP_DIR, "test-email-2");
@@ -99,7 +99,7 @@ describe("email pull output structure", () => {
   it("writes body.html from parsed MIME HTML body", async () => {
     const rawMime = [
       "From: test@example.com",
-      "To: agent@alook.ai",
+      "To: agent@onecaptain.ai",
       "Subject: Hello",
       "Content-Type: text/html; charset=utf-8",
       "",
@@ -122,7 +122,7 @@ describe("email pull output structure", () => {
     const boundary = "----=_Part_001";
     const rawMime = [
       "From: test@example.com",
-      "To: agent@alook.ai",
+      "To: agent@onecaptain.ai",
       "Subject: With attachment",
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       "",
@@ -169,7 +169,7 @@ describe("email pull output structure", () => {
     const boundary = "----=_Part_002";
     const rawMime = [
       "From: test@example.com",
-      "To: agent@alook.ai",
+      "To: agent@onecaptain.ai",
       "Subject: No filename",
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       "",
@@ -300,7 +300,7 @@ describe("email send subcommand shape", () => {
 });
 
 describe("email send behavior", () => {
-  const SEND_TMP = "/tmp/alook-email-send-test";
+  const SEND_TMP = "/tmp/onecaptain-email-send-test";
 
   async function runSend(args: string[]): Promise<{ out: string[]; err: string[]; exitCode: number | null }> {
     const out: string[] = [];
@@ -318,7 +318,7 @@ describe("email send behavior", () => {
     }) as never);
     try {
       const program = new Command()
-        .name("alook")
+        .name("onecaptain")
         .option("--server <url>", "Server URL")
         .option("--profile <name>", "Profile name");
       program.addCommand(emailCommand());
@@ -498,7 +498,7 @@ async function runForward(args: string[]): Promise<{ out: string[]; err: string[
   }) as never);
   try {
     const program = new Command()
-      .name("alook")
+      .name("onecaptain")
       .option("--server <url>", "Server URL")
       .option("--profile <name>", "Profile name");
     program.addCommand(emailCommand());
@@ -529,7 +529,7 @@ async function runPull(args: string[]): Promise<{ out: string[]; err: string[]; 
   }) as never);
   try {
     const program = new Command()
-      .name("alook")
+      .name("onecaptain")
       .option("--server <url>", "Server URL")
       .option("--profile <name>", "Profile name");
     program.addCommand(emailCommand());
@@ -544,14 +544,14 @@ async function runPull(args: string[]): Promise<{ out: string[]; err: string[]; 
   return { out, err, exitCode };
 }
 
-const FORWARD_TMP = "/tmp/alook-email-forward-test";
+const FORWARD_TMP = "/tmp/onecaptain-email-forward-test";
 
 function makeOriginalEmail(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "em_orig",
     agent_id: "ag_1",
     from_email: "sender@example.com",
-    to_email: "agent@alook.ai",
+    to_email: "agent@onecaptain.ai",
     subject: "Original Subject",
     r2_key: "emails/em_orig",
     is_whitelisted: true,
@@ -583,12 +583,12 @@ function makeRawMime(opts: { html?: string; text?: string; attachment?: boolean 
     parts.push(
       `--${boundary}\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename="original.pdf"\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from("pdf-content").toString("base64")}`,
     );
-    return `From: sender@example.com\r\nTo: agent@alook.ai\r\nSubject: Original Subject\r\nContent-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n${parts.join("\r\n")}\r\n--${boundary}--`;
+    return `From: sender@example.com\r\nTo: agent@onecaptain.ai\r\nSubject: Original Subject\r\nContent-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n${parts.join("\r\n")}\r\n--${boundary}--`;
   }
   if (opts.html) {
-    return `From: sender@example.com\r\nTo: agent@alook.ai\r\nSubject: Original Subject\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${opts.html}`;
+    return `From: sender@example.com\r\nTo: agent@onecaptain.ai\r\nSubject: Original Subject\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${opts.html}`;
   }
-  return `From: sender@example.com\r\nTo: agent@alook.ai\r\nSubject: Original Subject\r\nContent-Type: text/plain\r\n\r\n${opts.text || "Hello world"}`;
+  return `From: sender@example.com\r\nTo: agent@onecaptain.ai\r\nSubject: Original Subject\r\nContent-Type: text/plain\r\n\r\n${opts.text || "Hello world"}`;
 }
 
 describe("email forward subcommand shape", () => {
@@ -824,7 +824,7 @@ describe("email pull with --email_id", () => {
       id: "em_123",
       agent_id: "ag_1",
       from_email: "sender@example.com",
-      to_email: "agent@alook.ai",
+      to_email: "agent@onecaptain.ai",
       subject: "Test",
       r2_key: "emails/em_123",
       is_whitelisted: true,
@@ -837,7 +837,7 @@ describe("email pull with --email_id", () => {
       status: "unread",
       created_at: "2026-05-26T00:00:00Z",
     });
-    getTextMock.mockResolvedValueOnce("From: sender@example.com\r\nTo: agent@alook.ai\r\nSubject: Test\r\nContent-Type: text/plain\r\n\r\nHello");
+    getTextMock.mockResolvedValueOnce("From: sender@example.com\r\nTo: agent@onecaptain.ai\r\nSubject: Test\r\nContent-Type: text/plain\r\n\r\nHello");
 
     const { exitCode } = await runPull(["--agent_id", "ag_1", "--email_id", "em_123"]);
 
@@ -1023,7 +1023,7 @@ async function runWhitelist(args: string[]): Promise<{ out: string[]; err: strin
   }) as never);
   try {
     const program = new Command()
-      .name("alook")
+      .name("onecaptain")
       .option("--server <url>", "Server URL")
       .option("--profile <name>", "Profile name");
     program.addCommand(emailCommand());

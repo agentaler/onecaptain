@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { createAuth } from "@/lib/auth"
-import { DEV_WS_DO_URL } from "@alook/shared"
+import { DEV_WS_DO_URL } from "@onecaptain/shared"
 import { withEnv } from "@/lib/middleware/env"
 
 export const GET = withEnv(async (req: NextRequest, ctx) => {

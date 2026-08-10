@@ -16,7 +16,7 @@ describe("GET /.well-known/apple-app-site-association", () => {
     expect(body.applinks).toHaveProperty("details");
     expect(body.applinks.details).toHaveLength(1);
     expect(body.applinks.details[0]).toEqual({
-      appIDs: ["TEAM_ID.ai.alook.app"],
+      appIDs: ["TEAM_ID.ai.onecaptain.app"],
       paths: ["*"],
     });
   });

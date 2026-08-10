@@ -40,8 +40,8 @@ describe("isSensitiveRecipient", () => {
     expect(isSensitiveRecipient("x@example.com")).toBe(false)
   })
 
-  it("does not match the internal @alook.ai domain", () => {
-    expect(isSensitiveRecipient("x@alook.ai")).toBe(false)
+  it("does not match the internal @onecaptain.ai domain", () => {
+    expect(isSensitiveRecipient("x@onecaptain.ai")).toBe(false)
   })
 
   it("returns false for a malformed address without throwing", () => {

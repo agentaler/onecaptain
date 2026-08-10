@@ -3,7 +3,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
-import type { CommunityMachineSummary } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
 
 /**
  * Fetches the current user's community-daemon machines.

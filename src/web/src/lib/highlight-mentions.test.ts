@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { highlightMentions } from "./highlight-mentions"
-import type { Agent } from "@alook/shared"
+import type { Agent } from "@onecaptain/shared"
 
 const agent = (name: string, email_handle: string | null = null): Agent => ({
   id: `ag_${name.toLowerCase()}`,
@@ -28,8 +28,8 @@ describe("highlightMentions", () => {
   })
 
   it("wraps only name portion of enriched form", () => {
-    const result = highlightMentions("Hey @TestBot (testbot@alook.ai) do this", [agent("TestBot", "testbot")])
-    expect(result).toBe('Hey <mention data-agent-id="ag_testbot">@TestBot</mention> (testbot@alook.ai) do this')
+    const result = highlightMentions("Hey @TestBot (testbot@onecaptain.ai) do this", [agent("TestBot", "testbot")])
+    expect(result).toBe('Hey <mention data-agent-id="ag_testbot">@TestBot</mention> (testbot@onecaptain.ai) do this')
   })
 
   it("leaves non-matching @ as plain text", () => {

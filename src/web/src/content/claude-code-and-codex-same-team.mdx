@@ -2,7 +2,7 @@ export const metadata = {
   slug: "claude-code-and-codex-same-team",
   title: "How to Bring Claude Code and Codex Into the Same Team",
   date: "2026-07-22",
-  author: "Alook Team",
+  author: "OneCaptain Team",
   excerpt:
     "Use Claude Code and Codex as one coordinated team. Roles, handoffs, shared status, and a coordination layer that connects separate coding-agent sessions.",
   readingTime: "8 min read",
@@ -26,10 +26,10 @@ export const jsonLd = [
       },
       {
         "@type": "Question",
-        name: "Does Alook replace Claude Code or Codex?",
+        name: "Does OneCaptain replace Claude Code or Codex?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "No. Alook is a coordination layer for local coding agents. Claude Code and Codex still run on your machine, execute commands, and modify files. Alook adds roles, addressable agents, durable threads, and task visibility across those runtimes.",
+          text: "No. OneCaptain is a coordination layer for local coding agents. Claude Code and Codex still run on your machine, execute commands, and modify files. OneCaptain adds roles, addressable agents, durable threads, and task visibility across those runtimes.",
         },
       },
       {
@@ -37,15 +37,15 @@ export const jsonLd = [
         name: "Do Claude Code and Codex agents need to run on the same machine?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Not necessarily. What matters is that each runtime you connect can reach the repository and that handoffs carry enough context for the next agent to act. Check Alook's current runtime and daemon documentation for how your setup registers local machines.",
+          text: "Not necessarily. What matters is that each runtime you connect can reach the repository and that handoffs carry enough context for the next agent to act. Check OneCaptain's current runtime and daemon documentation for how your setup registers local machines.",
         },
       },
       {
         "@type": "Question",
-        name: "Can Alook be self-hosted?",
+        name: "Can OneCaptain be self-hosted?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Yes. Alook is open source under Apache 2.0. You can self-host from the GitHub repository or sign up at alook.ai and connect your local runtime, depending on how you want to run the control plane.",
+          text: "Yes. Sign up at onecaptain.ai and connect your local runtime, or attach a cloud model API key — the hosted control plane handles the rest.",
         },
       },
     ],
@@ -177,13 +177,13 @@ A minimal handoff package:
 
 That list overlaps with the handoff minimum in [shared context between agents](/blog/shared-context-between-agents). The difference here is the handoff crosses runtimes, not just roles inside one chat.
 
-## Running Claude Code and Codex through Alook
+## Running Claude Code and Codex through OneCaptain
 
-[Alook](https://alook.ai) is an open-source, self-hosted platform that connects local AI coding agents into a coordinated team. Public documentation and the [GitHub repository](https://github.com/alookai/alook) state support for Claude Code, Codex, and OpenCode today, with additional runtimes listed as coming soon.
+[OneCaptain](https://onecaptain.ai) is an open-source, self-hosted platform that connects local AI coding agents into a coordinated team. Public documentation and the [GitHub repository](https://github.com/agentaler/onecaptain) state support for Claude Code, Codex, and OpenCode today, with additional runtimes listed as coming soon.
 
-### When Alook fits
+### When OneCaptain fits
 
-Alook fits when you already run more than one local coding agent and want cross-runtime work to have names, roles, inboxes, and task history instead of living only in your head and two terminals.
+OneCaptain fits when you already run more than one local coding agent and want cross-runtime work to have names, roles, inboxes, and task history instead of living only in your head and two terminals.
 
 It is a poor fit for a single quick question inside one runtime, or for work that never leaves Claude Code's own subagent model.
 
@@ -194,14 +194,14 @@ From the project README and onboarding flow:
 1. Install and run onboarding:
 
 ```bash
-npx @alook/app onboard
+npx @onecaptain/app onboard
 ```
 
-2. Alternatively, register at [alook.ai](https://alook.ai) and connect your local runtime, or deploy a self-hosted instance from GitHub.
+2. Alternatively, register at [onecaptain.ai](https://onecaptain.ai) and connect your local runtime, or deploy a self-hosted instance from GitHub.
 
 3. Connect the local environments where Claude Code and Codex run.
 
-4. Create agents with distinct roles and give each agent an addressable inbox on the `@alook.ai` domain.
+4. Create agents with distinct roles and give each agent an addressable inbox on the `@onecaptain.ai` domain.
 
 5. Route work through tasks, threads, or email-style messages so handoffs stay visible after either CLI session closes.
 
@@ -217,13 +217,13 @@ A minimal cross-runtime team **could** be configured like this:
 
 Work flows: you assign a scoped task to Builder → Builder commits and sends a handoff with branch, files, and open questions → Reviewer receives the task in its inbox → Reviewer returns findings → Builder addresses them → you merge when satisfied.
 
-That pattern mirrors the example workflow earlier. Alook supplies the identities, threads, and task surface; each runtime still executes commands and edits files locally.
+That pattern mirrors the example workflow earlier. OneCaptain supplies the identities, threads, and task surface; each runtime still executes commands and edits files locally.
 
 ![Org chart with a human owner, a Builder agent on Claude Code, and a Reviewer agent on Codex connected by handoff arrows](/blog/claude-code-and-codex-same-team/team-setup.webp)
 
 > **Demo video — to be added.** A short walkthrough of this setup (connect Claude Code and Codex, assign Builder/Reviewer roles, run one handoff) will be embedded here once the recording is ready.
 
-### What Alook coordinates
+### What OneCaptain coordinates
 
 - Agent identity and addressability
 - Role ownership across runtimes
@@ -239,13 +239,13 @@ That pattern mirrors the example workflow earlier. Alook supplies the identities
 - Account, subscription, and CLI-specific constraints
 - Whether the generated code is correct for your repo
 
-Alook does not replace either runtime. It sits between them so you stop being the only integration point.
+OneCaptain does not replace either runtime. It sits between them so you stop being the only integration point.
 
 ### Current limits
 
-Alook is a coordination layer, not a merged IDE. You still maintain two runtimes, two sets of credentials, and your own review standards. Features and onboarding flows evolve; confirm runtime support and setup steps in the current docs before you plan a production workflow around them.
+OneCaptain is a coordination layer, not a merged IDE. You still maintain two runtimes, two sets of credentials, and your own review standards. Features and onboarding flows evolve; confirm runtime support and setup steps in the current docs before you plan a production workflow around them.
 
-To explore templates and roles, see [Alook templates](https://alook.ai/templates). For broader team design, see [how to build an AI agent team](/blog/ai-agent-team) and [how to delegate tasks to AI agents](/blog/how-to-delegate-tasks-to-ai-agents).
+To explore templates and roles, see [OneCaptain templates](https://onecaptain.ai/templates). For broader team design, see [how to build an AI agent team](/blog/ai-agent-team) and [how to delegate tasks to AI agents](/blog/how-to-delegate-tasks-to-ai-agents).
 
 ## When keeping them separate is simpler
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import type { AgentFolder } from "@/hooks/use-agent-folders";
 import { AnimatedAvatar } from "@/components/avatar/animated-avatar";
 import { cn } from "@/lib/utils";

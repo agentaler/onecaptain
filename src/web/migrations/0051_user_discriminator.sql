@@ -2,7 +2,7 @@
 -- disambiguation in the UserCard and friend-search picker.
 --
 -- New rows get an FNV-1a hash of user.id at INSERT time via the Better-Auth
--- `user.create.before` hook (see computeDiscriminator in @alook/shared).
+-- `user.create.before` hook (see computeDiscriminator in @onecaptain/shared).
 --
 -- Existing rows are seeded with a random 4-digit tag right here in SQL so we
 -- don't ship a screenful of `#0000` on day one. The stored value is opaque —

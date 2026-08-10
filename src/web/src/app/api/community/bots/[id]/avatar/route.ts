@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { queries, CACHE_REVALIDATE } from "@alook/shared"
+import { queries, CACHE_REVALIDATE } from "@onecaptain/shared"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"

@@ -153,7 +153,7 @@ describe("analyzeSwitch — re-renders are genuine (not deduped away)", () => {
 describe("renderReport — cache-state split", () => {
   it("emits a section per switch across cache states", () => {
     const file: CaptureFile = {
-      owner: { email: "perf-seed@alook.test", userId: "u1" },
+      owner: { email: "perf-seed@onecaptain.test", userId: "u1" },
       createdAt: "2026-07-24T00:00:00.000Z",
       switches: [
         baseSwitch({ cacheState: "cold" }),

@@ -9,7 +9,7 @@ import { defineConfig, devices } from "@playwright/test"
 //   stress-seed just populated, and must drive as the STABLE seed identity
 //   (loaded from perf-artifacts/seed-manifest.json inside the spec), not a
 //   fresh stamped user.
-const BASE_URL = process.env.ALOOK_SERVER_URL || "http://localhost:3000"
+const BASE_URL = process.env.ONECAPTAIN_SERVER_URL || "http://localhost:3000"
 
 export default defineConfig({
   testDir: "./src/test/e2e-ui/perf",

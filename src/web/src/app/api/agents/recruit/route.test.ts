@@ -21,8 +21,8 @@ const mockCreateAgent = vi.fn();
 const mockLinkCreate = vi.fn();
 const mockAddWhitelist = vi.fn();
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     queries: {
@@ -115,7 +115,7 @@ describe("POST /api/agents/recruit", () => {
     const body = await res.json();
     expect(res.status).toBe(201);
     expect(body.agent.id).toBe("new1");
-    expect(body.agent.email).toBe("robin@alook.ai");
+    expect(body.agent.email).toBe("robin@onecaptain.ai");
     expect(body.link.id).toBe("link1");
     expect(mockCreateAgent.mock.calls[0]![1]).toMatchObject({ workspaceId: "w1", ownerId: "u1" });
     expect(mockLinkCreate.mock.calls[0]![1]).toMatchObject({

@@ -29,13 +29,13 @@ describe("buildInstructionContent email tool injection", () => {
     });
     const content = buildInstructionContent(task);
 
-    expect(content).toContain("npx @alook/cli email pull --status unread");
-    expect(content).toContain("npx @alook/cli email set --email_id <EMAIL_ID> --status read");
+    expect(content).toContain("npx @onecaptain/cli email pull --status unread");
+    expect(content).toContain("npx @onecaptain/cli email set --email_id <EMAIL_ID> --status read");
     expect(content).not.toContain("email pull --agent_id");
     expect(content).not.toContain("email set --agent_id");
-    expect(content).toContain(`${tempDir("alook-emails")}/ws1/agent-123/`);
+    expect(content).toContain(`${tempDir("onecaptain-emails")}/ws1/agent-123/`);
     expect(content).toContain("metadata.json");
-    expect(content).toContain("'myagent@alook.ai' (default, Alook platform address)");
+    expect(content).toContain("'myagent@onecaptain.ai' (default, OneCaptain platform address)");
   });
 
   it("includes --email_id pull instruction for ID-based fetching", () => {
@@ -55,7 +55,7 @@ describe("buildInstructionContent email tool injection", () => {
     });
     const content = buildInstructionContent(task);
 
-    expect(content).toContain("npx @alook/cli email send --to");
+    expect(content).toContain("npx @onecaptain/cli email send --to");
     expect(content).toContain("--body-file");
     expect(content).toContain("--attachment");
   });
@@ -86,7 +86,7 @@ describe("buildInstructionContent email tool injection", () => {
     });
     const content = buildInstructionContent(task);
 
-    expect(content).toContain("'myagent@alook.ai' (default, Alook platform address)");
+    expect(content).toContain("'myagent@onecaptain.ai' (default, OneCaptain platform address)");
     expect(content).toContain("Your owner and creator is (gus@example.com).");
   });
 
@@ -96,7 +96,7 @@ describe("buildInstructionContent email tool injection", () => {
     });
     const content = buildInstructionContent(task);
 
-    expect(content).toContain("'myagent@alook.ai' (default, Alook platform address)");
+    expect(content).toContain("'myagent@onecaptain.ai' (default, OneCaptain platform address)");
     expect(content).not.toContain("owner and creator");
   });
 
@@ -134,7 +134,7 @@ describe("buildInstructionContent email tool injection", () => {
 
     expect(content).toContain("### Talking to the user");
     expect(content).toContain("texting a colleague");
-    expect(content).toContain("npx @alook/cli sync send-dm");
+    expect(content).toContain("npx @onecaptain/cli sync send-dm");
     expect(content).not.toContain("sync send-dm --agent_id");
   });
 
@@ -153,18 +153,18 @@ describe("buildInstructionContent email tool injection", () => {
         name: "test",
         instructions: "",
         colleagues: [
-          { name: "Scout", email: "scout@alook.ai", description: "A researcher agent", instruction: 'Share findings with [@ id="agent-123" label="test"]' },
-          { name: "Writer", email: "writer@alook.ai", description: "", instruction: "Draft blog posts" },
+          { name: "Scout", email: "scout@onecaptain.ai", description: "A researcher agent", instruction: 'Share findings with [@ id="agent-123" label="test"]' },
+          { name: "Writer", email: "writer@onecaptain.ai", description: "", instruction: "Draft blog posts" },
         ],
       },
     });
     const content = buildInstructionContent(task);
 
     expect(content).toContain("## YOUR COLLEAGUES");
-    expect(content).toContain("### Scout (scout@alook.ai)");
+    expect(content).toContain("### Scout (scout@onecaptain.ai)");
     expect(content).toContain("A researcher agent");
     expect(content).toContain("**DELEGATE when:** Share findings with YOU");
-    expect(content).toContain("### Writer (writer@alook.ai)");
+    expect(content).toContain("### Writer (writer@onecaptain.ai)");
     expect(content).toContain("**DELEGATE when:** Draft blog posts");
   });
 
@@ -174,7 +174,7 @@ describe("buildInstructionContent email tool injection", () => {
         name: "test",
         instructions: "",
         colleagues: [
-          { name: "Scout", email: "scout@alook.ai", description: "", instruction: "Research" },
+          { name: "Scout", email: "scout@onecaptain.ai", description: "", instruction: "Research" },
         ],
       },
     });
@@ -209,13 +209,13 @@ describe("buildInstructionContent email tool injection", () => {
         name: "test",
         instructions: "",
         colleagues: [
-          { name: "Scout", email: "scout@alook.ai", description: "", instruction: "Share data" },
+          { name: "Scout", email: "scout@onecaptain.ai", description: "", instruction: "Share data" },
         ],
       },
     });
     const content = buildInstructionContent(task);
 
-    expect(content).toContain("### Scout (scout@alook.ai)");
+    expect(content).toContain("### Scout (scout@onecaptain.ai)");
     expect(content).toContain("**DELEGATE when:** Share data");
     // Only the header + relationship, no blank description line
     const scoutSection = content.split("### Scout")[1].split("##")[0];

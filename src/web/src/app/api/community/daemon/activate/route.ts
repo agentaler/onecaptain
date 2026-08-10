@@ -6,7 +6,7 @@ import {
   WS_EVENTS,
   type CommunityDaemonActivateResponse,
   type CommunityMachineCreated,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { broadcastToUser } from "@/lib/broadcast"
 import { withCommunityPairingToken } from "@/lib/middleware/community-pairing-token"

@@ -13,13 +13,13 @@ import { readComposerDraft, writeComposerDraft, clearComposerDraft } from "@/lib
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useFileAttachments, type PendingFile } from "@/hooks/use-file-attachments"
-import { MAX_ATTACHMENT_SIZE_BYTES } from "@alook/shared"
+import { MAX_ATTACHMENT_SIZE_BYTES } from "@onecaptain/shared"
 import { tid } from "@/lib/community/testids"
 import { Avatar } from "./avatar"
 import { ChannelIcon } from "./channel-icon"
 import { EmojiPickerPopover } from "./emoji-picker"
 import type { Member } from "./_types"
-import type { MentionType } from "@alook/shared"
+import type { MentionType } from "@onecaptain/shared"
 import {
   buildCommunityMentionExtension,
   detectMentionType,

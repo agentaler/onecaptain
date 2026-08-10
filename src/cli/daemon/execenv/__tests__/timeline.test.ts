@@ -9,7 +9,7 @@ vi.mock("../../../lib/logger.js", () => {
   return { createLogger: () => mockLog, log: mockLog };
 });
 
-import { TASK_TYPES } from "@alook/shared";
+import { TASK_TYPES } from "@onecaptain/shared";
 import {
   initEntry,
   updateEntry,
@@ -668,7 +668,7 @@ describe("timeline", () => {
   });
 
   describe("steerWarmupGraceMs", () => {
-    const KEY = "ALOOK_STEER_WARMUP_GRACE_MS";
+    const KEY = "ONECAPTAIN_STEER_WARMUP_GRACE_MS";
     let saved: string | undefined;
     beforeEach(() => { saved = process.env[KEY]; });
     afterEach(() => {

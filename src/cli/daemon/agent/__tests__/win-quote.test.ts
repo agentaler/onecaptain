@@ -9,8 +9,8 @@ describe("quoteWinArg", () => {
   });
 
   it("wraps paths containing spaces", () => {
-    expect(quoteWinArg("C:\\Users\\John Doe\\.alook")).toBe(
-      "\"C:\\Users\\John Doe\\.alook\"",
+    expect(quoteWinArg("C:\\Users\\John Doe\\.onecaptain")).toBe(
+      "\"C:\\Users\\John Doe\\.onecaptain\"",
     );
   });
 
@@ -56,13 +56,13 @@ describe("quoteWinArg", () => {
       quoteWinArgs([
         "run",
         "--dir",
-        "C:\\Users\\John Doe\\.alook\\workspaces",
+        "C:\\Users\\John Doe\\.onecaptain\\workspaces",
         "hello world",
       ]),
     ).toEqual([
       "run",
       "--dir",
-      "\"C:\\Users\\John Doe\\.alook\\workspaces\"",
+      "\"C:\\Users\\John Doe\\.onecaptain\\workspaces\"",
       "\"hello world\"",
     ]);
   });

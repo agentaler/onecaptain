@@ -1,4 +1,4 @@
-name = "alook-email-worker"
+name = "onecaptain-email-worker"
 main = "src/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
@@ -26,15 +26,15 @@ inspector_port = 9231
 [[d1_databases]]
 binding = "DB"
 database_id = "1593b87c-d8a8-4cdf-b6c0-c80d94442654"
-database_name = "alook-app"
+database_name = "onecaptain-app"
 
 [[r2_buckets]]
 binding = "EMAIL_BUCKET"
-bucket_name = "alook-emails"
+bucket_name = "onecaptain-emails"
 
 [[services]]
 binding = "WEB_SERVICE"
-service = "alook-web"
+service = "onecaptain-web"
 
 [[send_email]]
 name = "SEND_EMAIL"

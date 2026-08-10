@@ -51,7 +51,7 @@ vi.mock("nanoid", () => ({
   customAlphabet: () => () => `mock-${++nanoidCounter}`,
 }))
 
-vi.mock("@alook/shared/crypto", () => ({
+vi.mock("@onecaptain/shared/crypto", () => ({
   encrypt: (val: string) => `encrypted:${val}`,
   decrypt: (val: string) => `decrypted:${val}`,
 }))
@@ -61,8 +61,8 @@ const mockUpdateEmailAccount = vi.fn()
 const mockIsWhitelisted = vi.fn().mockResolvedValue(true)
 const mockBuildWhitelistSet = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   const noopLogger = {
     debug: () => {},
     info: () => {},

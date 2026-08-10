@@ -6,7 +6,7 @@ const base: BlogPost = {
   slug: "sample",
   title: "Sample",
   date: "2026-06-08",
-  author: "Alook Team",
+  author: "OneCaptain Team",
   excerpt: "Excerpt",
   readingTime: "5 min read",
   image: "/blog/sample/hero.webp",
@@ -17,7 +17,7 @@ describe("buildBlogPostingJsonLd", () => {
     const jsonLd = buildBlogPostingJsonLd(base);
     expect(jsonLd.datePublished).toBe("2026-06-08");
     expect(jsonLd).not.toHaveProperty("dateModified");
-    expect(jsonLd.image).toBe("https://alook.ai/blog/sample/hero.webp");
+    expect(jsonLd.image).toBe("https://onecaptain.ai/blog/sample/hero.webp");
   });
 
   it("includes dateModified when set", () => {

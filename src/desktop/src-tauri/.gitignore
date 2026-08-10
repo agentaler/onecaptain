@@ -5,9 +5,9 @@
 /gen/apple/Externals/
 /gen/apple/Pods/
 /gen/apple/*.xcworkspace/
-/gen/apple/alook-desktop.xcodeproj/
+/gen/apple/onecaptain-desktop.xcodeproj/
 /gen/apple/exported_binaries/
-/gen/apple/alook-desktop_iOS/Info.plist
+/gen/apple/onecaptain-desktop_iOS/Info.plist
 !/gen/android/
 /gen/android/.gradle/
 /gen/android/.tauri/
@@ -22,4 +22,4 @@
 /gen/android/app/tauri.build.gradle.kts
 /gen/android/app/tauri.properties
 /gen/android/app/src/main/jniLibs/
-/gen/android/app/src/main/java/ai/alook/desktop/generated/
+/gen/android/app/src/main/java/ai/onecaptain/desktop/generated/

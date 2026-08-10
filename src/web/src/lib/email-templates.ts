@@ -5,14 +5,14 @@ type OtpType =
   | "change-email"
 
 const subjectByType: Record<OtpType, string> = {
-  "sign-in": "Your Alook sign-in code",
-  "email-verification": "Verify your Alook email",
-  "forget-password": "Reset your Alook password",
+  "sign-in": "Your OneCaptain sign-in code",
+  "email-verification": "Verify your OneCaptain email",
+  "forget-password": "Reset your OneCaptain password",
   "change-email": "Confirm your new email address",
 }
 
 const headingByType: Record<OtpType, string> = {
-  "sign-in": "Sign in to Alook",
+  "sign-in": "Sign in to OneCaptain",
   "email-verification": "Verify your email",
   "forget-password": "Reset your password",
   "change-email": "Confirm email change",
@@ -45,7 +45,7 @@ export function renderOtpEmail(otp: string, type: OtpType): string {
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background-color:#ffffff;border-radius:8px;padding:40px 36px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
 <tr><td>
-  <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#8c7e6f;letter-spacing:0.04em;text-transform:uppercase;">Alook</p>
+  <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#8c7e6f;letter-spacing:0.04em;text-transform:uppercase;">OneCaptain</p>
   <h1 style="margin:0 0 12px;font-size:22px;font-weight:600;color:#2c2825;line-height:1.3;">${heading}</h1>
   <p style="margin:0 0 28px;font-size:15px;color:#6b6057;line-height:1.5;">${description}</p>
   <div style="background-color:#faf8f6;border:1px solid #ebe7e2;border-radius:6px;padding:20px;text-align:center;margin:0 0 28px;">

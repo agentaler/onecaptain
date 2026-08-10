@@ -44,7 +44,7 @@ function baseCtx(): LaunchContext {
 }
 
 describe("KimiDriver initialize payload", () => {
-  it("sends alook-daemon identity and the named protocol version", async () => {
+  it("sends onecaptain-daemon identity and the named protocol version", async () => {
     const driver = new KimiDriver();
     const ctx = baseCtx();
     const { process: proc } = await driver.spawn(ctx);
@@ -57,6 +57,6 @@ describe("KimiDriver initialize payload", () => {
     expect(initPayload.jsonrpc).toBe("2.0");
     expect(initPayload.method).toBe("initialize");
     expect(initPayload.params.protocol_version).toBe(KIMI_WIRE_PROTOCOL_VERSION);
-    expect(initPayload.params.client).toEqual({ name: "alook-daemon", version: readDaemonVersion() });
+    expect(initPayload.params.client).toEqual({ name: "onecaptain-daemon", version: readDaemonVersion() });
   });
 });

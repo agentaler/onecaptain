@@ -7,7 +7,7 @@ import {
   computeEventLayout,
   weekRangeIso,
 } from "./calendar-week-utils";
-import type { CalendarEvent } from "@alook/shared";
+import type { CalendarEvent } from "@onecaptain/shared";
 
 function makeEvent(scheduled_at: string, id = "ev_1"): CalendarEvent {
   return {

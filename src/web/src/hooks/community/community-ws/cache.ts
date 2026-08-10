@@ -2,7 +2,7 @@ import type { InfiniteData } from "@tanstack/react-query"
 import type {
   CommunityReactionAdd,
   CommunityReactionRemove,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import type { Msg } from "@/components/community/_types"
 import type { MessagesPage } from "@/hooks/community/use-messages"
 

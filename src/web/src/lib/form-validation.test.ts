@@ -18,7 +18,7 @@ describe("validateWorkspaceForm", () => {
   });
 
   it("passes when name and slug are present", () => {
-    const errors = validateWorkspaceForm({ name: "Alook", slug: "alook" });
+    const errors = validateWorkspaceForm({ name: "OneCaptain", slug: "onecaptain" });
 
     expect(errors).toEqual({});
     expect(hasWorkspaceFormErrors(errors)).toBe(false);

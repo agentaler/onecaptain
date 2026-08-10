@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "How Alook collects, uses, and protects your personal information.",
-  alternates: { canonical: "https://alook.ai/privacy" },
+  description: "How OneCaptain collects, uses, and protects your personal information.",
+  alternates: { canonical: "https://onecaptain.ai/privacy" },
 };
 
 const linkClass =
@@ -24,8 +24,8 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold mt-10 mb-4">Interpretation and Definitions</h2>
           <p className="text-foreground/80">
             In this Privacy Policy, &quot;Company&quot; (referred to as &quot;We&quot;, &quot;Us&quot;, or &quot;Our&quot;)
-            refers to Alook AI. &quot;Service&quot; refers to the Alook platform accessible at{" "}
-            <a href="https://alook.ai" className={linkClass}>alook.ai</a>.
+            refers to OneCaptain AI. &quot;Service&quot; refers to the OneCaptain platform accessible at{" "}
+            <a href="https://onecaptain.ai" className={linkClass}>onecaptain.ai</a>.
             &quot;You&quot; means the individual accessing or using our Service.
             &quot;Personal Data&quot; is any information that relates to an identified or identifiable individual.
           </p>
@@ -58,7 +58,7 @@ export default function PrivacyPage() {
 
           <h4 className="text-base font-medium mt-6 mb-2">Information from Third-Party Social Login</h4>
           <p className="text-foreground/80">
-            Alook allows You to create an account and log in through third-party services
+            OneCaptain allows You to create an account and log in through third-party services
             including Google and GitHub. If You decide to register through or grant us access
             to a third-party service, We may collect Personal Data already associated with
             Your account, such as Your name and email address.
@@ -159,8 +159,8 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold mt-10 mb-4">Contact Us</h2>
           <p className="text-foreground/80">
             If you have any questions about this Privacy Policy, You can contact us at{" "}
-            <a href="mailto:support@alook.ai" className={linkClass}>
-              support@alook.ai
+            <a href="mailto:support@onecaptain.ai" className={linkClass}>
+              support@onecaptain.ai
             </a>.
           </p>
         </section>

@@ -11,9 +11,9 @@ import {
   isUniqueConstraintError,
   withD1Retry,
   reachIsParticipantSet,
-} from "@alook/shared"
-import type { MentionType } from "@alook/shared"
-import type { Database } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { MentionType } from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 import { broadcastToUserSafe, fanOutToChannel, resolveChannelRecipients } from "./fanout"
 import { dispatchMessageNotify } from "./notify"
 import { mapMessageForWs } from "./message-payload"

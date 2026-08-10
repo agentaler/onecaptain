@@ -20,7 +20,7 @@ import { formatMessageTime } from "./format-time"
 import { tid } from "@/lib/community/testids"
 import { avatarInitial } from "@/lib/community/avatar"
 import { displayName } from "@/lib/community/display-name"
-import { stripInlineMarkup } from "@alook/shared"
+import { stripInlineMarkup } from "@onecaptain/shared"
 import type { RenderMsg, OpenProfile } from "./_types"
 import { attachmentAspectRatio } from "./attachment-layout"
 

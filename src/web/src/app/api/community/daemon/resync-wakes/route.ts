@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { queries, dispatchOneUnreadWake, withD1Retry } from "@alook/shared"
+import { queries, dispatchOneUnreadWake, withD1Retry } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityDaemonAuth } from "@/lib/middleware/community-daemon-auth"
 
@@ -17,7 +17,7 @@ import { withCommunityDaemonAuth } from "@/lib/middleware/community-daemon-auth"
  *
  * This route decides nothing new about addressing/config — for every bot
  * bound to `ctx.machineId` with pending unread, it calls the SAME
- * `dispatchOneUnreadWake` the real `alook-wake-worker` queue consumer uses,
+ * `dispatchOneUnreadWake` the real `onecaptain-wake-worker` queue consumer uses,
  * which re-reads current D1 state and forwards a freshly built `agent:wake`.
  * Because the daemon's WS just connected, `sendWakeToMachine` finds a live
  * socket this time and delivers immediately.

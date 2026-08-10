@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, HeartbeatRequestSchema, OFFLINE_THRESHOLD_MS } from "@alook/shared";
+import { queries, HeartbeatRequestSchema, OFFLINE_THRESHOLD_MS } from "@onecaptain/shared";
 import { getDb } from "@/lib/db";
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers";

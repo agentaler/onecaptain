@@ -1,5 +1,5 @@
-import { createLogger, DEV_WAKE_WORKER_URL } from "@alook/shared"
-import type { WakePayload } from "@alook/shared"
+import { createLogger, DEV_WAKE_WORKER_URL } from "@onecaptain/shared"
+import type { WakePayload } from "@onecaptain/shared"
 import { fetchViaBindingOrDevFallback } from "../dev-binding-fetch"
 
 const log = createLogger({ service: "wake-transport" })
@@ -9,7 +9,7 @@ const log = createLogger({ service: "wake-transport" })
  * will actually resolve them. Exactly two implementations below — neither
  * caller (`wake-producer.ts`) ever talks to `WAKE_QUEUE`/`WAKE_WORKER`
  * directly, and neither ever re-implements "rebuild from D1, skip or
- * forward" (that logic lives once, in `@alook/shared`'s
+ * forward" (that logic lives once, in `@onecaptain/shared`'s
  * `dispatchOneUnreadWake`, and is exercised by whichever transport actually
  * runs it).
  */
@@ -30,14 +30,14 @@ export function createQueueWakeTransport(queue: Queue<WakePayload>): WakeTranspo
  * Dev-only. Local Cloudflare Queues simulation cannot bridge separate
  * `wrangler dev`/`next dev` processes (plans/minimal-wake-queue-unread-notice.md)
  * — every `WAKE_QUEUE.sendBatch()` call from `next dev` lands nowhere. This
- * transport instead calls the REAL `alook-wake-worker` process directly over
+ * transport instead calls the REAL `onecaptain-wake-worker` process directly over
  * HTTP (its `fetch()` dev entrypoint, see `src/wake-worker/src/index.ts`),
  * via the `WAKE_WORKER` service binding with the same binding-first/
  * HTTP-fallback reliability pattern `broadcast.ts` uses for `WS_DO_WORKER`
  * (`next dev`'s `getPlatformProxy` service bindings to separately-run
  * `wrangler dev` workers are not reliably reachable on their own). The
- * candidate then gets resolved by `alook-wake-worker`'s own process, against
- * the real D1 database, with a real forward to `alook-ws-do` — the actual
+ * candidate then gets resolved by `onecaptain-wake-worker`'s own process, against
+ * the real D1 database, with a real forward to `onecaptain-ws-do` — the actual
  * production code path, not a local stand-in for it.
  */
 export function createDevHttpWakeTransport(env: Env): WakeTransport {
@@ -55,7 +55,7 @@ export function createDevHttpWakeTransport(env: Env): WakeTransport {
         { logPrefix: "wake_transport", log, label: `${payloads.length}_candidates` },
       )
       if (!res.ok) {
-        throw new Error(`dev wake transport: alook-wake-worker responded ${res.status}`)
+        throw new Error(`dev wake transport: onecaptain-wake-worker responded ${res.status}`)
       }
     },
   }

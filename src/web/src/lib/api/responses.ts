@@ -2,7 +2,7 @@ import {
   formatTimestamp,
   formatTimestampNullable,
 } from "@/lib/middleware/helpers";
-import { TaskApiBaseSchema, isOnline, TASK_TYPES, schema, type Message } from "@alook/shared";
+import { TaskApiBaseSchema, isOnline, TASK_TYPES, schema, type Message } from "@onecaptain/shared";
 
 type WorkspaceRow = typeof schema.workspace.$inferSelect;
 type AgentRow = typeof schema.agent.$inferSelect;
@@ -42,6 +42,7 @@ export function workspaceToResponse(w: WorkspaceRow) {
     name: w.name,
     slug: w.slug,
     onboarded: !!w.onboarded,
+    plan: w.plan ?? "free",
     created_at: formatTimestamp(w.createdAt),
     updated_at: formatTimestamp(w.updatedAt),
   };

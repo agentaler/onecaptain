@@ -1,4 +1,4 @@
-import type { FriendCard } from "@alook/shared"
+import type { FriendCard } from "@onecaptain/shared"
 import { wsDoFetch } from "@/lib/broadcast"
 
 /** The peer-row shape the friendship bucket queries project (listAgentFriends). */
@@ -48,7 +48,7 @@ export async function resolvePresence(
 
 /**
  * Project a friendship peer row to the lean bot `FriendCard` (the shape
- * `alook friend list` renders). `presence` is looked up in the pre-resolved
+ * `onecaptain friend list` renders). `presence` is looked up in the pre-resolved
  * online set. Identical mapping to the pre-fold flat verb's `toCard`, lifted so
  * every bucket endpoint's bot arm emits the same card.
  */

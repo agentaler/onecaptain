@@ -1,7 +1,7 @@
 import { spawn, execSync, type ChildProcess } from "child_process";
 import { join } from "path";
 import { openSync, mkdirSync, closeSync } from "fs";
-import { resolveMode } from "@alook/shared";
+import { resolveMode } from "@onecaptain/shared";
 import { SELF_HOSTED_DIR } from "./constants.js";
 import { writePids, readPids, isAlive, clearPids } from "./pid.js";
 
@@ -17,7 +17,7 @@ interface StartOptions {
 
 const isDevMode =
   resolveMode({ nodeEnv: process.env.NODE_ENV }) === "dev" &&
-  !!process.env.ALOOK_PROJECT_ROOT;
+  !!process.env.ONECAPTAIN_PROJECT_ROOT;
 
 function logDir(): string {
   const dir = join(SELF_HOSTED_DIR, "logs");
@@ -78,7 +78,7 @@ export function startServices(ports: ServicePorts, opts: StartOptions = {}): voi
     (pid) => pid && isAlive(pid),
   );
   if (anyAlive) {
-    console.log("Services already running. Use 'alook-app stop' first.");
+    console.log("Services already running. Use 'onecaptain-app stop' first.");
     return;
   }
 
@@ -90,7 +90,7 @@ export function startServices(ports: ServicePorts, opts: StartOptions = {}): voi
   let wsChild: ChildProcess;
 
   if (isDevMode) {
-    const root = process.env.ALOOK_PROJECT_ROOT!;
+    const root = process.env.ONECAPTAIN_PROJECT_ROOT!;
     const webDir = join(root, "src", "web");
     const emailDir = join(root, "src", "email-worker");
     const wsDir = join(root, "src", "ws-do");

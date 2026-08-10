@@ -16,8 +16,8 @@ const mockGetUserInternal = vi.fn()
 const mockGetBotBinding = vi.fn()
 const mockListBlocked = vi.fn()
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {

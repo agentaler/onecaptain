@@ -6,7 +6,7 @@ const APPLE_APP_SITE_ASSOCIATION = {
     apps: [],
     details: [
       {
-        appIDs: ["TEAM_ID.ai.alook.app"],
+        appIDs: ["TEAM_ID.ai.onecaptain.app"],
         paths: ["*"],
       },
     ],

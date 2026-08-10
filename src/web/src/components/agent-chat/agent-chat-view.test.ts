@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Message, Artifact } from "@alook/shared";
+import type { Message, Artifact } from "@onecaptain/shared";
 import { sortMessages, mergeMessages, buildTimeline, computeGroupPositions, getEventIconType, eventTypeFromMessage, shouldPersistPointerForLoad, pointerRefreshTargetForTaskCreated } from "./chat-message-utils";
 import type { NapMarker } from "./chat-message-utils";
 

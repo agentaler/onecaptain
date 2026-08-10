@@ -1,4 +1,4 @@
-import { toAlookAddress } from "./email"
+import { toOneCaptainAddress } from "./email"
 import { MENTION_TOKEN_RE } from "./mention-token"
 
 export interface PromptAgent {
@@ -35,7 +35,7 @@ function isBoundary(prompt: string, endIndex: number): boolean {
 }
 
 function enrichMention(name: string, emailHandle: string | null): string {
-  return emailHandle ? `@${name} (${toAlookAddress(emailHandle)})` : `@${name}`
+  return emailHandle ? `@${name} (${toOneCaptainAddress(emailHandle)})` : `@${name}`
 }
 
 function parseBareNames(prompt: string, agents: PromptAgent[]): ParseResult {
@@ -79,7 +79,7 @@ function parseBareNames(prompt: string, agents: PromptAgent[]): ParseResult {
     const m = matches[i]
     const mention: PromptMention = {
       name: m.agent.name,
-      email: m.agent.emailHandle ? toAlookAddress(m.agent.emailHandle) : null,
+      email: m.agent.emailHandle ? toOneCaptainAddress(m.agent.emailHandle) : null,
       description: m.agent.description,
     }
     mentions.unshift(mention)
@@ -114,7 +114,7 @@ export function parsePromptMentions(prompt: string, agents: PromptAgent[]): Pars
       result += enrichMention(agent.name, agent.emailHandle)
       mentions.push({
         name: agent.name,
-        email: agent.emailHandle ? toAlookAddress(agent.emailHandle) : null,
+        email: agent.emailHandle ? toOneCaptainAddress(agent.emailHandle) : null,
         description: agent.description,
       })
     } else {

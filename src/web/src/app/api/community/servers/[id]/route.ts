@@ -9,7 +9,7 @@ import {
   MAX_SERVER_DESCRIPTION_LENGTH,
   WS_EVENTS,
   slugify,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { fanOutToServerMembers } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireServerAdmin } from "@/lib/community/permissions"

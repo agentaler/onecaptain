@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query"
-import { notifLevelDisplay } from "@alook/shared"
+import { notifLevelDisplay } from "@onecaptain/shared"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 

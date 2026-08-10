@@ -31,7 +31,7 @@ import {
 import { CalendarAgentFilter } from "@/components/calendar/calendar-agent-filter";
 import { CalendarEventSheet } from "@/components/calendar/calendar-event-sheet";
 import { getWeekStart, weekRangeIso } from "@/components/calendar/calendar-week-utils";
-import type { CalendarEvent, UpdateCalendarEventRequest } from "@alook/shared";
+import type { CalendarEvent, UpdateCalendarEventRequest } from "@onecaptain/shared";
 import { isTypingTarget } from "@/components/calendar/keyboard";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackCalendarEventCreated } from "@/lib/analytics";

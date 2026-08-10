@@ -1,7 +1,7 @@
 "use client"
 
 import { toast } from "sonner"
-import type { FriendApprovalPayload } from "@alook/shared"
+import type { FriendApprovalPayload } from "@onecaptain/shared"
 import { avatarInitial } from "@/lib/community/avatar"
 import { useOwnerDecision } from "@/hooks/community/mutations/friends"
 import { Button } from "@/components/ui/button"

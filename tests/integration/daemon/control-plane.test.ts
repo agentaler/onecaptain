@@ -5,16 +5,16 @@
  *
  *   POST /api/community/channels/:id/messages (human, real HTTP)
  *     → fanOutToChannel → enqueueBotWakes (dev HTTP transport)
- *     → alook-wake-worker (real process) → dispatchOneUnreadWake
- *     → sendWakeToMachine → alook-ws-do (real DO) → the daemon's real
+ *     → onecaptain-wake-worker (real process) → dispatchOneUnreadWake
+ *     → sendWakeToMachine → onecaptain-ws-do (real DO) → the daemon's real
  *       `WsControlChannel`, over a real WebSocket, receives `agent:wake`
  *     → the test (playing the "agent" — no CLI spawned) replies via the
  *       real `enroll-agent` → canonical pull/ack/send HTTP chain
  *     → the reply is visible via a real read of the channel.
  *
- * Requires `wrangler dev` (`@alook/web`), `@alook/ws-do dev`, and
- * `@alook/wake-worker dev` all already running (same servers CI's `e2e`
- * job boots for `@alook/cli`'s integration tests, plus `wake-worker`).
+ * Requires `wrangler dev` (`@onecaptain/web`), `@onecaptain/ws-do dev`, and
+ * `@onecaptain/wake-worker dev` all already running (same servers CI's `e2e`
+ * job boots for `@onecaptain/cli`'s integration tests, plus `wake-worker`).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { WebSocket } from "ws"
@@ -28,8 +28,8 @@ import {
   cleanupCommunityBot,
   type TestSeed,
   type SeededCommunityBot,
-} from "@alook/test-utils"
-import { parseSeq } from "@alook/shared"
+} from "@onecaptain/test-utils"
+import { parseSeq } from "@onecaptain/shared"
 import { WsControlChannel } from "../../../src/daemon/src/server/wsControlChannel"
 import type { HostCommand } from "../../../src/daemon/src/server/contract"
 import { nanoid, seedPairedBot, cleanupPairedBot, type DaemonItFixture } from "./seed-helpers"

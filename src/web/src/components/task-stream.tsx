@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import type { TaskMessageResponse } from "@alook/shared";
-import type { TaskApi as Task } from "@alook/shared";
+import type { TaskMessageResponse } from "@onecaptain/shared";
+import type { TaskApi as Task } from "@onecaptain/shared";
 import { RuntimeErrorBlock } from "@/components/agent-chat/runtime-error-block";
 
 /* ── Grouped stream items ── */

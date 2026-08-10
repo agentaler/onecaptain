@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { ChevronLeft } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
-import type { CommunityMachineSummary } from "@alook/shared"
-import { isPresenceOnline } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
+import { isPresenceOnline } from "@onecaptain/shared"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -70,11 +70,11 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
   const [pendingTokenId, setPendingTokenId] = useState<string | null>(null)
   const [connectedHostname, setConnectedHostname] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<CommunityMachineSummary | null>(null)
-  const [guideAvatarSeed, setGuideAvatarSeed] = useState("alook-guide")
+  const [guideAvatarSeed, setGuideAvatarSeed] = useState("onecaptain-guide")
   const onboardingState = useCommunityOnboarding()
 
   useEffect(() => {
-    setGuideAvatarSeed(`alook-guide-${crypto.randomUUID()}`)
+    setGuideAvatarSeed(`onecaptain-guide-${crypto.randomUUID()}`)
   }, [])
 
   // When the WS layer announces a machine for our pending token, flip the sheet.
@@ -274,7 +274,7 @@ export function MachineList({ onBack }: { onBack?: () => void } = {}) {
           <div>
             <h1 className="text-xl font-medium text-foreground">Machines</h1>
             <p className="text-sm text-muted-foreground">
-              Your computers running the alook daemon.
+              Your computers running the onecaptain daemon.
             </p>
           </div>
           <div data-onboarding-target="connect-machine" className="w-fit">

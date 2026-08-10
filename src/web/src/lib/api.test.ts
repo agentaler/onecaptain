@@ -17,7 +17,7 @@ Object.defineProperty(globalThis, "window", {
   value: {
     ...(globalThis.window || {}),
     location: {
-      origin: "https://alook.test",
+      origin: "https://onecaptain.test",
       assign: locationAssignMock,
     },
   },
@@ -216,7 +216,7 @@ describe("apiFetch", () => {
       expect((e as ApiError).status).toBe(401);
       expect((e as ApiError).message).toBe("Unauthorized");
       expect((e as ApiError).isUnauthorized).toBe(true);
-      expect(locationAssignMock).toHaveBeenCalledWith(new URL("/sign-in", "https://alook.test"));
+      expect(locationAssignMock).toHaveBeenCalledWith(new URL("/sign-in", "https://onecaptain.test"));
     }
   });
 });

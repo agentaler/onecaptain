@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Streamdown } from "streamdown";
-import type { WsMessage, WorkspaceFileEntry } from "@alook/shared";
+import type { WsMessage, WorkspaceFileEntry } from "@onecaptain/shared";
 import {
   ArrowLeft,
   ChevronRight,
@@ -61,7 +61,7 @@ export default function AgentFilesPage() {
   const pendingRef = useRef<Map<string, { type: "tree" | "read"; path: string; timer: ReturnType<typeof setTimeout> }>>(new Map());
 
   const workspacesRoot = runtime?.metadata?.workspaces_root;
-  const rootLabel = `${workspacesRoot || "~/.alook/workspaces"}/${workspaceId}/${agentId}/workdir`;
+  const rootLabel = `${workspacesRoot || "~/.onecaptain/workspaces"}/${workspaceId}/${agentId}/workdir`;
 
   const REQUEST_TIMEOUT_MS = 15_000;
 

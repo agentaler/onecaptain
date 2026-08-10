@@ -63,7 +63,7 @@ import type {
   TaskApi as Task,
   TaskMessageResponse,
   WsMessage,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { toast } from "sonner";
 import type { PendingFile } from "@/hooks/use-file-attachments";
 import type { ChatComposerHandle } from "@/components/agent-chat/chat-composer";

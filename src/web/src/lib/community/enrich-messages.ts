@@ -1,4 +1,4 @@
-import { queries, withD1Retry } from "@alook/shared"
+import { queries, withD1Retry } from "@onecaptain/shared"
 import type { getDb } from "@/lib/db"
 import { groupAttachments, groupReactions } from "@/lib/community/messages"
 import { mapMessageForApi } from "@/lib/community/message-payload"
@@ -115,7 +115,7 @@ export async function enrichMessages(
       attachmentsByMessage,
       reactionsByMessage,
       threadByMessageId,
-      approvalByMessageId: approvalByMessageId as Map<string, import("@alook/shared").FriendApprovalPayload>,
+      approvalByMessageId: approvalByMessageId as Map<string, import("@onecaptain/shared").FriendApprovalPayload>,
     }),
   )
   return { messages, latestSeq }

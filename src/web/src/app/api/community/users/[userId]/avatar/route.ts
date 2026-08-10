@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { CACHE_REVALIDATE } from "@alook/shared"
+import { CACHE_REVALIDATE } from "@onecaptain/shared"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError } from "@/lib/middleware/helpers"
 import { buildUserAvatarKey } from "@/lib/community/storage"

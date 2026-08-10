@@ -9,7 +9,7 @@ import {
   WS_EVENTS,
   slugify,
   withD1Retry,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { withCommunityActor, rejectBot } from "@/lib/middleware/community-actor"
 import { fanOutToServerMembers } from "@/lib/community/fanout"
 import { serverIconUrl } from "@/lib/community/storage"

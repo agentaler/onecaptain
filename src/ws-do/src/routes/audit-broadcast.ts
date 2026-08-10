@@ -1,4 +1,4 @@
-import { WS_EVENTS } from "@alook/shared"
+import { WS_EVENTS } from "@onecaptain/shared"
 import type { RouterContext } from "../router-context"
 
 export async function handleAuditBroadcast({ request, env, url, log }: RouterContext): Promise<Response | null> {

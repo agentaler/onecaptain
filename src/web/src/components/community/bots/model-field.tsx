@@ -8,7 +8,7 @@ import {
   modelNameFromSelect,
   MODEL_SELECT_DEFAULT,
   MODEL_SELECT_CUSTOM,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {

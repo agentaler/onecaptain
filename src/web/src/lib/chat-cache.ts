@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
-import type { Message, Artifact } from "@alook/shared";
+import type { Message, Artifact } from "@onecaptain/shared";
 
 export interface CacheMeta {
   conversation_id: string;
@@ -30,7 +30,7 @@ export interface CacheMeta {
  * this client hasn't heard of yet, the pointer may briefly lag until the next
  * `check-fresh` corrects it — the rare residual case, no longer the common one.
  *
- * The DB is already scoped per-workspace (`alook-chat-cache-${workspaceId}`),
+ * The DB is already scoped per-workspace (`onecaptain-chat-cache-${workspaceId}`),
  * so the key only needs to encode agent + channel.
  */
 export interface LastOpenEntry {
@@ -115,7 +115,7 @@ export function openCacheDB(workspaceId: string): Promise<IDBPDatabase<ChatCache
   if (dbPromise && currentWorkspaceId === workspaceId) return dbPromise;
 
   currentWorkspaceId = workspaceId;
-  dbPromise = openDB<ChatCacheDB>(`alook-chat-cache-${workspaceId}`, DB_VERSION, {
+  dbPromise = openDB<ChatCacheDB>(`onecaptain-chat-cache-${workspaceId}`, DB_VERSION, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         const msgStore = db.createObjectStore("messages", {
@@ -606,7 +606,7 @@ export async function clearAllCache(): Promise<void> {
       dbPromise = null;
     }
     if (currentWorkspaceId) {
-      await deleteDB(`alook-chat-cache-${currentWorkspaceId}`);
+      await deleteDB(`onecaptain-chat-cache-${currentWorkspaceId}`);
       currentWorkspaceId = null;
     }
   } catch {

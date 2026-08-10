@@ -6,7 +6,7 @@ import type {
   CommunityChildChannelUpdate,
   CommunityServerDelete,
   CommunityServerUpdate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getMessageOverlay, useMessageStreamStore } from "@/stores/community/message-stream"
 import { communityKeys } from "@/lib/query-keys"
 import {

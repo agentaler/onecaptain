@@ -6,7 +6,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Check, Play, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cliCmd, getAppMode } from "@/lib/utils";
-import { isTauri, tauriInvoke } from "@alook/shared";
+import { isTauri, tauriInvoke } from "@onecaptain/shared";
 
 export function ConnectMachineSteps({
   generatedToken,
@@ -82,7 +82,7 @@ export function ConnectMachineSteps({
       <p className="text-sm font-medium">Connect a computer</p>
       <p className="text-xs text-muted-foreground">
         {isDesktopApp
-          ? "Click to register your machine with Alook."
+          ? "Click to register your machine with OneCaptain."
           : "Run this in your terminal to link your machine."}
       </p>
       {generatingToken ? (

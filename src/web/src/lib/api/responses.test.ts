@@ -313,7 +313,7 @@ describe("WorkspaceResponse shape", () => {
   it("has expected keys: id, name, slug, onboarded, created_at, updated_at", () => {
     const res = workspaceToResponse({ id: "w1", name: "WS", slug: "ws", ...baseFields() });
     expect(Object.keys(res).sort()).toEqual(
-      ["created_at", "id", "name", "onboarded", "slug", "updated_at"]
+      ["created_at", "id", "name", "onboarded", "plan", "slug", "updated_at"]
     );
   });
 });
@@ -534,7 +534,7 @@ describe("emailToResponse", () => {
       id: "e1",
       agentId: "a1",
       fromEmail: "alice@example.com",
-      toEmail: "agent@alook.ai",
+      toEmail: "agent@onecaptain.ai",
       subject: "Hello",
       r2Key: "emails/abc/raw",
       isWhitelisted: 1,

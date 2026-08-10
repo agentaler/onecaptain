@@ -8,11 +8,11 @@
  * voucher → proxy → real-server chain, and that a forged voucher is
  * rejected AT THE PROXY, never reaching the real upstream.
  *
- * Requires `wrangler dev` (`@alook/web`) already running (`APP_URL`,
+ * Requires `wrangler dev` (`@onecaptain/web`) already running (`APP_URL`,
  * default `http://localhost:3000`).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { seedTestData, cleanupTestData, signIn, fetchWithRetry, type TestSeed } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, signIn, fetchWithRetry, type TestSeed } from "@onecaptain/test-utils"
 import { CredentialBroker, startCredentialProxy, type RunningProxy } from "../../../src/daemon/src/credentials/credentialProxy"
 import { createProxyServerApi } from "../../../src/daemon/src/cli/proxyServerApi"
 import { seedPairedBot, cleanupPairedBot, type DaemonItFixture } from "./seed-helpers"

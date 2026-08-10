@@ -3,15 +3,15 @@
  * runtime (Claude, Codex, Gemini, Kimi, Copilot, Cursor, OpenCode, Antigravity).
  *
  * The runtime child process talks back to its host platform through a small
- * **Alook CLI**, reached purely via the exec environment (PATH + env vars). The
+ * **OneCaptain CLI**, reached purely via the exec environment (PATH + env vars). The
  * agent always invokes a stable `cliName`; a per-launch link in a PATH-prepended
  * bin dir points it at the host's real `hostCliPath` (POSIX symlink / Windows
  * `.cmd` shim — see `cliLink.ts`), so the host binary can be renamed/relocated
  * without touching the agent-facing surface, and no forwarding script is written
  * on POSIX.
  *
- * This module is deliberately host-agnostic: it ships an Alook-branded, swappable
- * CLI config (`alook` name + `ALOOK_*` env contract, no real `hostCliPath`). A
+ * This module is deliberately host-agnostic: it ships an OneCaptain-branded, swappable
+ * CLI config (`onecaptain` name + `ONECAPTAIN_*` env contract, no real `hostCliPath`). A
  * real deployment passes its own `CliTransportConfig` — the backend never
  * hardcodes any particular platform.
  *
@@ -67,7 +67,7 @@ export interface PreparedCliTransport {
  *
  * The transport places a per-launch link named `cliName` in a `bin` dir and
  * prepends that dir to PATH. The agent always invokes the same stable name
- * (`cliName`, default `alook`); on POSIX the link is a symlink to `hostCliPath`,
+ * (`cliName`, default `onecaptain`); on POSIX the link is a symlink to `hostCliPath`,
  * on Windows a `.cmd` shim. This **decouples the agent-facing CLI name from the
  * host's real binary name** — the backend's prompts/contract never depend on what
  * the host actually calls its CLI, and the host can rename or relocate its binary
@@ -76,7 +76,7 @@ export interface PreparedCliTransport {
 export interface CliTransportConfig {
   /** Stable command name the agent invokes (the link's filename). */
   cliName: string;
-  /** Prefix for injected env vars, e.g. "ALOOK" → ALOOK_ID, ALOOK_PROXY_TOKEN_FILE. */
+  /** Prefix for injected env vars, e.g. "ONECAPTAIN" → ONECAPTAIN_ID, ONECAPTAIN_PROXY_TOKEN_FILE. */
   envPrefix: string;
   /** Name of the per-launch state directory under the working directory. */
   stateDirName: string;
@@ -94,13 +94,13 @@ export interface CliTransportConfig {
 }
 
 /**
- * The default Alook CLI config template. No `hostCliPath` is wired — a real
+ * The default OneCaptain CLI config template. No `hostCliPath` is wired — a real
  * deployment overrides it with `{ ...DEFAULT_CLI_CONFIG, hostCliPath }`.
  */
 export const DEFAULT_CLI_CONFIG: CliTransportConfig = {
-  cliName: "alook",
-  envPrefix: "ALOOK",
-  stateDirName: ".alook",
+  cliName: "onecaptain",
+  envPrefix: "ONECAPTAIN",
+  stateDirName: ".onecaptain",
 };
 
 function resolveStateHome(envPrefix: string): string {
@@ -122,7 +122,7 @@ function resolveStateHome(envPrefix: string): string {
  *
  * @param ctx        launch context (agent id, working dir, config, …)
  * @param extraEnv   runtime-specific extra env (e.g. `{ NO_COLOR: "1" }`)
- * @param cli        CLI transport config (defaults to the Alook mock config)
+ * @param cli        CLI transport config (defaults to the OneCaptain mock config)
  * @param platform   override for testing; defaults to process.platform
  */
 export async function prepareCliTransport(
@@ -146,12 +146,12 @@ export async function prepareCliTransport(
   // `ctx.agentCliPath` — the daemon threads the resolved agent-CLI path there
   // for EVERY launch, so this one fallback gives all child-process drivers the
   // shim without each repeating claude's construction (the omission that left
-  // codex/cursor/opencode/… invoking the HOST `alook`, which lacks the agent
+  // codex/cursor/opencode/… invoking the HOST `onecaptain`, which lacks the agent
   // subcommands). Explicit `cli.hostCliPath` still wins.
   const hostCliPath = cli.hostCliPath ?? ctx.agentCliPath;
 
   // Fail loud when a REAL launch can't resolve a host CLI. Silently leaving an
-  // empty bin dir lets the agent's `alook` fall through to the host CLI on
+  // empty bin dir lets the agent's `onecaptain` fall through to the host CLI on
   // PATH — the agent looks like it runs but uses the wrong binary, which is
   // very hard to trace. Only an explicit `mockCliTransport` opt-in may skip the
   // shim (test harnesses); the ABSENCE of a path is the bug shape, so it can't
@@ -159,7 +159,7 @@ export async function prepareCliTransport(
   if (!hostCliPath && !ctx.mockCliTransport) {
     throw new Error(
       "prepareCliTransport: no host CLI path — set ctx.agentCliPath (or cli.hostCliPath) " +
-      "so the agent's `alook` resolves to the injected agent CLI, not the host binary. " +
+      "so the agent's `onecaptain` resolves to the injected agent CLI, not the host binary. " +
       "For an intentional no-CLI test launch, set ctx.mockCliTransport = true.",
     );
   }

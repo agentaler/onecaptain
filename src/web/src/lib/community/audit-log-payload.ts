@@ -8,7 +8,7 @@ import {
   AuditLogSessionResetPayloadSchema,
   AuditLogNapPayloadSchema,
   AuditLogErrorPayloadSchema,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 /**
  * Parse a stored audit-event `payload` (JSON in the DB) into the shape the

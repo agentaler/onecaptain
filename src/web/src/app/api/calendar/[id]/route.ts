@@ -4,7 +4,7 @@ import {
   DeleteCalendarEventRequestSchema,
   computeNextScheduledAt,
   isEmptyHtml,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { getDb } from "@/lib/db";
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";

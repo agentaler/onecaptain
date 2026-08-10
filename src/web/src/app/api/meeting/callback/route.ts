@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { nanoid } from "nanoid"
-import { queries, MeetingStatus, DEV_WEB_URL, buildMimeMessage, toAlookAddress } from "@alook/shared"
+import { queries, MeetingStatus, DEV_WEB_URL, buildMimeMessage, toOneCaptainAddress } from "@onecaptain/shared"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
@@ -66,11 +66,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const agent = await queries.agent.getAgent(db, meeting.agentId, body.workspaceId)
 
     if (agent?.emailHandle) {
-      const messageId = `<meeting-${body.meetingId}@alook.ai>`
+      const messageId = `<meeting-${body.meetingId}@onecaptain.ai>`
       const existing = await queries.email.getEmailByMessageId(db, messageId, body.workspaceId)
       if (!existing) {
-        const fromAddr = toAlookAddress("no-reply")
-        const toAddr = toAlookAddress(agent.emailHandle)
+        const fromAddr = toOneCaptainAddress("no-reply")
+        const toAddr = toOneCaptainAddress(agent.emailHandle)
         const meetingTitle = meeting.title || "Untitled"
         const subject = `Meeting completed: ${meetingTitle} — please summarize`
 

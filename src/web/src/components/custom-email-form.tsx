@@ -19,7 +19,7 @@ import {
   deleteEmailAccount,
   syncEmailAccount,
 } from "@/lib/api";
-import type { AgentEmailAccount, CreateEmailAccountRequest } from "@alook/shared";
+import type { AgentEmailAccount, CreateEmailAccountRequest } from "@onecaptain/shared";
 import {
   Loader2, Mail, RefreshCw, AlertCircle, CheckCircle2,
   ChevronRight, XIcon, CircleHelp,

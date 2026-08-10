@@ -193,7 +193,7 @@ async function buildCardUpdateBroadcasts(
 // Re-export from the client-safe constants module so existing
 // `queries.communityFriendship.isSelfBotFriendship` call-sites keep working
 // without any behavior change. Client-side components should import from
-// `@alook/shared` directly instead of going through `queries`.
+// `@onecaptain/shared` directly instead of going through `queries`.
 import {
   SELF_BOT_FRIENDSHIP_PREFIX,
   isSelfBotFriendship,

@@ -8,7 +8,7 @@ import {
   WS_EVENTS,
   validateCommunityName,
   withD1Retry,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { createAuth } from "@/lib/auth"
 import { withAuth } from "@/lib/middleware/auth"

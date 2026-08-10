@@ -18,7 +18,7 @@ import { catId, catOf, isCat, reorderChannelsWithin, type ChannelTree } from "./
 import { InviteDialog } from "./invite-dialog"
 import { ChannelAddMembersDialog } from "./channel-add-members-dialog"
 import type { Channel, SettingsSection } from "./_types"
-import { UNCATEGORIZED_CATEGORY_ID, type ChannelType } from "@alook/shared"
+import { UNCATEGORIZED_CATEGORY_ID, type ChannelType } from "@onecaptain/shared"
 import { tid } from "@/lib/community/testids"
 import type { ForumSidebarThread } from "@/hooks/community/use-forum-sidebar-threads"
 

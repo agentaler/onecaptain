@@ -15,8 +15,8 @@ describe("GET /llms.txt", () => {
   it("returns markdown with blog posts and correct content type", async () => {
     vi.mocked(getAllPosts).mockResolvedValue([
       {
-        slug: "why-we-built-alook",
-        title: "Why We Built Alook",
+        slug: "why-we-built-onecaptain",
+        title: "Why We Built OneCaptain",
         date: "2026-05-15",
         author: "Gus",
         excerpt: "Origin story excerpt.",
@@ -30,9 +30,9 @@ describe("GET /llms.txt", () => {
     expect(res.headers.get("Content-Type")).toBe(
       "text/markdown; charset=utf-8"
     );
-    expect(body).toContain("# Alook");
+    expect(body).toContain("# OneCaptain");
     expect(body).toContain(
-      "[Why We Built Alook](https://alook.ai/blog/why-we-built-alook)"
+      "[Why We Built OneCaptain](https://onecaptain.ai/blog/why-we-built-onecaptain)"
     );
   });
 });

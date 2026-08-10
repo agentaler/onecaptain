@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Agent, AgentLink } from "@alook/shared";
+import type { Agent, AgentLink } from "@onecaptain/shared";
 import { relatedAgentIdSet, filterAgentsByQuery, rankMentionAgents } from "./mention-agents";
 
 const agent = (id: string, name: string): Agent =>

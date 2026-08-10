@@ -59,8 +59,8 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: (...a: unknown[]) => mockCheckMessageRateLimit(...a),
 }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -189,7 +189,7 @@ vi.mock("@/lib/middleware/helpers", () => {
 })
 
 import { POST, GET } from "./route"
-import { MAX_MESSAGE_CONTENT_LENGTH, MAX_ATTACHMENTS_PER_MESSAGE, MAX_FORUM_TAG_LENGTH, WS_EVENTS } from "@alook/shared"
+import { MAX_MESSAGE_CONTENT_LENGTH, MAX_ATTACHMENTS_PER_MESSAGE, MAX_FORUM_TAG_LENGTH, WS_EVENTS } from "@onecaptain/shared"
 
 function postReq(body: unknown) {
   return new NextRequest("http://localhost/api/community/channels/c1/messages", {

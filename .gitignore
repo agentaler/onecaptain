@@ -1,4 +1,4 @@
-.alook-qa-scratch/
+.onecaptain-qa-scratch/
 node_modules/
 .pnpm-store/
 dist/
@@ -14,7 +14,7 @@ coverage/
 temp/
 docs/
 .DS_Store
-.alook/
+.onecaptain/
 .dev.vars
 plans/
 perf-artifacts/

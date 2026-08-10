@@ -65,7 +65,7 @@ describe("runNpmUpdate", () => {
     const result = await promise;
     expect(mockSpawn).toHaveBeenCalledWith(
       "npm",
-      ["install", "-g", "@alook/cli@1.0.0"],
+      ["install", "-g", "@onecaptain/cli@1.0.0"],
       expect.objectContaining({ stdio: ["ignore", "pipe", "pipe"] }),
     );
     expect(result.success).toBe(true);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityDaemonAuth } from "@/lib/middleware/community-daemon-auth"
 

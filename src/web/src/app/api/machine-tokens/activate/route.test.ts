@@ -14,7 +14,7 @@ function sharedMocks() {
     "@opennextjs/cloudflare": {
       getCloudflareContext: vi.fn(() => Promise.resolve({ env: { DB: {}, CACHE_KV: mockKv } })),
     },
-    "@alook/shared": async () => ({
+    "@onecaptain/shared": async () => ({
       createDb: vi.fn(() => ({})),
       queries: {
         machineToken: {
@@ -28,7 +28,7 @@ function sharedMocks() {
           batchUpsertAgentRuntimes: (...a: any[]) => mockBatchUpsertAgentRuntimes(...a),
         },
       },
-      ActivateTokenRequestSchema: (await import("@alook/shared"))
+      ActivateTokenRequestSchema: (await import("@onecaptain/shared"))
         .ActivateTokenRequestSchema,
       createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
     }),
@@ -55,7 +55,7 @@ describe("POST /api/machine-tokens/activate", () => {
     const mocks = sharedMocks();
 
     vi.doMock("@opennextjs/cloudflare", () => mocks["@opennextjs/cloudflare"]);
-    vi.doMock("@alook/shared", mocks["@alook/shared"]);
+    vi.doMock("@onecaptain/shared", mocks["@onecaptain/shared"]);
     vi.doMock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
     vi.doMock("@/lib/broadcast", () => mocks["@/lib/broadcast"]);
     vi.doMock("@/lib/cache", () => ({
@@ -165,7 +165,7 @@ describe("POST /api/machine-tokens/activate", () => {
       Promise.resolve({ env: { DB: {} } }),
     );
     vi.doMock("@opennextjs/cloudflare", () => mocks["@opennextjs/cloudflare"]);
-    vi.doMock("@alook/shared", mocks["@alook/shared"]);
+    vi.doMock("@onecaptain/shared", mocks["@onecaptain/shared"]);
     vi.doMock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
     vi.doMock("@/lib/broadcast", () => mocks["@/lib/broadcast"]);
     vi.doMock("@/lib/cache", () => ({

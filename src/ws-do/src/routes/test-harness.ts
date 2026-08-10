@@ -32,7 +32,7 @@ const sharedMocks = vi.hoisted(() => {
   }
 })
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   WS_EVENTS: {
     BOT_AUDIT_EVENT: "community:bot.audit_event",
   },

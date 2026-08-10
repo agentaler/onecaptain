@@ -8,7 +8,7 @@ import { useWorkspace } from "@/contexts/workspace-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AgentAvatar } from "@/components/avatar";
 import { listCalendarEvents } from "@/lib/api";
-import type { CalendarEvent } from "@alook/shared";
+import type { CalendarEvent } from "@onecaptain/shared";
 
 interface AgentEventSummary {
   agentId: string;

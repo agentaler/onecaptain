@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 import { openDB } from "idb";
-import type { Message } from "@alook/shared";
+import type { Message } from "@onecaptain/shared";
 import {
   openCacheDB,
   getCachedMessages,
@@ -20,7 +20,7 @@ import {
   setConvExtras,
   clearConvExtras,
 } from "./chat-cache";
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 
 const WORKSPACE_ID = "ws_test";
 
@@ -461,7 +461,7 @@ describe("chat-cache", () => {
       await clearAllCache();
 
       // Build a v3-shaped DB by hand (messages + cache_meta + last_open, v3).
-      const v3 = await openDB(`alook-chat-cache-${MIGRATE_WS}`, 3, {
+      const v3 = await openDB(`onecaptain-chat-cache-${MIGRATE_WS}`, 3, {
         upgrade(db) {
           const msgStore = db.createObjectStore("messages", { keyPath: ["conversation_id", "id"] });
           msgStore.createIndex("by-conversation", "conversation_id", { unique: false });
@@ -733,7 +733,7 @@ describe("chat-cache", () => {
       await clearAllCache();
 
       // Build a v2-shaped DB by hand (only messages + cache_meta, version 2).
-      const v2 = await openDB(`alook-chat-cache-${MIGRATE_WS}`, 2, {
+      const v2 = await openDB(`onecaptain-chat-cache-${MIGRATE_WS}`, 2, {
         upgrade(db) {
           const msgStore = db.createObjectStore("messages", { keyPath: ["conversation_id", "id"] });
           msgStore.createIndex("by-conversation", "conversation_id", { unique: false });

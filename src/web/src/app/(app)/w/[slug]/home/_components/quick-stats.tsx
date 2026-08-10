@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bot, Mail, Send, Users, Monitor, Zap } from "lucide-react";
-import type { Agent, AgentRuntime } from "@alook/shared";
+import type { Agent, AgentRuntime } from "@onecaptain/shared";
 import type { WorkspaceOverview } from "@/lib/api";
 
 interface QuickStatsProps {

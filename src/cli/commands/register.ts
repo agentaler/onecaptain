@@ -10,7 +10,7 @@ interface MeResponse {
 
 export function registerCommand(): Command {
   const cmd = new Command("register")
-    .description("Register CLI with your Alook account")
+    .description("Register CLI with your OneCaptain account")
     .requiredOption("--token <token>", "API token (starts with al_)")
     .option("--server <url>", "Server URL")
     .option("--profile <name>", "Profile name")

@@ -1,5 +1,5 @@
 import Mention from "@tiptap/extension-mention"
-import { MENTION_TYPES, type MentionType } from "@alook/shared"
+import { MENTION_TYPES, type MentionType } from "@onecaptain/shared"
 import type { Member } from "@/components/community/_types"
 
 export type MentionContext = "channel" | "thread" | "dm"

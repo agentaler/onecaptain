@@ -17,7 +17,7 @@ vi.mock("../daemon/pidfile.js", () => ({
 }));
 
 vi.mock("../lib/env.js", () => ({
-  cmdPrefix: () => "alook",
+  cmdPrefix: () => "onecaptain",
   isDev: () => false,
 }));
 
@@ -37,7 +37,7 @@ vi.mock("child_process", () => ({
 
 import { registerCommand } from "./register";
 
-describe("alook register", () => {
+describe("onecaptain register", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrSpy: ReturnType<typeof vi.spyOn>;
   let mockExit: ReturnType<typeof vi.spyOn>;

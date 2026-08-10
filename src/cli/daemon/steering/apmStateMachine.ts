@@ -214,7 +214,7 @@ export function reduceApmGatedRecentEvent(
 }
 
 /* ------------------------------------------------------------------ */
-/* Alook-specific: enqueue pending messages                            */
+/* OneCaptain-specific: enqueue pending messages                            */
 /* ------------------------------------------------------------------ */
 
 export function reduceApmGatedEnqueue(

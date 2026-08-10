@@ -1,4 +1,4 @@
-import { createDb, queries, readOrStale } from "@alook/shared"
+import { createDb, queries, readOrStale } from "@onecaptain/shared"
 import type {
   CommunityMachineConnectionState,
   ConnectionState,

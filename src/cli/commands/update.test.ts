@@ -10,7 +10,7 @@ vi.mock("../lib/update.js", () => ({
   runNpmUpdate: (...args: any[]) => mockRunNpmUpdate(...args),
 }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   semverGte: (a: string, b: string) => {
     const pa = a.split(".").map(Number);
     const pb = b.split(".").map(Number);
@@ -26,7 +26,7 @@ vi.mock("@alook/shared", () => ({
 
 import { updateCommand } from "./update";
 
-describe("alook update", () => {
+describe("onecaptain update", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
   let consoleErrSpy: ReturnType<typeof vi.spyOn>;
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;

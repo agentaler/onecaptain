@@ -1,7 +1,7 @@
 import { execSync } from "child_process";
 import { isWindows } from "./platform.js";
 
-const PASSTHROUGH_VARS = ["ALOOK_PROJECT_ROOT", "ALOOK_SERVER_URL", "ALOOK_CMD_PREFIX", "ALOOK_HEALTH_PORT"];
+const PASSTHROUGH_VARS = ["ONECAPTAIN_PROJECT_ROOT", "ONECAPTAIN_SERVER_URL", "ONECAPTAIN_CMD_PREFIX", "ONECAPTAIN_HEALTH_PORT"];
 
 export function resolveLoginShellEnv(): NodeJS.ProcessEnv {
   if (isWindows) {

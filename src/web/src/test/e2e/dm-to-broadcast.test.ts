@@ -5,8 +5,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { randomUUID } from "crypto"
-import { DEV_WS_DO_URL } from "@alook/shared"
-import { seedTestData, cleanupTestData, type TestSeed, tokenRequest } from "@alook/test-utils"
+import { DEV_WS_DO_URL } from "@onecaptain/shared"
+import { seedTestData, cleanupTestData, type TestSeed, tokenRequest } from "@onecaptain/test-utils"
 
 let seed: TestSeed
 let wsAvailable = false

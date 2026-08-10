@@ -3,7 +3,7 @@ import type {
   CommunityFriendRequest,
   CommunityMentionCreate,
   CommunityMessageCreate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getMessageOverlay } from "@/stores/community/message-stream"
 import { communityKeys } from "@/lib/query-keys"
 import type { ServerDetail } from "../use-servers"

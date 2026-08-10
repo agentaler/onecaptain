@@ -4,6 +4,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(() => ({ env: { DB: {} } })),
 }));
 
+const mockGetWorkspacePlan = vi.fn(async () => "free");
+const mockCountAgents = vi.fn(async () => 0);
 const mockListAgents = vi.fn();
 const mockCreateAgent = vi.fn();
 const mockGetAgent = vi.fn();
@@ -11,8 +13,8 @@ const mockGetAgentRuntimeForWorkspace = vi.fn();
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     createDb: vi.fn(() => ({})),
@@ -23,12 +25,19 @@ vi.mock("@alook/shared", async () => {
         getAllAgentsForWorkspace: (...args: unknown[]) => mockListAgents(...args),
         createAgent: (...args: unknown[]) => mockCreateAgent(...args),
         getAgent: (...args: unknown[]) => mockGetAgent(...args),
+        countAgentsForWorkspace: (...args: unknown[]) => mockCountAgents(...args),
       },
       agentAccess: {
         getAllAgentAccessForWorkspace: vi.fn().mockResolvedValue([]),
       },
       runtime: {
         getAgentRuntimeForWorkspace: (...args: unknown[]) => mockGetAgentRuntimeForWorkspace(...args),
+      },
+      workspace: {
+        getWorkspacePlan: (...args: unknown[]) => mockGetWorkspacePlan(...args),
+      },
+      workspaceAudit: {
+        logAction: vi.fn(async () => ({ id: "wal_1" })),
       },
     },
   };
@@ -97,6 +106,23 @@ describe("GET /api/agents", () => {
 
 describe("POST /api/agents", () => {
   const validBody = { name: "New Agent", runtime_id: "r1" };
+
+  it("rejects creation beyond the plan's agent quota", async () => {
+    mockGetAgentRuntimeForWorkspace.mockResolvedValue({ id: "r1", workspaceId: "w1" });
+    mockGetWorkspacePlan.mockResolvedValueOnce("free");
+    mockCountAgents.mockResolvedValueOnce(5);
+
+    const req = new NextRequest("http://localhost/api/agents?workspace_id=w1", {
+      method: "POST",
+      body: JSON.stringify(validBody),
+      headers: { "content-type": "application/json" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("PLAN_AGENT_LIMIT_REACHED");
+    expect(mockCreateAgent).not.toHaveBeenCalled();
+  });
 
   it("creates agent with valid input", async () => {
     mockGetAgentRuntimeForWorkspace.mockResolvedValue({ machineLastSeenAt: null, runtimeMode: "local" });

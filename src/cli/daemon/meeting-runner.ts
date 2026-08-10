@@ -12,8 +12,8 @@ import {
   parseCaptionElements,
   deduplicateCaptions,
   formatTranscript,
-} from "@alook/shared/browser"
-import type { TranscriptEntry } from "@alook/shared/browser"
+} from "@onecaptain/shared/browser"
+import type { TranscriptEntry } from "@onecaptain/shared/browser"
 import { join } from "path"
 import { mkdirSync } from "fs"
 import { tempDir } from "../lib/platform.js"
@@ -23,7 +23,7 @@ import { createTimelineEntry, initEntry, updateEntry } from "./execenv/timeline.
 const log = createLogger({ module: "meeting-runner" })
 
 const SCRAPE_INTERVAL_MS = 3_000
-const DEFAULT_BOT_NAME = "Alook Meeting Bot"
+const DEFAULT_BOT_NAME = "OneCaptain Meeting Bot"
 const MAX_RETRY_DURATION_MS = 30 * 60 * 1000
 const RETRY_BACKOFF = [30_000, 60_000, 120_000, 300_000]
 
@@ -97,7 +97,7 @@ async function tryJoinAndRecord(input: MeetingRunnerInput, chromePath: string): 
   let transcript: TranscriptEntry[] = []
 
   try {
-    const botName = input.agentName ? `${input.agentName} (Alook)` : DEFAULT_BOT_NAME
+    const botName = input.agentName ? `${input.agentName} (OneCaptain)` : DEFAULT_BOT_NAME
     await joinMeeting(page, input.meetingUrl, botName)
     log.info("joined meeting, waiting for UI ready...", { meeting: input.meetingId })
     await waitForMeetingReady(page)
@@ -158,7 +158,7 @@ async function tryJoinAndRecord(input: MeetingRunnerInput, chromePath: string): 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     if (msg.includes("Blocked from joining")) {
-      const screenshotPath = join(tempDir("alook-meetings"), `meeting-${input.meetingId}-blocked.png`)
+      const screenshotPath = join(tempDir("onecaptain-meetings"), `meeting-${input.meetingId}-blocked.png`)
       await page.screenshot({ path: screenshotPath }).catch(() => {})
       log.warn(`blocked from joining, screenshot saved: ${screenshotPath}`, { meeting: input.meetingId })
       return { status: "blocked", transcript, error: msg }

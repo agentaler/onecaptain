@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * Rotating capability hints for the main chat composer's empty-state
- * placeholder. Each maps to a REAL Alook capability — the placeholder teaches
+ * placeholder. Each maps to a REAL OneCaptain capability — the placeholder teaches
  * by example. Copy LOCKED by Gus 2026-06-01 (natural-imperative voice).
  *
  * This is the ONE place to edit the copy. Keep every entry ≤ ~45 chars so the

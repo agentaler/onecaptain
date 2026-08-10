@@ -107,7 +107,7 @@ export interface AgentRouterOpts {
    * builds can construct AgentRouter without one.
    */
   typingTracker?: TypingScopeTracker;
-  /** Defaults to `createLogger({ header: "@alook/daemon:router" })`. */
+  /** Defaults to `createLogger({ header: "@onecaptain/daemon:router" })`. */
   logger?: Logger;
 }
 
@@ -178,7 +178,7 @@ export class AgentRouter {
   private readonly log: Logger;
 
   constructor(private readonly opts: AgentRouterOpts) {
-    this.log = opts.logger ?? createLogger({ header: "@alook/daemon:router" });
+    this.log = opts.logger ?? createLogger({ header: "@onecaptain/daemon:router" });
     this.scheduleResend = opts.scheduleReadyResend ?? queueMicrotask.bind(globalThis);
     for (const r of opts.runtimeReport) {
       this.runtimes.set(r.id, {

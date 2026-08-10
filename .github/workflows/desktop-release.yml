@@ -65,7 +65,7 @@ jobs:
         with:
           projectPath: src/desktop
           tagName: v${{ steps.version.outputs.version }}
-          releaseName: "Alook v${{ steps.version.outputs.version }}"
+          releaseName: "OneCaptain v${{ steps.version.outputs.version }}"
           releaseBody: ""
           releaseDraft: false
           prerelease: false
@@ -101,12 +101,12 @@ jobs:
           ## Download
 
           ### macOS
-          [Apple Silicon](${BASE}/Alook_${VERSION}_aarch64.dmg) | [Intel](${BASE}/Alook_${VERSION}_x64.dmg)
+          [Apple Silicon](${BASE}/OneCaptain_${VERSION}_aarch64.dmg) | [Intel](${BASE}/OneCaptain_${VERSION}_x64.dmg)
 
           ### Windows
-          [.exe Installer](${BASE}/Alook_${VERSION}_x64-setup.exe) | [.msi](${BASE}/Alook_${VERSION}_x64_en-US.msi)
+          [.exe Installer](${BASE}/OneCaptain_${VERSION}_x64-setup.exe) | [.msi](${BASE}/OneCaptain_${VERSION}_x64_en-US.msi)
 
           ### Linux
-          [.deb](${BASE}/Alook_${VERSION}_amd64.deb) | [.rpm](${BASE}/Alook-${VERSION}-1.x86_64.rpm) | [.AppImage](${BASE}/Alook_${VERSION}_amd64.AppImage)"
+          [.deb](${BASE}/OneCaptain_${VERSION}_amd64.deb) | [.rpm](${BASE}/OneCaptain-${VERSION}-1.x86_64.rpm) | [.AppImage](${BASE}/OneCaptain_${VERSION}_amd64.AppImage)"
 
           gh release edit "$TAG" --notes "${EXISTING}${DOWNLOADS}"

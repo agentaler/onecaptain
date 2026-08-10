@@ -3,7 +3,7 @@ import type {
   CreateCalendarEventRequest,
   UpdateCalendarEventRequest,
   DeleteCalendarEventRequest,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { apiFetch, wsQuery } from "./client";
 
 export const listCalendarEvents = (

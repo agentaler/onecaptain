@@ -1,6 +1,6 @@
 {
-  "name": "Alook — Personal Company",
-  "short_name": "Alook",
+  "name": "OneCaptain — Personal Company",
+  "short_name": "OneCaptain",
   "description": "Your AI agents, always on. Give them an email, let them work for you around the clock.",
   "start_url": "/",
   "display": "standalone",
@@ -8,7 +8,7 @@
   "theme_color": "#f5f0e8",
   "icons": [
     {
-      "src": "/alook.svg",
+      "src": "/onecaptain.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }

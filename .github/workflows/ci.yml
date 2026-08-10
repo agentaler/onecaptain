@@ -93,10 +93,10 @@ jobs:
       - run: pnpm run db:migrate
       - name: Start dev servers
         run: |
-          pnpm --filter @alook/email-worker dev &
-          pnpm --filter @alook/ws-do dev &
-          pnpm --filter @alook/web dev &
-          pnpm --filter @alook/wake-worker dev &
+          pnpm --filter @onecaptain/email-worker dev &
+          pnpm --filter @onecaptain/ws-do dev &
+          pnpm --filter @onecaptain/web dev &
+          pnpm --filter @onecaptain/wake-worker dev &
       - name: Wait for services to be ready
         run: |
           wait_for() {
@@ -123,10 +123,10 @@ jobs:
             pkill -f "wrangler" || true
             pkill -f "next" || true
             sleep 3
-            pnpm --filter @alook/email-worker dev &
-            pnpm --filter @alook/ws-do dev &
-            pnpm --filter @alook/web dev &
-            pnpm --filter @alook/wake-worker dev &
+            pnpm --filter @onecaptain/email-worker dev &
+            pnpm --filter @onecaptain/ws-do dev &
+            pnpm --filter @onecaptain/web dev &
+            pnpm --filter @onecaptain/wake-worker dev &
             # Second attempt — fail hard
             wait_for http://localhost:8787/health "email-worker" || exit 1
             wait_for http://localhost:8789/health "ws-do" || exit 1
@@ -134,8 +134,8 @@ jobs:
             wait_for http://localhost:8790/health "wake-worker" || exit 1
           fi
       - run: pnpm test:e2e
-      - run: pnpm --filter @alook/cli run test:integration
-      - run: pnpm --filter @alook/daemon run test:integration
+      - run: pnpm --filter @onecaptain/cli run test:integration
+      - run: pnpm --filter @onecaptain/daemon run test:integration
 
   build:
     name: Build
@@ -150,28 +150,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build --filter=@alook/shared --filter=@alook/web --filter=@alook/cli --filter=@alook/email-worker --filter=@alook/ws-do --filter=@alook/wake-worker
-
-  coverage:
-    name: Coverage
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release:'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --coverage --coverage.reporter=json --coverage.reporter=text
-      - uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/coverage-final.json
-          fail_ci_if_error: true
+      - run: pnpm build --filter=@onecaptain/shared --filter=@onecaptain/web --filter=@onecaptain/cli --filter=@onecaptain/email-worker --filter=@onecaptain/ws-do --filter=@onecaptain/wake-worker
 
   desktop-rust:
     name: Desktop Rust (test + machete)

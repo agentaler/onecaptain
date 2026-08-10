@@ -9,7 +9,7 @@ import {
   isAssignableRole,
   ASSIGNABLE_ROLES,
   WS_EVENTS,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { broadcastToUserSafe, fanOutToServerMembers } from "@/lib/community/fanout"
 import { logAudit, COMMUNITY_AUDIT_ACTIONS } from "@/lib/community/audit"
 import { requireServerAdmin } from "@/lib/community/permissions"

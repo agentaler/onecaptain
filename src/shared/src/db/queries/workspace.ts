@@ -9,6 +9,7 @@ export async function getWorkspace(db: Database, id: string, userId: string) {
       name: workspace.name,
       slug: workspace.slug,
       onboarded: workspace.onboarded,
+      plan: workspace.plan,
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
     })
@@ -16,6 +17,15 @@ export async function getWorkspace(db: Database, id: string, userId: string) {
     .innerJoin(member, eq(member.workspaceId, workspace.id))
     .where(and(eq(workspace.id, id), eq(member.userId, userId)));
   return rows[0] ?? null;
+}
+
+/** Plan lookup by workspace id — for quota checks on already-authorized routes. */
+export async function getWorkspacePlan(db: Database, id: string): Promise<string | null> {
+  const rows = await db
+    .select({ plan: workspace.plan })
+    .from(workspace)
+    .where(eq(workspace.id, id));
+  return rows[0]?.plan ?? null;
 }
 
 export async function getWorkspaceBySlug(db: Database, slug: string) {
@@ -30,6 +40,7 @@ export async function listWorkspaces(db: Database, userId: string) {
       name: workspace.name,
       slug: workspace.slug,
       onboarded: workspace.onboarded,
+      plan: workspace.plan,
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
     })

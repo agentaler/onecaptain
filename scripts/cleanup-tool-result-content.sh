@@ -10,7 +10,7 @@ TOTAL_UPDATED=0
 
 while true; do
   echo "Updating batch of $BATCH rows..."
-  RESULT=$(npx wrangler d1 execute alook-app --remote --json --command \
+  RESULT=$(npx wrangler d1 execute onecaptain-app --remote --json --command \
     "UPDATE task_message SET content = '', output = '', input = NULL WHERE type = 'tool-result' AND (content != '' OR output != '' OR input IS NOT NULL) LIMIT $BATCH;" 2>&1)
 
   if [ $? -ne 0 ]; then

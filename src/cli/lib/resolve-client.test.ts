@@ -6,7 +6,7 @@ vi.mock("./config.js", async (importActual) => ({
 }));
 
 vi.mock("./env.js", () => ({
-  cmdPrefix: () => "npx @alook/cli",
+  cmdPrefix: () => "npx @onecaptain/cli",
 }));
 
 import { resolveClientOpts } from "./resolve-client.js";
@@ -25,7 +25,7 @@ function makeNestedCommand(rootOpts: Record<string, unknown> = {}) {
 }
 
 describe("resolveClientOpts", () => {
-  const envKeys = ["ALOOK_SERVER_URL", "ALOOK_WORKSPACE_ID", "ALOOK_TOKEN"];
+  const envKeys = ["ONECAPTAIN_SERVER_URL", "ONECAPTAIN_WORKSPACE_ID", "ONECAPTAIN_TOKEN"];
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
@@ -47,9 +47,9 @@ describe("resolveClientOpts", () => {
   });
 
   it("resolves from env vars when no config exists", () => {
-    process.env.ALOOK_SERVER_URL = "https://self-hosted.example.com";
-    process.env.ALOOK_WORKSPACE_ID = "ws_env";
-    process.env.ALOOK_TOKEN = "tok_env";
+    process.env.ONECAPTAIN_SERVER_URL = "https://self-hosted.example.com";
+    process.env.ONECAPTAIN_WORKSPACE_ID = "ws_env";
+    process.env.ONECAPTAIN_TOKEN = "tok_env";
 
     const result = resolveClientOpts(makeCommand(), { agentId: "ag1" });
 
@@ -59,7 +59,7 @@ describe("resolveClientOpts", () => {
   });
 
   it("env token takes priority over config token", () => {
-    process.env.ALOOK_TOKEN = "tok_env";
+    process.env.ONECAPTAIN_TOKEN = "tok_env";
     mockedLoadConfig.mockReturnValue({
       server_url: "https://config.example.com",
       watched_workspaces: [
@@ -74,7 +74,7 @@ describe("resolveClientOpts", () => {
   });
 
   it("flag > env > config for server URL", () => {
-    process.env.ALOOK_SERVER_URL = "https://env.example.com";
+    process.env.ONECAPTAIN_SERVER_URL = "https://env.example.com";
     mockedLoadConfig.mockReturnValue({
       server_url: "https://config.example.com",
       watched_workspaces: [
@@ -92,7 +92,7 @@ describe("resolveClientOpts", () => {
 
   it("resolves workspace by agent_id from config", () => {
     mockedLoadConfig.mockReturnValue({
-      server_url: "https://alook.ai",
+      server_url: "https://onecaptain.ai",
       watched_workspaces: [
         { id: "ws1", name: "WS1", token: "tok1", agent_ids: ["ag1"] },
         { id: "ws2", name: "WS2", token: "tok2", agent_ids: ["ag2"] },
@@ -107,7 +107,7 @@ describe("resolveClientOpts", () => {
 
   it("falls back to single workspace when agent not found", () => {
     mockedLoadConfig.mockReturnValue({
-      server_url: "https://alook.ai",
+      server_url: "https://onecaptain.ai",
       watched_workspaces: [
         { id: "ws1", name: "WS1", token: "tok1", agent_ids: ["other"] },
       ],
@@ -120,10 +120,10 @@ describe("resolveClientOpts", () => {
   });
 
   it("resolves via env when agent_id not in config and no single fallback", () => {
-    process.env.ALOOK_WORKSPACE_ID = "ws_env";
-    process.env.ALOOK_TOKEN = "tok_env";
+    process.env.ONECAPTAIN_WORKSPACE_ID = "ws_env";
+    process.env.ONECAPTAIN_TOKEN = "tok_env";
     mockedLoadConfig.mockReturnValue({
-      server_url: "https://alook.ai",
+      server_url: "https://onecaptain.ai",
       watched_workspaces: [
         { id: "ws1", name: "WS1", token: "tok1", agent_ids: ["other1"] },
         { id: "ws2", name: "WS2", token: "tok2", agent_ids: ["other2"] },
@@ -150,8 +150,8 @@ describe("resolveClientOpts", () => {
   });
 
   it("traverses to root command for parent opts", () => {
-    process.env.ALOOK_TOKEN = "tok_env";
-    process.env.ALOOK_WORKSPACE_ID = "ws_env";
+    process.env.ONECAPTAIN_TOKEN = "tok_env";
+    process.env.ONECAPTAIN_WORKSPACE_ID = "ws_env";
 
     const cmd = makeNestedCommand({ server: "https://from-root.example.com" });
     const result = resolveClientOpts(cmd, { agentId: "ag1" });
@@ -161,7 +161,7 @@ describe("resolveClientOpts", () => {
 
   it("workspace flag selects specific workspace from config", () => {
     mockedLoadConfig.mockReturnValue({
-      server_url: "https://alook.ai",
+      server_url: "https://onecaptain.ai",
       watched_workspaces: [
         { id: "ws1", name: "WS1", token: "tok1", agent_ids: ["ag1"] },
         { id: "ws2", name: "WS2", token: "tok2", agent_ids: ["ag2"] },
@@ -175,10 +175,10 @@ describe("resolveClientOpts", () => {
   });
 
   it("errors with workspace guidance when token is set but workspace cannot be determined", () => {
-    process.env.ALOOK_TOKEN = "tok_env";
-    // No ALOOK_WORKSPACE_ID, no config match, multiple workspaces
+    process.env.ONECAPTAIN_TOKEN = "tok_env";
+    // No ONECAPTAIN_WORKSPACE_ID, no config match, multiple workspaces
     mockedLoadConfig.mockReturnValue({
-      server_url: "https://alook.ai",
+      server_url: "https://onecaptain.ai",
       watched_workspaces: [
         { id: "ws1", name: "WS1", token: "tok1", agent_ids: ["other1"] },
         { id: "ws2", name: "WS2", token: "tok2", agent_ids: ["other2"] },
@@ -192,7 +192,7 @@ describe("resolveClientOpts", () => {
 
     expect(() => resolveClientOpts(makeCommand(), { agentId: "ag_missing" })).toThrow("__exit__");
     expect(errSpy).toHaveBeenCalledWith(
-      "Error: cannot determine workspace. Set ALOOK_WORKSPACE_ID env var or use --workspace flag.",
+      "Error: cannot determine workspace. Set ONECAPTAIN_WORKSPACE_ID env var or use --workspace flag.",
     );
 
     exitSpy.mockRestore();

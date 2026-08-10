@@ -6,7 +6,7 @@ import type {
   CommunityFriendRequest,
   CommunityMentionCreate,
   CommunityWsEvent,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import { useCommunityStore } from "@/stores/community"
 import { patchChannelUnread } from "@/hooks/community/server-detail-cache"

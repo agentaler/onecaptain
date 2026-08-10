@@ -21,8 +21,8 @@ vi.mock("@/lib/db", () => ({
   getDb: vi.fn(() => ({})),
 }));
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
   return { ...real };
 });
 
@@ -78,8 +78,8 @@ describe("POST /api/daemon/sweep", () => {
       })),
     }));
     vi.doMock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
-    vi.doMock("@alook/shared", async () => {
-      const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+    vi.doMock("@onecaptain/shared", async () => {
+      const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
       return { ...real };
     });
     vi.doMock("@/lib/middleware/auth", () => ({

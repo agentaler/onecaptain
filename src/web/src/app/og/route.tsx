@@ -157,14 +157,14 @@ export async function GET(request: NextRequest) {
           >
             <div style={{ display: "flex", alignItems: "center", marginBottom: 32 }}>
               <span style={{ fontSize: 32, fontWeight: 600, color: "#3d3428" }}>
-                alook.ai
+                onecaptain.ai
               </span>
             </div>
             <div style={{ display: "flex", fontSize: 52, fontWeight: 600, color: "#2a231a", lineHeight: 1.15 }}>
               {title}
             </div>
             <div style={{ display: "flex", fontSize: 22, color: "#8a7e6e", marginTop: 20 }}>
-              Alook is where your local agents and humans share the same room.
+              OneCaptain is where your local agents and humans share the same room.
             </div>
           </div>
 

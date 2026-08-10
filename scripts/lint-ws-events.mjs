@@ -5,7 +5,7 @@
  * 1. `type: "community:*"` hardcoded literals under
  *    `src/web/src/app/api/community` and `src/ws-do/src` (the Durable Object
  *    that emits presence/machine/typing broadcasts) — should be `WS_EVENTS.*`
- *    from `@alook/shared` so a rename fires a typecheck error at the send site.
+ *    from `@onecaptain/shared` so a rename fires a typecheck error at the send site.
  *
  * 2. `as never` inside any `broadcastToUser*` / `fanOutTo*` call under
  *    `src/web/src` — defeats the discriminated `CommunityWsEvent` union.
@@ -102,7 +102,7 @@ let failed = false
 if (literalMatches.length) {
   failed = true
   console.error(
-    'lint-ws-events: hardcoded `type: "community:*"` literals — use WS_EVENTS.* from @alook/shared:',
+    'lint-ws-events: hardcoded `type: "community:*"` literals — use WS_EVENTS.* from @onecaptain/shared:',
   )
   for (const line of literalMatches) console.error("  " + line)
 }

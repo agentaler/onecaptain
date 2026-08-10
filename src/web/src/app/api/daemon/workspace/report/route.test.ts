@@ -14,8 +14,8 @@ vi.mock("@/lib/db", () => ({
   withD1Retry: vi.fn((fn: () => Promise<any>) => fn()),
 }));
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
   return {
     ...real,
     queries: {
@@ -87,7 +87,8 @@ describe("POST /api/daemon/workspace/report", () => {
 
     expect(res.status).toBe(200);
     expect(body.status).toBe("ok");
-    expect(mockCompleteRequest).toHaveBeenCalledWith({}, "wfr_1", {
+    expect(mockGetRequest).toHaveBeenCalledWith({}, "w1", "wfr_1");
+    expect(mockCompleteRequest).toHaveBeenCalledWith({}, "w1", "wfr_1", {
       entries,
       content: undefined,
       isBinary: undefined,
@@ -155,5 +156,16 @@ describe("POST /api/daemon/workspace/report", () => {
   it("returns 400 when request_id is missing", async () => {
     const res = await POST(postReq({ path: "." }));
     expect(res.status).toBe(400);
+  });
+
+  it("scopes the lookup to the machine token's workspace — a foreign request id 404s", async () => {
+    // The workspace-scoped query returns null for any id outside workspace w1,
+    // so a daemon can neither read nor complete another tenant's request.
+    mockGetRequest.mockResolvedValue(null);
+
+    const res = await POST(postReq({ request_id: "wfr_other_tenant", path: "." }));
+    expect(res.status).toBe(404);
+    expect(mockGetRequest).toHaveBeenCalledWith({}, "w1", "wfr_other_tenant");
+    expect(mockCompleteRequest).not.toHaveBeenCalled();
   });
 });

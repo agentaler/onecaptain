@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: pageTitle,
   description,
   alternates: {
-    canonical: "https://alook.ai/blog",
+    canonical: "https://onecaptain.ai/blog",
     types: {
       "application/rss+xml": "/blog/feed.xml",
       "text/markdown": "/llms.txt",
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: pageTitle,
     description,
-    url: "https://alook.ai/blog",
+    url: "https://onecaptain.ai/blog",
     images: [
       {
         url: `/og?title=${encodeURIComponent(pageTitle)}`,
@@ -42,7 +42,7 @@ const collectionJsonLd = {
   "@type": "CollectionPage",
   name: pageTitle,
   description,
-  url: "https://alook.ai/blog",
+  url: "https://onecaptain.ai/blog",
 };
 
 export default async function BlogPage() {

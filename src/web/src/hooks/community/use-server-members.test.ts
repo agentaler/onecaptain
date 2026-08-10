@@ -32,7 +32,7 @@ import type {
   CommunityMemberJoin,
   CommunityMemberLeave,
   CommunityMemberUpdate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 // This suite exercises the pure WS-event reducers pulled out of the hook.
 // The React harness for the hook itself isn't available in the repo (no

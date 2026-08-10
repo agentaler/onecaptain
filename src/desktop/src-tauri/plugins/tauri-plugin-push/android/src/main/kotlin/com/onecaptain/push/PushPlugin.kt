@@ -1,4 +1,4 @@
-package com.alook.push
+package com.onecaptain.push
 
 import android.app.Activity
 import app.tauri.annotation.Command

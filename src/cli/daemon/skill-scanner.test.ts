@@ -15,7 +15,7 @@ vi.mock("../lib/logger.js", () => ({
 }));
 
 vi.mock("../lib/config.js", () => ({
-  configDir: () => join(tmpdir(), "alook-skill-scanner-test-config-" + process.pid),
+  configDir: () => join(tmpdir(), "onecaptain-skill-scanner-test-config-" + process.pid),
 }));
 
 import { startSkillScanner, stopSkillScanner, parseFrontmatter, isClientError } from "./skill-scanner.js";

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test"
 
-const BASE_URL = process.env.ALOOK_SERVER_URL || "http://localhost:3000"
+const BASE_URL = process.env.ONECAPTAIN_SERVER_URL || "http://localhost:3000"
 
 export default defineConfig({
   testDir: "./src/test/e2e-ui",

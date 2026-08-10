@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest"
-import { sql, sqlRun, sqlQuery } from "@alook/test-utils"
+import { sql, sqlRun, sqlQuery } from "@onecaptain/test-utils"
 
 /**
  * Real-DB verification for `plans/community-account-debt-fixes.md` Fix 1.

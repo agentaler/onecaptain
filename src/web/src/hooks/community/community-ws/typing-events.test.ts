@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { CommunityMessageCreate, CommunityTypingStart } from "@alook/shared"
+import type { CommunityMessageCreate, CommunityTypingStart } from "@onecaptain/shared"
 import {
   capturedOnMessage,
   cleanupCommunityWsHarness,

@@ -64,8 +64,8 @@ export async function installReactScan(): Promise<LiteHandle | null> {
   if (process.env.NODE_ENV === "production") return null
   if (!perfTraceEnabled()) return null
   if (typeof window === "undefined") return null
-  if (window.__ALOOK_PERF_INSTALLED__) return null
-  window.__ALOOK_PERF_INSTALLED__ = true
+  if (window.__ONECAPTAIN_PERF_INSTALLED__) return null
+  window.__ONECAPTAIN_PERF_INSTALLED__ = true
 
   const { instrument } = await import("react-scan/lite")
 
@@ -75,7 +75,7 @@ export async function installReactScan(): Promise<LiteHandle | null> {
     includeFiberIdentity: true,
     onEvent: (event) => {
       if (event.kind === "profiling-hooks-status" && event.available === false) {
-        window.__ALOOK_PERF_DEGRADED__ = true
+        window.__ONECAPTAIN_PERF_DEGRADED__ = true
         log.warn(
           "[perf] react-scan profiling hooks unavailable — render data will be incomplete",
           { reason: event.reason },
@@ -104,5 +104,5 @@ let activeHandle: LiteHandle | null = null
 export function stopReactScan(): void {
   activeHandle?.stop()
   activeHandle = null
-  if (typeof window !== "undefined") window.__ALOOK_PERF_INSTALLED__ = false
+  if (typeof window !== "undefined") window.__ONECAPTAIN_PERF_INSTALLED__ = false
 }

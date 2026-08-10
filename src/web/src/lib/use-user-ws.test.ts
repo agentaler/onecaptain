@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import type { WsMessage } from "@alook/shared"
+import type { WsMessage } from "@onecaptain/shared"
 import type { UseUserWsOptions } from "./use-user-ws"
 
 // --- Mock WebSocket ---

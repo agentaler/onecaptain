@@ -1,5 +1,5 @@
-import type { Agent } from "@alook/shared"
-import { MENTION_TOKEN_RE } from "@alook/shared"
+import type { Agent } from "@onecaptain/shared"
+import { MENTION_TOKEN_RE } from "@onecaptain/shared"
 
 function isTrigger(text: string, atIndex: number): boolean {
   if (atIndex === 0) return true
@@ -61,10 +61,10 @@ function highlightBareNames(content: string, agents: Agent[]): string {
       const slice = content.slice(afterAt, nameEnd)
       if (slice.toLowerCase() !== agent.name.toLowerCase()) continue
 
-      // Check if this is the enriched form: @AgentName (handle@alook.ai)
+      // Check if this is the enriched form: @AgentName (handle@onecaptain.ai)
       let matchEnd = nameEnd
       const afterName = content.slice(nameEnd)
-      const enrichedMatch = afterName.match(/^ \([a-zA-Z0-9-]+@alook\.ai\)/)
+      const enrichedMatch = afterName.match(/^ \([a-zA-Z0-9-]+@onecaptain\.ai\)/)
       if (enrichedMatch) {
         matchEnd = nameEnd + enrichedMatch[0].length
       }

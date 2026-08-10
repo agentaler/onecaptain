@@ -1,4 +1,4 @@
-import { TYPING_INDICATOR_TIMEOUT_MS } from "@alook/shared"
+import { TYPING_INDICATOR_TIMEOUT_MS } from "@onecaptain/shared"
 import { useCommunityStore } from "@/stores/community"
 
 /**

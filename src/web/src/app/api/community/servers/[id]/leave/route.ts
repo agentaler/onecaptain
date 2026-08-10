@@ -1,7 +1,7 @@
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, isServerOwner, WS_EVENTS } from "@alook/shared"
+import { queries, isServerOwner, WS_EVENTS } from "@onecaptain/shared"
 import { broadcastToUserSafe, fanOutToServerMembers } from "@/lib/community/fanout"
 import { logAudit, COMMUNITY_AUDIT_ACTIONS } from "@/lib/community/audit"
 import { requireServerMember } from "@/lib/community/permissions"

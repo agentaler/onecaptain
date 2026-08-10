@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries, readOrStale } from "@alook/shared"
+import { queries, readOrStale } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor } from "@/lib/middleware/community-actor"
 import { avatarInitial } from "@/lib/community/avatar"
@@ -14,7 +14,7 @@ import { resolvePresence, toFriendCard } from "@/lib/community/friend-cards"
  *   - human → the pending-page DTO (one `pending[]` with a `kind` in|out tag),
  *     UNCHANGED from before this fold (byte-identical for the web client).
  *   - bot   → the two directional buckets `{ pendingIncoming, pendingOutgoing }`
- *     as lean FriendCards + presence (the shape `alook friend list` composes).
+ *     as lean FriendCards + presence (the shape `onecaptain friend list` composes).
  *
  * ①-C / users/me/* family invariant (Aigneis #426): NO target-user param — a
  * bot only ever reads its own pending set (scope = ctx.actor.userId).

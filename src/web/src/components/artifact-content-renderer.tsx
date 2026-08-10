@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getArtifactContent } from "@/lib/api";
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 import { Loader2, Download } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { mermaid, cjk } from "@/lib/streamdown-plugins";

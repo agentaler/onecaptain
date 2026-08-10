@@ -70,7 +70,7 @@ function makePage(messages: Array<Partial<MessagesPage["messages"][number]>>): M
 
 async function readPersistedBlob(userId: string | null): Promise<PersistedClient> {
   const raw = await get<string>(
-    `alook:qc:v1:${userId ?? "anon"}:client`,
+    `onecaptain:qc:v1:${userId ?? "anon"}:client`,
   )
   if (!raw) throw new Error("no persisted blob")
   return JSON.parse(raw) as PersistedClient
@@ -433,7 +433,7 @@ describe("createIdbPersister — user scoping", () => {
     await clearPersistedCache("u_alice")
 
     // Alice's blob is gone but Bob's is untouched.
-    expect(await get(`alook:qc:v1:u_alice:client`)).toBeUndefined()
+    expect(await get(`onecaptain:qc:v1:u_alice:client`)).toBeUndefined()
     const bobBlob = await readPersistedBlob("u_bob")
     expect(bobBlob.timestamp).toBe(2)
   })

@@ -10,8 +10,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", async () => {
-  const real = await vi.importActual<typeof import("@alook/shared")>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const real = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared");
   return {
     ...real,
     queries: {
@@ -36,6 +36,7 @@ vi.mock("@/lib/middleware/helpers", async () =>
 
 vi.mock("@/lib/middleware/workspace", () => ({
   withWorkspaceOwner: vi.fn(async () => ({ workspaceId: "w1", memberRole: "owner" })),
+  withWorkspaceRole: vi.fn(async () => ({ workspaceId: "w1", memberRole: "owner" })),
 }));
 
 vi.mock("@/lib/api/responses", async () =>

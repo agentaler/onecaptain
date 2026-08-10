@@ -49,12 +49,12 @@ let cap: ReturnType<typeof captureStdout>;
 // case silently take the proxy branch instead. The test must isolate its own
 // preconditions — unset the whole set here (mirror `proxyServerApiFromEnv`; add
 // any new `<PREFIX>_` var it reads to this list) and restore after.
-const PROXY_ENV_KEYS = ["ALOOK_PROXY_URL", "ALOOK_PROXY_TOKEN_FILE"] as const;
+const PROXY_ENV_KEYS = ["ONECAPTAIN_PROXY_URL", "ONECAPTAIN_PROXY_TOKEN_FILE"] as const;
 let savedProxyEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   cap = captureStdout();
-  process.env.ALOOK_AGENT_ID = "agent_test";
+  process.env.ONECAPTAIN_AGENT_ID = "agent_test";
   savedProxyEnv = {};
   for (const k of PROXY_ENV_KEYS) {
     savedProxyEnv[k] = process.env[k];
@@ -64,7 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   cap.restore();
   setApiForTesting(null);
-  delete process.env.ALOOK_AGENT_ID;
+  delete process.env.ONECAPTAIN_AGENT_ID;
   for (const k of PROXY_ENV_KEYS) {
     if (savedProxyEnv[k] === undefined) delete process.env[k];
     else process.env[k] = savedProxyEnv[k];
@@ -528,7 +528,7 @@ describe("server join", () => {
   it("extracts the token from a full URL and calls joinServer with the bare token only", async () => {
     const joinServerSpy = vi.fn(async () => ({ server: { handle: "Design Studio#0042" } }));
     setApiForTesting(stubApi({ joinServer: joinServerSpy }));
-    await main(["server", "join", "--invite", "https://alook.dev/c/invite/AbC123XyZ0"]);
+    await main(["server", "join", "--invite", "https://onecaptain.dev/c/invite/AbC123XyZ0"]);
     expect(joinServerSpy).toHaveBeenCalledWith(expect.objectContaining({ invite: "AbC123XyZ0" }));
   });
 
@@ -696,7 +696,7 @@ describe("channel member", () => {
   it("prints {success:{visibility:'public',hint:'...'}} for a public channel", async () => {
     const channelMemberSpy = vi.fn(async () => ({
       visibility: "public" as const,
-      hint: "This channel is public. Use `alook server member --server demo` to list who can see it.",
+      hint: "This channel is public. Use `onecaptain server member --server demo` to list who can see it.",
     }));
     setApiForTesting(stubApi({ channelMember: channelMemberSpy }));
     await main(["channel", "member", "--channel", "/demo#0042/general"]);
@@ -704,7 +704,7 @@ describe("channel member", () => {
     expect(env).toEqual({
       success: {
         visibility: "public",
-        hint: "This channel is public. Use `alook server member --server demo` to list who can see it.",
+        hint: "This channel is public. Use `onecaptain server member --server demo` to list who can see it.",
       },
     });
     expect(channelMemberSpy).toHaveBeenCalledWith(
@@ -980,7 +980,7 @@ describe("message attachment upload", () => {
     const fs = await import("node:fs");
     const os = await import("node:os");
     const path = await import("node:path");
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-attachment-upload-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-attachment-upload-"));
     const file = path.join(dir, `prototype.${extension}`);
     const body = "<!doctype html><title>Motion prototype</title>";
     fs.writeFileSync(file, body);

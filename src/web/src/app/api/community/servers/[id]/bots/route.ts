@@ -5,8 +5,8 @@ import {
   WS_EVENTS,
   CommunityBotAddToServerRequestSchema,
   createLogger,
-} from "@alook/shared"
-import type { CommunityMemberJoin } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { CommunityMemberJoin } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers"

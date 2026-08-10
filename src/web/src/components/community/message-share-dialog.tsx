@@ -15,7 +15,7 @@ import type { RenderMsg } from "./_types"
 
 // Share one OR several messages as an image. Renders a self-contained "share
 // card" that mirrors the in-app message blob(s) (avatar / name / content — NO
-// timestamp, per spec) plus an Alook brand footer, then rasterises THAT SAME
+// timestamp, per spec) plus an OneCaptain brand footer, then rasterises THAT SAME
 // node to PNG (WYSIWYG) via html-to-image — fully client-side, no backend. The
 // captured node has a fixed width and its own solid background so the export is
 // stable regardless of the surrounding theme surface.
@@ -126,7 +126,7 @@ export function MessageShareDialog({ m, open, onClose }: {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `alook-message-${messages[0]?.authorName ?? "share"}.png`
+      a.download = `onecaptain-message-${messages[0]?.authorName ?? "share"}.png`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -205,15 +205,15 @@ export function MessageShareDialog({ m, open, onClose }: {
               </div>
             ))}
 
-            {/* Brand footer — Alook logo + brand font, mirrors the marketing
+            {/* Brand footer — OneCaptain logo + brand font, mirrors the marketing
                 footer treatment. One footer for the whole card, single or multi. */}
             <div className="mt-4 flex items-center gap-1.5 border-t border-border/50 pt-3">
-              <Image src="/alook.svg" alt="" width={16} height={16} />
+              <Image src="/onecaptain.svg" alt="" width={16} height={16} />
               <span
                 className="text-sm font-bold tracking-tight text-muted-foreground"
                 style={{ fontFamily: "var(--font-brand)" }}
               >
-                Alook
+                OneCaptain
               </span>
             </div>
           </div>

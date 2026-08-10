@@ -2,8 +2,8 @@
 
 import { useMemo } from "react"
 import { Monitor, MoreVertical } from "lucide-react"
-import type { CommunityMachineSummary } from "@alook/shared"
-import { isPresenceOnline } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
+import { isPresenceOnline } from "@onecaptain/shared"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"

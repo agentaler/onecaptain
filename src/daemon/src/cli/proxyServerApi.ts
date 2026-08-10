@@ -49,7 +49,7 @@ import type {
   FriendRequestResult,
   FriendCard,
 } from "../server/contract.js";
-import { formatHandle } from "@alook/shared";
+import { formatHandle } from "@onecaptain/shared";
 
 export interface ProxyServerApiConfig {
   /** The credential proxy base URL (from `<PREFIX>_PROXY_URL`). */
@@ -64,7 +64,7 @@ export interface ProxyServerApiConfig {
  * Build a proxy-routed ServerApi from the agent's injected env. Returns null when
  * the proxy env isn't present (so a caller can decide what to do — the CLI errors).
  */
-export function proxyServerApiFromEnv(prefix = "ALOOK", env: NodeJS.ProcessEnv = process.env): ServerApi | null {
+export function proxyServerApiFromEnv(prefix = "ONECAPTAIN", env: NodeJS.ProcessEnv = process.env): ServerApi | null {
   const proxyUrl = env[`${prefix}_PROXY_URL`];
   const tokenFile = env[`${prefix}_PROXY_TOKEN_FILE`];
   if (!proxyUrl || !tokenFile) return null;
@@ -350,7 +350,7 @@ export function createProxyServerApi(config: ProxyServerApiConfig): ServerApi {
     // RETARGETED off the flat `listFriends` verb onto the per-bucket friends
     // sub-resource endpoints (route/disc 轴3): accepted from GET friends/accepted,
     // pending from GET friends/pending. The bot NEVER calls friends/blocked
-    // (owner-only, bot-403). Compose the 3-bucket shape `alook friend list`
+    // (owner-only, bot-403). Compose the 3-bucket shape `onecaptain friend list`
     // renders — CLI output unchanged. Both endpoints are self-scoped to the
     // voucher's bot (no target-user param), so no addressing goes on the wire.
     const get = async (path: string) => {
@@ -468,7 +468,7 @@ export function createProxyServerApi(config: ProxyServerApiConfig): ServerApi {
     // The attachment id is authoritative (the door authorizes from the row's own
     // channel, never the path), so the id moves from the old POST body into the
     // path and the `resolve` placeholder fills the channel segment. The response
-    // is still a raw binary body + `X-Alook-Filename`; success streaming +
+    // is still a raw binary body + `X-OneCaptain-Filename`; success streaming +
     // error-as-JSON handling below is unchanged.
     const res = await fetchImpl(
       `${base}/api/community/channels/${REF_PLACEHOLDER_ID}/attachments/${encodeURIComponent(req.id)}`,
@@ -488,7 +488,7 @@ export function createProxyServerApi(config: ProxyServerApiConfig): ServerApi {
       await parseJsonResponse<never>(res, "attachmentDownload");
       throw new Error("unreachable: parseJsonResponse must throw on !res.ok");
     }
-    const encoded = res.headers.get("x-alook-filename");
+    const encoded = res.headers.get("x-onecaptain-filename");
     const filename = encoded ? decodeURIComponent(encoded) : path.basename(req.destPath);
     const contentType = res.headers.get("content-type") || "application/octet-stream";
     const size = Number(res.headers.get("content-length") ?? "0");

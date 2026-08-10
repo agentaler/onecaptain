@@ -1,4 +1,4 @@
-import type { Logger } from "@alook/shared"
+import type { Logger } from "@onecaptain/shared"
 
 export type ConnectionState =
   | { type: "user"; userId: string; authenticated: boolean; name?: string; discriminator?: string }

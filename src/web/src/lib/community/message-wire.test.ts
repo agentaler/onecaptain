@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { CommunityMessageCreate } from "@alook/shared"
+import type { CommunityMessageCreate } from "@onecaptain/shared"
 import { projectCommunityMessageCreate } from "./message-wire"
 
 function wire(

@@ -1,4 +1,4 @@
-import type { Database } from "@alook/shared"
+import type { Database } from "@onecaptain/shared"
 import { resolveTargetForMember, type TargetResolution } from "./resolve-ref"
 import { requireMessageSurfaceAccess } from "./permissions"
 import { requireMessageBearingSurface } from "./channel-write-guard"

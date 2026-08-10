@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, MIN_SEARCH_LENGTH, MAX_SEARCH_LENGTH } from "@alook/shared"
+import { queries, MIN_SEARCH_LENGTH, MAX_SEARCH_LENGTH } from "@onecaptain/shared"
 import {
   requireServerMember,
   requireChannelMember,

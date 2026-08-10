@@ -1,6 +1,6 @@
 import { readdir, stat, readFile } from "fs/promises";
 import { join, resolve, extname, relative, sep } from "path";
-import type { WorkspaceFileEntry } from "@alook/shared";
+import type { WorkspaceFileEntry } from "@onecaptain/shared";
 
 const SKIP_DIRS = new Set([".git", "node_modules", ".next", ".wrangler", "__pycache__", ".venv"]);
 

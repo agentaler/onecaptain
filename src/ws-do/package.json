@@ -1,5 +1,5 @@
 {
-  "name": "@alook/ws-do",
+  "name": "@onecaptain/ws-do",
   "version": "0.0.160",
   "private": true,
   "scripts": {
@@ -9,7 +9,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@alook/shared": "workspace:*"
+    "@onecaptain/shared": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",

@@ -29,7 +29,7 @@ vi.mock("@/lib/cache", () => ({
     allAgentAccess: (ws: string) => `aa:${ws}`,
   },
 }));
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   queries: {
     task: {
       listActiveTaskCountsByWorkspace: (...args: any[]) =>

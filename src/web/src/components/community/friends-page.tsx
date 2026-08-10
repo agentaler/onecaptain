@@ -14,7 +14,7 @@ import { avatarInitial } from "@/lib/community/avatar"
 import { EmptyState } from "./empty-state"
 import { hasStatus } from "./status-presets"
 import type { Friend, PendingRequest, BlockedUser, OpenProfile } from "./_types"
-import { isSelfBotFriendship, isPresenceOffline, MIN_SEARCH_LENGTH } from "@alook/shared"
+import { isSelfBotFriendship, isPresenceOffline, MIN_SEARCH_LENGTH } from "@onecaptain/shared"
 
 function FriendSection({ title, count, emptyLabel, children }: {
   title: string

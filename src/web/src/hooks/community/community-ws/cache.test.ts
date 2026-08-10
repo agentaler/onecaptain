@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type {
   CommunityReactionAdd,
   CommunityReactionRemove,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import type { Msg } from "@/components/community/_types"
 import {
   applyReactionToCache,

@@ -53,13 +53,13 @@ describe("buildInstructionContent", () => {
   it("uses agent name in opening line when provided", () => {
     const task = makeTask({ agent: { name: "My Assistant", instructions: "" } });
     const content = buildInstructionContent(task);
-    expect(content).toContain("You're My Assistant in the Alook Platform.");
+    expect(content).toContain("You're My Assistant in the OneCaptain Platform.");
   });
 
-  it("falls back to 'Alook Agent' when agent is undefined", () => {
+  it("falls back to 'OneCaptain Agent' when agent is undefined", () => {
     const task = makeTask({ agent: undefined });
     const content = buildInstructionContent(task);
-    expect(content).toContain("You're Alook Agent in the Alook Platform.");
+    expect(content).toContain("You're OneCaptain Agent in the OneCaptain Platform.");
   });
 
   it("includes agent email in opening line", () => {
@@ -67,7 +67,7 @@ describe("buildInstructionContent", () => {
       agent: { name: "Aria", instructions: "", emailHandle: "aria" },
     });
     const content = buildInstructionContent(task);
-    expect(content).toContain("You're Aria (aria@alook.ai) in the Alook Platform.");
+    expect(content).toContain("You're Aria (aria@onecaptain.ai) in the OneCaptain Platform.");
   });
 
   it("omits email parenthetical when no email configured", () => {
@@ -75,7 +75,7 @@ describe("buildInstructionContent", () => {
       agent: { name: "Aria", instructions: "" },
     });
     const content = buildInstructionContent(task);
-    expect(content).toContain("You're Aria in the Alook Platform.");
+    expect(content).toContain("You're Aria in the OneCaptain Platform.");
     expect(content).not.toContain("You're Aria (");
   });
 
@@ -103,12 +103,12 @@ describe("buildInstructionContent", () => {
     expect(content).not.toContain("owner and creator");
   });
 
-  it("uses custom email address when no alook handle", () => {
+  it("uses custom email address when no onecaptain handle", () => {
     const task = makeTask({
       agent: { name: "Aria", instructions: "", emailAddresses: ["aria@company.com"] },
     });
     const content = buildInstructionContent(task);
-    expect(content).toContain("You're Aria (aria@company.com) in the Alook Platform.");
+    expect(content).toContain("You're Aria (aria@company.com) in the OneCaptain Platform.");
   });
 });
 

@@ -1,4 +1,4 @@
-import type { CommunityMessageCreate } from "@alook/shared"
+import type { CommunityMessageCreate } from "@onecaptain/shared"
 import type { Msg } from "@/components/community/_types"
 import { avatarInitial } from "@/lib/community/avatar"
 import { isInlineAttachmentContentType } from "@/lib/community/attachment-content-type"

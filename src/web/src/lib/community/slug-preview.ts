@@ -1,4 +1,4 @@
-import { slugify } from "@alook/shared"
+import { slugify } from "@onecaptain/shared"
 
 export type SlugPreview = {
   slug: string

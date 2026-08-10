@@ -1,5 +1,5 @@
 import { wsDoFetch } from "@/lib/broadcast"
-import { RATE_LIMITS, type RateLimitName, type RateLimitPolicy, type RateLimitResult } from "@alook/shared"
+import { RATE_LIMITS, type RateLimitName, type RateLimitPolicy, type RateLimitResult } from "@onecaptain/shared"
 
 // Re-export the shared types from this module so route handlers only need
 // one import path (`@/lib/rate-limit`) instead of two.
@@ -10,7 +10,7 @@ export type { RateLimitName, RateLimitPolicy, RateLimitResult }
  * this app. Adds a new rate limit? Register it in
  * `src/shared/src/lib/rate-limits.ts` first, then call this helper.
  *
- * Backed by `RateLimitDurableObject` in the `alook-ws-do` worker via the
+ * Backed by `RateLimitDurableObject` in the `onecaptain-ws-do` worker via the
  * `WS_DO_WORKER` service binding. The DO's `ctx.storage` is strongly
  * consistent, so concurrent callers can't leak past the cap the way a
  * KV-backed counter could.

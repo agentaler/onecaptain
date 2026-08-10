@@ -11,9 +11,9 @@ describe("forum tag selection", () => {
   it("stores a selected tag and removes All", () => {
     const storage = { setItem: vi.fn(), removeItem: vi.fn() }
     writeForumTagSelection(storage, "forum-a", "bug")
-    expect(storage.setItem).toHaveBeenCalledWith("alook:forum-tag:forum-a", "bug")
+    expect(storage.setItem).toHaveBeenCalledWith("onecaptain:forum-tag:forum-a", "bug")
     writeForumTagSelection(storage, "forum-a", "All")
-    expect(storage.removeItem).toHaveBeenCalledWith("alook:forum-tag:forum-a")
+    expect(storage.removeItem).toHaveBeenCalledWith("onecaptain:forum-tag:forum-a")
   })
 
   it("keeps a restored tag only after it exists in the scoped distinct set", () => {

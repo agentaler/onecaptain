@@ -3,7 +3,7 @@ import {
   queries,
   withD1Retry,
   WS_EVENTS,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import type { UserConnectionState, WsDurableContext } from "./internal"
 
 export function handleClientTypingStart(

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { onEnterSubmit } from "@/lib/ime"
 import { toastApiError } from "@/lib/api/client"
-import { MAX_CHANNEL_NAME_LENGTH, type MentionType } from "@alook/shared"
+import { MAX_CHANNEL_NAME_LENGTH, type MentionType } from "@onecaptain/shared"
 import { Composer, type ComposerHandle, type SendAttachment } from "./composer"
 import type { Member } from "./_types"
 import {

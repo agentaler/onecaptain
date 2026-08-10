@@ -147,9 +147,9 @@ export async function waitForMeetingReady(page: BrowserPage, timeoutMs = 60_000)
 export function buildAloneDetectorScript(): string {
   return `
     (() => {
-      if (window.__alookAloneDetector) return;
-      window.__alookAloneDetector = true;
-      window.__alookAlone = false;
+      if (window.__onecaptainAloneDetector) return;
+      window.__onecaptainAloneDetector = true;
+      window.__onecaptainAlone = false;
 
       const keywords = ['only one here', 'no one else', 'everyone has left',
                          '只有你', '没有其他人', '所有人都已离开'];
@@ -161,7 +161,7 @@ export function buildAloneDetectorScript(): string {
             const text = (node.textContent || '').toLowerCase();
             for (const kw of keywords) {
               if (text.includes(kw)) {
-                window.__alookAlone = true;
+                window.__onecaptainAlone = true;
                 return;
               }
             }
@@ -178,7 +178,7 @@ export async function isMeetingActive(page: BrowserPage): Promise<boolean> {
     return await page.evaluate(() => {
       const leaveBtn = document.querySelector('button[aria-label="Leave call" i], button[aria-label*="hang up" i]')
       if (!leaveBtn) return false
-      if ((window as any).__alookAlone) return false
+      if ((window as any).__onecaptainAlone) return false
       return true
     })
   } catch {

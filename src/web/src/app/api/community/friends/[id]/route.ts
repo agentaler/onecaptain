@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { queries, WS_EVENTS } from "@alook/shared"
+import { queries, WS_EVENTS } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError } from "@/lib/middleware/helpers"

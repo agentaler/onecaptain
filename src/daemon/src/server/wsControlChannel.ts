@@ -71,7 +71,7 @@ export interface WsControlChannelOpts {
    */
   onAuthRejected?: () => void;
   now?: () => number;
-  /** Defaults to `createLogger({ header: "@alook/daemon:ws" })`. */
+  /** Defaults to `createLogger({ header: "@onecaptain/daemon:ws" })`. */
   logger?: Logger;
 }
 
@@ -79,7 +79,7 @@ export interface WsControlChannelOpts {
  * Outbound (host → server) control frames.
  *
  * `ready` is spread FLAT into the frame (not nested under a `ready` key) so
- * the shape matches `HostReadyMessageSchema` in @alook/shared — the server
+ * the shape matches `HostReadyMessageSchema` in @onecaptain/shared — the server
  * (community DO) validates frames against that schema, so any nesting drop
  * would silently be discarded.
  */
@@ -152,7 +152,7 @@ export class WsControlChannel implements HostControlChannel {
   private readonly log: Logger;
 
   constructor(private readonly opts: WsControlChannelOpts) {
-    this.log = opts.logger ?? createLogger({ header: "@alook/daemon:ws" });
+    this.log = opts.logger ?? createLogger({ header: "@onecaptain/daemon:ws" });
   }
 
   get status(): ControlChannelStatus {

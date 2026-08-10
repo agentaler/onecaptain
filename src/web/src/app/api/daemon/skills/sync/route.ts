@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, SkillSyncRequestSchema } from "@alook/shared";
+import { queries, SkillSyncRequestSchema } from "@onecaptain/shared";
 import { withAuth } from "@/lib/middleware/auth";
 import { parseBody, writeJSON, writeError } from "@/lib/middleware/helpers";
 import { getDb, withD1Retry } from "@/lib/db";

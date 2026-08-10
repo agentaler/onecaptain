@@ -37,10 +37,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import { mermaid, cjk } from "@/lib/streamdown-plugins";
-import type { Agent, Artifact, Issue, IssueComment, Message, TaskApi } from "@alook/shared";
+import type { Agent, Artifact, Issue, IssueComment, Message, TaskApi } from "@onecaptain/shared";
 import { isPreviewable, getArtifactUrl } from "@/components/artifact-content-renderer";
 import { formatSize } from "@/components/agent-chat/artifact-sheet";
-import { isTerminalIssueStatus, toAlookAddress } from "@alook/shared";
+import { isTerminalIssueStatus, toOneCaptainAddress } from "@onecaptain/shared";
 import type { TraceTask } from "@/lib/api";
 import { updateIssue } from "@/lib/api";
 import { AgentAvatar } from "@/components/avatar";
@@ -67,7 +67,7 @@ function statusLabel(status: string) {
 // --- Sub-components ---
 
 function AgentIdentity({ agent, size = 24 }: { agent: Agent; size?: number }) {
-  const email = agent.email_handle ? toAlookAddress(agent.email_handle) : "";
+  const email = agent.email_handle ? toOneCaptainAddress(agent.email_handle) : "";
   return (
     <div className="flex min-w-0 items-center gap-2">
       <AgentAvatar name={agent.name} avatarUrl={agent.avatar_url} seed={agent.id} size={size} />

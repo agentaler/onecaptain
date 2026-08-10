@@ -1,4 +1,4 @@
-name = "alook-web"
+name = "onecaptain-web"
 main = "custom-worker.ts"
 compatibility_date = "2026-04-09"
 compatibility_flags = ["nodejs_compat"]
@@ -28,17 +28,17 @@ binding = "ASSETS"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
-service = "alook-web"
+service = "onecaptain-web"
 
 # OpenNext internal cache
 [[r2_buckets]]
 binding = "NEXT_INC_CACHE_R2_BUCKET"
-bucket_name = "alook-next-cache"
+bucket_name = "onecaptain-next-cache"
 
 [[d1_databases]]
 binding = "NEXT_TAG_CACHE_D1"
 database_id = "f15ea77a-d5e9-460e-926b-532948e3ad1b"
-database_name = "alook-next-tags"
+database_name = "onecaptain-next-tags"
 
 [[durable_objects.bindings]]
 name = "NEXT_CACHE_DO_QUEUE"
@@ -52,39 +52,39 @@ new_sqlite_classes = ["DOQueueHandler"]
 [[d1_databases]]
 binding = "DB"
 database_id = "1593b87c-d8a8-4cdf-b6c0-c80d94442654"
-database_name = "alook-app"
+database_name = "onecaptain-app"
 
 [[r2_buckets]]
 binding = "EMAIL_BUCKET"
-bucket_name = "alook-emails"
+bucket_name = "onecaptain-emails"
 
 [[r2_buckets]]
 binding = "COMMUNITY_MEDIA"
-bucket_name = "alook-community-media"
+bucket_name = "onecaptain-community-media"
 
 # WS Durable Object is in a separate worker — access via Service Binding
 [[services]]
 binding = "WS_DO_WORKER"
-service = "alook-ws-do"
+service = "onecaptain-ws-do"
 
 [[services]]
 binding = "EMAIL_WORKER"
-service = "alook-email-worker"
+service = "onecaptain-email-worker"
 
 # Bot wake-on-unread producer — see plans/community-agent-cli-bridge.md §8.
-# Consumer is the separate `alook-wake-worker` (src/wake-worker).
+# Consumer is the separate `onecaptain-wake-worker` (src/wake-worker).
 [[queues.producers]]
 binding = "WAKE_QUEUE"
-queue = "alook-wake"
+queue = "onecaptain-wake"
 
-# Dev-only direct path to the `alook-wake-worker` HTTP dev endpoint — local
+# Dev-only direct path to the `onecaptain-wake-worker` HTTP dev endpoint — local
 # Cloudflare Queues can't bridge separate `wrangler dev`/`next dev` processes
 # (see plans/minimal-wake-queue-unread-notice.md), so `wake-transport.ts` uses
 # this binding (with an HTTP fallback, like `WS_DO_WORKER`) instead of
 # `WAKE_QUEUE` when `NODE_ENV === "development"`. Unused in production.
 [[services]]
 binding = "WAKE_WORKER"
-service = "alook-wake-worker"
+service = "onecaptain-wake-worker"
 
 [[kv_namespaces]]
 binding = "CACHE_KV"

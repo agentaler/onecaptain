@@ -101,6 +101,28 @@ export const EVENT_POLL_INTERVAL_MS = Number(process.env.EVENT_POLL_INTERVAL_MS)
 export const AGENT_HANDLE_MIN_LENGTH = 4;
 export const MAX_TASKS_PER_TRACE = 256;
 
+// ---------------------------------------------------------------------------
+// Workspace plans & quotas (multi-tenant SaaS)
+// ---------------------------------------------------------------------------
+
+export const WORKSPACE_PLANS = ["free", "pro", "enterprise"] as const;
+export type WorkspacePlan = (typeof WORKSPACE_PLANS)[number];
+
+/**
+ * Per-plan tenant quotas, enforced at creation time (agent create, invite
+ * accept). `Infinity` means uncapped. Reading an unknown/legacy plan value
+ * must go through `getPlanLimits`, which falls back to the free tier.
+ */
+export const PLAN_LIMITS: Record<WorkspacePlan, { maxAgents: number; maxMembers: number }> = {
+  free: { maxAgents: 5, maxMembers: 5 },
+  pro: { maxAgents: 25, maxMembers: 25 },
+  enterprise: { maxAgents: Number.POSITIVE_INFINITY, maxMembers: Number.POSITIVE_INFINITY },
+};
+
+export function getPlanLimits(plan: string | null | undefined) {
+  return PLAN_LIMITS[(plan ?? "free") as WorkspacePlan] ?? PLAN_LIMITS.free;
+}
+
 export const MeetingStatus = {
   PENDING: "pending",
   SCHEDULED: "scheduled",
@@ -131,9 +153,9 @@ export const COMMUNITY_BOT_DESCRIPTION_MAX = 1024;
 // HTTP URL bounds.
 export const COMMUNITY_BOT_IMAGE_URL_MAX = 2048;
 // Synthetic email — bots never sign in (no session mint), but Better-Auth
-// requires a unique email on the user row. `bots.alook.local` is a reserved
+// requires a unique email on the user row. `bots.onecaptain.local` is a reserved
 // non-routable local domain.
-export const COMMUNITY_BOT_EMAIL_DOMAIN = "bots.alook.local";
+export const COMMUNITY_BOT_EMAIL_DOMAIN = "bots.onecaptain.local";
 export const COMMUNITY_BOT_EMAIL_PREFIX = "bot-";
 
 // Government / law-enforcement / intelligence domain LABELS. A recipient
@@ -186,13 +208,13 @@ export function isSelfBotFriendship(id: string): boolean {
   return id.startsWith(SELF_BOT_FRIENDSHIP_PREFIX);
 }
 
-// Dev mode auth (shared between web frontend and @alook/app CLI)
+// Dev mode auth (shared between web frontend and @onecaptain/app CLI)
 export const DEV_PASSWORD = "dev-password-000";
 
 /**
  * Shape shared by every "which port does each service run on" profile in the
  * monorepo — the monorepo-local dev profile below (`DEV_PORTS`) and the
- * self-hosted `@alook/app` profile (`DEFAULT_PORTS` in
+ * self-hosted `@onecaptain/app` profile (`DEFAULT_PORTS` in
  * src/app/src/lib/constants.ts, which uses the 1521x range so it doesn't
  * collide with a developer's own `pnpm dev` checkout). Same format, two
  * separate value sets on purpose.
@@ -216,7 +238,7 @@ export const DEV_PORTS: DevPortProfile = {
 };
 
 // Local dev URLs (used for service-binding fallbacks)
-export const DEV_WEB_URL = process.env.ALOOK_SERVER_URL || `http://localhost:${DEV_PORTS.web}`;
+export const DEV_WEB_URL = process.env.ONECAPTAIN_SERVER_URL || `http://localhost:${DEV_PORTS.web}`;
 export const DEV_WS_DO_URL = process.env.DEV_WS_DO_URL || `http://localhost:${DEV_PORTS.wsDo}`;
 export const DEV_EMAIL_WORKER_URL = process.env.DEV_EMAIL_WORKER_URL || `http://localhost:${DEV_PORTS.emailWorker}`;
 export const DEV_WAKE_WORKER_URL = process.env.DEV_WAKE_WORKER_URL || `http://localhost:${DEV_PORTS.wakeWorker}`;

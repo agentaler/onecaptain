@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers";
-import { DeregisterRequestSchema } from "@alook/shared";
+import { DeregisterRequestSchema } from "@onecaptain/shared";
 import { broadcastToUser } from "@/lib/broadcast";
 import { invalidate, cacheKeys } from "@/lib/cache";
 import { log } from "@/lib/logger";

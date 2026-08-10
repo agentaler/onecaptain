@@ -153,8 +153,8 @@ export async function startServices(): Promise<ManagedService[]> {
   await new Promise((r) => setTimeout(r, 1000))
 
   const services = [
-    startService("web", "@alook/web", webHealth),
-    startService("ws-do", "@alook/ws-do", wsHealth),
+    startService("web", "@onecaptain/web", webHealth),
+    startService("ws-do", "@onecaptain/ws-do", wsHealth),
   ]
 
   await Promise.all(services.map((s) => waitForHealth(s.healthUrl, s.name)))

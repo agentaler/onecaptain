@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { getCurrentVersion, fetchLatestVersion, runNpmUpdate } from "../lib/update.js";
-import { semverGte } from "@alook/shared";
+import { semverGte } from "@onecaptain/shared";
 
 export function updateCommand(): Command {
   const cmd = new Command("update")
@@ -22,12 +22,12 @@ export function updateCommand(): Command {
       }
 
       // Check if daemon is running
-      const healthPort = Number(process.env.ALOOK_HEALTH_PORT) || 19514;
+      const healthPort = Number(process.env.ONECAPTAIN_HEALTH_PORT) || 19514;
       try {
         const res = await fetch(`http://127.0.0.1:${healthPort}/health`);
         if (res.ok) {
           console.warn(
-            "Warning: daemon is running on the old version. After update, restart with: alook daemon restart",
+            "Warning: daemon is running on the old version. After update, restart with: onecaptain daemon restart",
           );
         }
       } catch {

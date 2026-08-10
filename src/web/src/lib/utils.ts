@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { resolveMode, cliCommand, updateCommand, daemonCommand, isTauri, isMobile, devWsDoPort, type AlookMode } from "@alook/shared"
+import { resolveMode, cliCommand, updateCommand, daemonCommand, isTauri, isMobile, devWsDoPort, type OneCaptainMode } from "@onecaptain/shared"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -16,7 +16,7 @@ function getMode() {
   })
 }
 
-export function getAppMode(): AlookMode {
+export function getAppMode(): OneCaptainMode {
   return getMode()
 }
 
@@ -24,7 +24,7 @@ export function isLocalMode(): boolean {
   return getMode() !== "production"
 }
 
-// The local dev WS Durable Object port (see DEV_WS_DO_URL in @alook/shared).
+// The local dev WS Durable Object port (see DEV_WS_DO_URL in @onecaptain/shared).
 // Browser-side constant shared by every hook/component that dials ws-do
 // directly in local dev — keep this the single definition instead of
 // re-reading NEXT_PUBLIC_WS_DO_PORT in each call site.

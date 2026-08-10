@@ -9,7 +9,7 @@ import { tid } from "@/lib/community/testids"
 import { onEnterSubmit } from "@/lib/ime"
 import { SlugHint } from "./slug-hint"
 import { previewSlug } from "@/lib/community/slug-preview"
-import type { ChannelType } from "@alook/shared"
+import type { ChannelType } from "@onecaptain/shared"
 
 // Create / edit Channel dialog. v0.1 supports Text + Forum only. No private toggle.
 // Submits { name, type }.

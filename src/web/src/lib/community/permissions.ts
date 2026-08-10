@@ -4,8 +4,8 @@ import {
   canSeePrivateChannel,
   visibilityIsDmParticipant,
   withD1Retry,
-} from "@alook/shared"
-import type { Database } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 
 type PermissionError =
   | { ok: false; status: 401 | 403 | 404; error: string }

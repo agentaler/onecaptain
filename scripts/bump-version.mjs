@@ -95,16 +95,16 @@ writeFileSync(cargoTomlPath, cargoToml);
 files.push(cargoTomlPath);
 console.log(`  Cargo.toml: ${oldCargoVersion} → ${version}`);
 
-// Sync Cargo.lock version for alook-desktop (always)
+// Sync Cargo.lock version for onecaptain-desktop (always)
 const cargoLockPath = join(ROOT, "src/desktop/src-tauri/Cargo.lock");
 let cargoLock = readFileSync(cargoLockPath, "utf8");
 cargoLock = cargoLock.replace(
-  /(name = "alook-desktop"\nversion = ")[^"]+"/,
+  /(name = "onecaptain-desktop"\nversion = ")[^"]+"/,
   `$1${version}"`,
 );
 writeFileSync(cargoLockPath, cargoLock);
 files.push(cargoLockPath);
-console.log(`  Cargo.lock: alook-desktop → ${version}`);
+console.log(`  Cargo.lock: onecaptain-desktop → ${version}`);
 
 // Desktop deploy trigger (only with --desktop)
 if (includeDesktop) {

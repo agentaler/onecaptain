@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAgentContext } from "@/contexts/agent-context";
 import { getMinCliVersion, triggerRuntimeUpdate } from "@/lib/api";
-import { semverGte, isTauri, tauriInvoke } from "@alook/shared";
+import { semverGte, isTauri, tauriInvoke } from "@onecaptain/shared";
 import { getAppMode, updateCmd } from "@/lib/utils";
 import {
   Dialog,
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { AlertTriangle, RefreshCw, Terminal } from "lucide-react";
 import { toast } from "sonner";
-import type { AgentRuntime } from "@alook/shared";
+import type { AgentRuntime } from "@onecaptain/shared";
 
 export function RuntimeVersionGate() {
   const { runtimes, workspaceId } = useAgentContext();
@@ -111,7 +111,7 @@ export function RuntimeVersionGate() {
           </DialogTitle>
           <DialogDescription>
             {mode === "app"
-              ? `Your local Alook app is running an outdated version (minimum required: v${minVersion}). Please update to continue.`
+              ? `Your local OneCaptain app is running an outdated version (minimum required: v${minVersion}). Please update to continue.`
               : `The following machine(s) are running an outdated CLI version (minimum required: v${minVersion}). Please update to continue.`}
           </DialogDescription>
         </DialogHeader>

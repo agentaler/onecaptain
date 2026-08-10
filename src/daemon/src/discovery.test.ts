@@ -4,9 +4,9 @@ import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
-  resolveAlookCliPath,
+  resolveOneCaptainCliPath,
   deriveCliFallbackCandidates,
-  resolveAlookCliPathWithFallback,
+  resolveOneCaptainCliPathWithFallback,
   detectRuntimes,
   getAvailableRuntimes,
 } from "./discovery";
@@ -26,27 +26,27 @@ afterEach(() => {
   for (const d of tmpDirs.splice(0)) fs.rmSync(d, { recursive: true, force: true });
 });
 
-describe("resolveAlookCliPath", () => {
+describe("resolveOneCaptainCliPath", () => {
   it("finds the dev shim from the real src directory (never the raw .ts entry)", () => {
     // The real discovery.ts lives in src/, so this always exercises the dev
     // branch. It must resolve to the shim, never the raw cli/index.ts.
     const thisDir = path.dirname(fileURLToPath(import.meta.url));
-    const result = resolveAlookCliPath(thisDir);
+    const result = resolveOneCaptainCliPath(thisDir);
     expect(result).not.toBeNull();
     expect(fs.existsSync(result!)).toBe(true);
-    expect(result!.endsWith("alook-shim.mjs")).toBe(true);
+    expect(result!.endsWith("onecaptain-shim.mjs")).toBe(true);
   });
 
-  it("dev shape (moduleDir named `src`): resolves to the sibling scripts/alook-shim.mjs", () => {
+  it("dev shape (moduleDir named `src`): resolves to the sibling scripts/onecaptain-shim.mjs", () => {
     const root = mkTmp();
     const srcDir = path.join(root, "src");
     const scriptsDir = path.join(root, "scripts");
     fs.mkdirSync(srcDir, { recursive: true });
     fs.mkdirSync(scriptsDir, { recursive: true });
-    const shim = path.join(scriptsDir, "alook-shim.mjs");
+    const shim = path.join(scriptsDir, "onecaptain-shim.mjs");
     fs.writeFileSync(shim, "#!/usr/bin/env node\n", { mode: 0o755 });
 
-    const result = resolveAlookCliPath(srcDir);
+    const result = resolveOneCaptainCliPath(srcDir);
     expect(result).toBe(shim);
     // Must be a real, executable-looking entrypoint — not a raw .ts file
     // that would throw ERR_MODULE_NOT_FOUND when exec'd directly.
@@ -64,9 +64,9 @@ describe("resolveAlookCliPath", () => {
     fs.mkdirSync(srcDir, { recursive: true });
     fs.mkdirSync(distCliDir, { recursive: true });
     fs.writeFileSync(path.join(distCliDir, "index.js"), "#!/usr/bin/env node\n", { mode: 0o755 });
-    // No scripts/alook-shim.mjs created — the dev target genuinely doesn't exist.
+    // No scripts/onecaptain-shim.mjs created — the dev target genuinely doesn't exist.
 
-    const result = resolveAlookCliPath(srcDir);
+    const result = resolveOneCaptainCliPath(srcDir);
     expect(result).toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe("resolveAlookCliPath", () => {
     const entry = path.join(cliDir, "index.js");
     fs.writeFileSync(entry, "#!/usr/bin/env node\n", { mode: 0o755 });
 
-    const result = resolveAlookCliPath(distDir);
+    const result = resolveOneCaptainCliPath(distDir);
     expect(result).toBe(entry);
   });
 
@@ -87,51 +87,51 @@ describe("resolveAlookCliPath", () => {
     const distDir = path.join(root, "dist");
     fs.mkdirSync(distDir, { recursive: true });
 
-    const result = resolveAlookCliPath(distDir);
+    const result = resolveOneCaptainCliPath(distDir);
     expect(result).toBeNull();
   });
 
   it("returns null for a nonexistent directory", () => {
-    const result = resolveAlookCliPath("/tmp/nonexistent-xyz-12345");
+    const result = resolveOneCaptainCliPath("/tmp/nonexistent-xyz-12345");
     expect(result).toBeNull();
   });
 });
 
 describe("deriveCliFallbackCandidates", () => {
   it("returns empty for non-node_modules paths", () => {
-    expect(deriveCliFallbackCandidates("/usr/local/bin/alook")).toEqual([]);
+    expect(deriveCliFallbackCandidates("/usr/local/bin/onecaptain")).toEqual([]);
   });
 
   it("returns empty for empty string", () => {
     expect(deriveCliFallbackCandidates("")).toEqual([]);
   });
 
-  it("derives @alook/daemon candidate from a node_modules path", () => {
+  it("derives @onecaptain/daemon candidate from a node_modules path", () => {
     const primary = "/home/user/project/node_modules/@other/pkg/dist/cli/index.js";
     const candidates = deriveCliFallbackCandidates(primary);
     expect(candidates.length).toBe(1);
-    expect(candidates[0]).toContain("@alook");
+    expect(candidates[0]).toContain("@onecaptain");
     expect(candidates[0]).toContain("daemon");
     expect(candidates[0]).toContain(path.join("dist", "cli", "index.js"));
   });
 
   it("excludes the input path from candidates", () => {
-    const primary = "/home/user/node_modules/@alook/daemon/dist/cli/index.js";
+    const primary = "/home/user/node_modules/@onecaptain/daemon/dist/cli/index.js";
     const candidates = deriveCliFallbackCandidates(primary);
     expect(candidates).not.toContain(primary);
   });
 });
 
-describe("resolveAlookCliPathWithFallback", () => {
+describe("resolveOneCaptainCliPathWithFallback", () => {
   it("returns existing path as-is", () => {
     // Use this test file as a path we know exists
     const thisFile = fileURLToPath(import.meta.url);
-    const result = resolveAlookCliPathWithFallback(thisFile);
+    const result = resolveOneCaptainCliPathWithFallback(thisFile);
     expect(result).toBe(thisFile);
   });
 
   it("returns null resolved path when primary is missing and no fallbacks", () => {
-    const result = resolveAlookCliPathWithFallback("/tmp/definitely-does-not-exist-xyz.js");
+    const result = resolveOneCaptainCliPathWithFallback("/tmp/definitely-does-not-exist-xyz.js");
     // Should return the original (no fallback found either)
     expect(result).toBe("/tmp/definitely-does-not-exist-xyz.js");
   });

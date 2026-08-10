@@ -28,7 +28,7 @@ import type {
   Message,
   SkillEntry,
   WsMessage,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { useAgentContext } from "@/contexts/agent-context";
 import { useInboxCount } from "@/contexts/inbox-count-context";
 import { useChannel } from "@/contexts/channel-context";

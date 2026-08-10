@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid"
 import PostalMime from "postal-mime"
-import { createDb, queries, parseEmailHandle, toAlookAddress, DEV_WEB_URL, createLogger, buildMimeMessage, extractAttachmentMeta } from "@alook/shared"
-import { decrypt } from "@alook/shared/crypto"
+import { createDb, queries, parseEmailHandle, toOneCaptainAddress, DEV_WEB_URL, createLogger, buildMimeMessage, extractAttachmentMeta } from "@onecaptain/shared"
+import { decrypt } from "@onecaptain/shared/crypto"
 import { WorkerMailer, type AuthType } from "worker-mailer"
 import { EmailMessage } from "cloudflare:email"
 
@@ -81,7 +81,7 @@ export default {
     }
 
     await env.SEND_EMAIL.send({
-      from: toAlookAddress("no-reply"),
+      from: toOneCaptainAddress("no-reply"),
       to: body.to,
       subject: body.subject,
       html: body.html ?? "",
@@ -130,7 +130,7 @@ export default {
       if (!agent.emailHandle) {
         return Response.json({ error: "agent has no email handle configured" }, { status: 400 })
       }
-      fromAddress = toAlookAddress(agent.emailHandle)
+      fromAddress = toOneCaptainAddress(agent.emailHandle)
     }
 
     const htmlBody = body.htmlBody ?? ""
@@ -156,10 +156,10 @@ export default {
     // on the wire, returned to the caller (for conversation-map registration), and
     // stored in the R2 archive — so a human's reply (In-Reply-To = this id) threads
     // back into the originating conversation. The id's domain must match the sending
-    // domain: @alook.ai for the CF path, the custom-account domain for the SMTP path.
+    // domain: @onecaptain.ai for the CF path, the custom-account domain for the SMTP path.
     const fromDomain = useCustomSmtp && customAccount
       ? customAccount.emailAddress.split("@").pop()
-      : "alook.ai"
+      : "onecaptain.ai"
     const outMessageId = `<${nanoid()}@${fromDomain}>`
 
     // Build the raw MIME once — used both as the wire message (CF path) and as the

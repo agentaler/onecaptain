@@ -11,8 +11,8 @@ import {
   formatHandle,
   parseRef,
   withD1Retry,
-} from "@alook/shared"
-import type { CommunityCliServerMember as ServerMember } from "@alook/shared"
+} from "@onecaptain/shared"
+import type { CommunityCliServerMember as ServerMember } from "@onecaptain/shared"
 import { broadcastToUserSafe } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireChannelAccess } from "@/lib/community/permissions"
@@ -192,7 +192,7 @@ export const POST = withCommunityActor(async (req: NextRequest, ctx) => {
 })
 
 /**
- * Bot arm — the folded `channelMember` verb (`alook channel member --channel
+ * Bot arm — the folded `channelMember` verb (`onecaptain channel member --channel
  * <ref>`). ref-in-query → member-scoped resolve (404-before-enumeration, ①-C) →
  * the lean `ChannelMemberResult`. Behavior byte-identical to the old flat
  * `channelMember` route: DM refs are channel-scoped → 400; a thread returns its
@@ -253,7 +253,7 @@ async function handleBotChannelMember(
   if (!isPrivate) {
     const server = await queries.communityServer.getServer(db, channel.serverId)
     const serverName = server?.name ?? channel.serverId
-    const hint = `This channel is public. Use \`alook server member --server ${serverName}\` to list who can see it.`
+    const hint = `This channel is public. Use \`onecaptain server member --server ${serverName}\` to list who can see it.`
     return writeJSON({ visibility: "public", hint })
   }
 

@@ -12,7 +12,7 @@ import type {
   CommunityInviteCreate,
   CommunityServerDelete,
   CommunityServerUpdate,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { communityKeys } from "@/lib/query-keys"
 import { avatarInitial } from "@/lib/community/avatar"
 import type { CanonicalMessage } from "@/lib/community/message-stream"

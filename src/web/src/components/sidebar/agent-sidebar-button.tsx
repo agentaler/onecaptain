@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 import { cn } from "@/lib/utils";
 import { PinIcon, PinOffIcon } from "lucide-react";
 import {

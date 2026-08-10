@@ -5,7 +5,7 @@ import {
   cleanupTestData,
   type TestSeed,
   sqlQuery,
-} from "@alook/test-utils"
+} from "@onecaptain/test-utils"
 import { DaemonClient } from "../../../src/cli/daemon/client"
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000"

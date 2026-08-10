@@ -8,7 +8,7 @@ describe("daemonStart — credentialFilePath by machineId", () => {
   let baseDir: string;
 
   beforeEach(() => {
-    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-daemon-test-"));
+    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-daemon-test-"));
   });
 
   afterEach(() => {
@@ -39,7 +39,7 @@ describe("daemonStart — credentialFilePath by machineId", () => {
 describe("daemonStatus — reads snapshot + always flags freshness (batch E2)", () => {
   let baseDir: string;
   beforeEach(() => {
-    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-status-test-"));
+    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-status-test-"));
   });
   afterEach(() => {
     fs.rmSync(baseDir, { recursive: true, force: true });

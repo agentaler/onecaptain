@@ -46,7 +46,7 @@ import { loadCLIConfigForProfile } from "../lib/config.js";
 const mockedResolvePartial = vi.mocked(resolveClientOptsPartial);
 const mockedLoadConfig = vi.mocked(loadCLIConfigForProfile);
 
-const TMP_DIR = "/tmp/alook-workspace-test";
+const TMP_DIR = "/tmp/onecaptain-workspace-test";
 
 describe("workspace init", () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>;
@@ -114,7 +114,7 @@ describe("workspace init", () => {
       ]),
     }));
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Workspace initialized"));
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("alice@alook.ai"));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("alice@onecaptain.ai"));
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("http://localhost:3000/w/test-ws"));
   });
 

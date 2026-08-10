@@ -135,7 +135,7 @@ describe("createDaemon", () => {
       .find((f: any) => f.type === "ready");
     expect(ready).toBeDefined();
     // Fields are spread FLAT into the frame so it validates against
-    // HostReadyMessageSchema in @alook/shared (see WsControlChannel).
+    // HostReadyMessageSchema in @onecaptain/shared (see WsControlChannel).
     expect(ready).toMatchObject({
       type: "ready",
       hostname: "my-mac",
@@ -327,7 +327,7 @@ describe("createDaemon — logging", () => {
     );
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(spawnedPrompt).toContain("Use `alook inbox pull` to read your messages.");
+    expect(spawnedPrompt).toContain("Use `onecaptain inbox pull` to read your messages.");
     expect(spawnedPrompt).not.toContain("message send");
 
     await daemon.stop();
@@ -768,7 +768,7 @@ describe("deriveAuditLogSubcommand", () => {
     expect(deriveAuditLogSubcommand("/api/community/servers/srv_1/channels", "GET")).toBe("listChannels");
     expect(deriveAuditLogSubcommand("/api/community/servers/channels", "GET")).toBe("listChannels");
     // friends bucket doors (轴3 fold): accepted + pending map back to listFriends
-    // (the bot's `alook friend list` fans out to both). blocked is bot-403 → not mapped.
+    // (the bot's `onecaptain friend list` fans out to both). blocked is bot-403 → not mapped.
     expect(deriveAuditLogSubcommand("/api/community/friends/accepted", "GET")).toBe("listFriends");
     expect(deriveAuditLogSubcommand("/api/community/friends/pending", "GET")).toBe("listFriends");
     // friend-request door (friendRequest fold): POST friends/request maps back to

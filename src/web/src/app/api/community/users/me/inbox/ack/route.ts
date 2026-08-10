@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries, withD1Retry, CommunityAgentAckRequestSchema } from "@alook/shared"
+import { queries, withD1Retry, CommunityAgentAckRequestSchema } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor, requireBot } from "@/lib/middleware/community-actor"
 import { resolveTargetForMember } from "@/lib/community/resolve-ref"

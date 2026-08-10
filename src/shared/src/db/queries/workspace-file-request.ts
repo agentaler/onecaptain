@@ -50,6 +50,7 @@ export async function markDispatched(db: Database, ids: string[]) {
 
 export async function completeRequest(
   db: Database,
+  workspaceId: string,
   id: string,
   result: unknown,
 ) {
@@ -60,16 +61,26 @@ export async function completeRequest(
       result: JSON.stringify(result),
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(workspaceFileRequest.id, id))
+    .where(
+      and(
+        eq(workspaceFileRequest.workspaceId, workspaceId),
+        eq(workspaceFileRequest.id, id),
+      ),
+    )
     .returning();
   return rows[0] ?? null;
 }
 
-export async function getRequest(db: Database, id: string) {
+export async function getRequest(db: Database, workspaceId: string, id: string) {
   const rows = await db
     .select()
     .from(workspaceFileRequest)
-    .where(eq(workspaceFileRequest.id, id));
+    .where(
+      and(
+        eq(workspaceFileRequest.workspaceId, workspaceId),
+        eq(workspaceFileRequest.id, id),
+      ),
+    );
   return rows[0] ?? null;
 }
 

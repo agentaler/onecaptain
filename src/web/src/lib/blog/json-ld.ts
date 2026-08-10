@@ -14,10 +14,10 @@ export function buildBlogPostingJsonLd(post: BlogPost) {
     },
     publisher: {
       "@type": "Organization",
-      name: "Alook AI",
-      url: "https://alook.ai",
+      name: "OneCaptain AI",
+      url: "https://onecaptain.ai",
     },
-    url: `https://alook.ai/blog/${post.slug}`,
-    ...(post.image ? { image: `https://alook.ai${post.image}` } : {}),
+    url: `https://onecaptain.ai/blog/${post.slug}`,
+    ...(post.image ? { image: `https://onecaptain.ai${post.image}` } : {}),
   };
 }

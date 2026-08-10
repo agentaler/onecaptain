@@ -11,8 +11,8 @@ const mockFetch = vi.fn<(...args: unknown[]) => Promise<Response>>()
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }))
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     queries: {
@@ -52,7 +52,7 @@ beforeEach(() => {
 })
 
 import { GET } from "./route"
-import { PRESENCE_MEMBER_CAP } from "@alook/shared"
+import { PRESENCE_MEMBER_CAP } from "@onecaptain/shared"
 
 function getReq() {
   return new NextRequest("http://localhost/api/community/servers/s1/presence", { method: "GET" })

@@ -4,7 +4,7 @@ import {
   MAX_INBOX_PAGE_SIZE,
   readOrStale,
   withD1Retry,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON } from "@/lib/middleware/helpers"

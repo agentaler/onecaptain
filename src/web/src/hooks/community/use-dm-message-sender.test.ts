@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { getMessageOverlay, useMessageStreamStore } from "@/stores/community/message-stream"
 import { materializeMessageStream } from "@/lib/community/message-stream"
-import { MESSAGE_PREVIEW_LENGTH } from "@alook/shared"
+import { MESSAGE_PREVIEW_LENGTH } from "@onecaptain/shared"
 
 vi.mock("react", () => ({
   useCallback: (fn: Function) => fn,

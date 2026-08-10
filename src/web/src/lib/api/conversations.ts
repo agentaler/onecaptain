@@ -4,7 +4,7 @@ import type {
   Message,
   TaskApi,
   TaskMessageResponse,
-} from "@alook/shared";
+} from "@onecaptain/shared";
 import { ApiError } from "@/lib/errors";
 import type { PendingFile } from "@/hooks/use-file-attachments";
 import { apiFetch, redirectToSignIn, wsQuery } from "./client";

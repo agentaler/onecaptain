@@ -12,7 +12,7 @@ const mockEnqueueTask = vi.fn();
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   createDb: vi.fn(() => ({})),
   TASK_TYPES: { USER_DM_MESSAGE: "user_dm_message", EMAIL_NOTIFICATION: "email_notification", CALENDAR_EVENT: "calendar_event" },
   queries: {

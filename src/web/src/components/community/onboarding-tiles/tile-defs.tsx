@@ -1,7 +1,7 @@
 // Shared SVG assets for the onboarding motion tiles (Connect / Create / Memory /
 // Workspace / Nap). Defined once and referenced by <use> inside each tile's SVG.
-// Real Alook assets: lucide icon paths (exact, from lucide-react@1.25.0), the app's
-// alook logo mark, beam faces from renderFaceSvg, and the circular avatar disc clip.
+// Real OneCaptain assets: lucide icon paths (exact, from lucide-react@1.25.0), the app's
+// onecaptain logo mark, beam faces from renderFaceSvg, and the circular avatar disc clip.
 //
 // IMPORTANT: <use href="#id"> resolves against ids that must be unique in the
 // document. Each tile mounts its own copy of <TileDefs> with an `idPrefix` so
@@ -17,7 +17,7 @@ export function tileIds(p: string) {
     book: `${p}-ic-book`,
     layers: `${p}-ic-layers`,
     clock: `${p}-ic-clock`,
-    alook: `${p}-ic-alook`,
+    onecaptain: `${p}-ic-onecaptain`,
     phone: `${p}-ic-phone`,
     faceA: `${p}-face-a`,
     faceB: `${p}-face-b`,
@@ -68,8 +68,8 @@ export function TileDefs({ idPrefix }: { idPrefix: string }) {
         <path className="ot-art" d="M12 6v6l4 2" />
       </g>
 
-      {/* Alook logo mark (public/alook.svg) — nested-svg viewBox 3 5 22 22 */}
-      <g id={id.alook}>
+      {/* OneCaptain logo mark (public/onecaptain.svg) — nested-svg viewBox 3 5 22 22 */}
+      <g id={id.onecaptain}>
         <rect x="4" y="6" width="18" height="18" rx="3" fill="currentColor" opacity="0.4" />
         <rect x="6" y="8" width="18" height="18" rx="3" fill="currentColor" />
         <rect x="9.5" y="13" width="11" height="9" rx="2" fill="var(--card)" />

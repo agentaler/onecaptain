@@ -7,7 +7,7 @@ import {
   canManageServer,
   MAX_FORUM_TAG_LENGTH,
   MAX_FORUM_TAGS_PER_POST,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { requireChannelAccess } from "@/lib/community/permissions"
 
 /** Replace the tag set on a forum opener message. */

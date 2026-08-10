@@ -1,4 +1,4 @@
-import { createLogger, type Logger } from "@alook/shared"
+import { createLogger, type Logger } from "@onecaptain/shared"
 
 export const log = createLogger({ service: "ws-do" })
 

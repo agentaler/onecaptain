@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, isValidHandle } from "@alook/shared";
+import { queries, isValidHandle } from "@onecaptain/shared";
 import { nanoid } from "nanoid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { getDb } from "@/lib/db";

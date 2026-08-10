@@ -2,7 +2,7 @@
 
 import React, { useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import type { Artifact } from "@alook/shared";
+import type { Artifact } from "@onecaptain/shared";
 import { X, Download } from "lucide-react";
 import { getArtifactUrl } from "@/components/artifact-content-renderer";
 

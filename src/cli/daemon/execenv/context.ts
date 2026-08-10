@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { toAlookAddress } from "@alook/shared";
+import { toOneCaptainAddress } from "@onecaptain/shared";
 import { tempDir } from "../../lib/platform.js";
 import { cmdPrefix } from "../../lib/env.js";
 import {
@@ -31,15 +31,15 @@ Your memory directory is \`./\`. Write ONLY here — never write any external me
 ### What to memorize
 Actively record, without being asked:
 - **User profile & preferences** — name, what they work on, how they like things done.
-- **Local project mapping** — e.g. "alook = the project under /Users/.../alook".
-- **When to read what** — e.g. "read ./experiences/alook_dev_workflow.md when starting a new PR in alook".
+- **Local project mapping** — e.g. "onecaptain = the project under /Users/.../onecaptain".
+- **When to read what** — e.g. "read ./experiences/onecaptain_dev_workflow.md when starting a new PR in onecaptain".
 - **Specific workflows** — conditionally-triggered procedures → \`experiences/[NAME].md\`.
 
 ### What NOT to memorize
 Keep \`./memory.md\` free of time-sensitive state. Do NOT write what you're working on right now, in-progress task status, or anything that goes stale quickly — the Context Timeline already records the full history of your work and is where you recall such things. memory.md is for durable facts that stay true across many sessions.
 
 ## Context Timeline
-You're a solo working unit inside a powerful personal agent in the Alook platform. Your current context is only a fraction of the full timeline of what you have done.
+You're a solo working unit inside a powerful personal agent in the OneCaptain platform. Your current context is only a fraction of the full timeline of what you have done.
 
 The full context timeline lives in \`./.context_timeline/YYYY-MM-DD.jsonl\`. Each line is a JSON object, sorted by \`datetime\` ascending, with these fields:
 - \`task_id\` — unique task identifier
@@ -87,12 +87,12 @@ export function resolveInstruction(text: string, selfAgentId: string): string {
 }
 
 export function buildInstructionContent(task: Task): string {
-  const displayName = task.agent?.name || "Alook Agent";
-  const alookAddr = task.agent?.emailHandle ? toAlookAddress(task.agent.emailHandle) : null;
-  const customAddrs = (task.agent?.emailAddresses ?? []).filter((a) => a !== alookAddr);
-  const primaryEmail = alookAddr ?? customAddrs[0] ?? null;
+  const displayName = task.agent?.name || "OneCaptain Agent";
+  const onecaptainAddr = task.agent?.emailHandle ? toOneCaptainAddress(task.agent.emailHandle) : null;
+  const customAddrs = (task.agent?.emailAddresses ?? []).filter((a) => a !== onecaptainAddr);
+  const primaryEmail = onecaptainAddr ?? customAddrs[0] ?? null;
 
-  let agentLine = `You're ${displayName}${primaryEmail ? ` (${primaryEmail})` : ""} in the Alook Platform.`;
+  let agentLine = `You're ${displayName}${primaryEmail ? ` (${primaryEmail})` : ""} in the OneCaptain Platform.`;
   if (task.agent?.userName || task.agent?.userEmail) {
     const ownerParts = [task.agent.userName, task.agent.userEmail ? `(${task.agent.userEmail})` : null].filter(Boolean).join(" ");
     agentLine += ` Your owner and creator is ${ownerParts}.`;
@@ -133,8 +133,8 @@ CRITICAL: Before you start ANY task, scan the colleague list below.
 `;
   }
 
-  content += `\n## Alook CLI Tools
-You can communicate with the world through Alook CLI.
+  content += `\n## OneCaptain CLI Tools
+You can communicate with the world through OneCaptain CLI.
 The CLI auto-detects your identity from the environment. No need to pass \`--agent_id\`.
 
 ### Command quick reference
@@ -149,7 +149,7 @@ Detailed usage for each capability follows below.
 `;
 
   const emailLines: string[] = [];
-  if (alookAddr) emailLines.push(`- '${alookAddr}' (default, Alook platform address)`);
+  if (onecaptainAddr) emailLines.push(`- '${onecaptainAddr}' (default, OneCaptain platform address)`);
   for (const a of customAddrs) emailLines.push(`- '${a}' (custom IMAP/SMTP mailbox)`);
   content += `\nYour email addresses:\n${emailLines.join("\n")}\n
 These are YOUR OWN agent email addresses — not the user's. You can only send and receive emails through your own addresses. You do NOT have access to the user's personal email inbox.
@@ -169,14 +169,14 @@ These are YOUR OWN agent email addresses — not the user's. You can only send a
 When your task prompt includes an \`email_id\` field, fetch ONLY that specific email:
 - Run '${cmdPrefix()} email pull --email_id <EMAIL_ID>' (uses the email_id from the prompt)
 When no \`email_id\` is present, fall back to listing unread:
-- Run '${cmdPrefix()} email pull --status unread' to download unread emails from inbox to '${tempDir("alook-emails")}/${task.workspaceId}/${task.agentId}/'.
+- Run '${cmdPrefix()} email pull --status unread' to download unread emails from inbox to '${tempDir("onecaptain-emails")}/${task.workspaceId}/${task.agentId}/'.
 
 To download sent emails, add '--folder sent': '${cmdPrefix()} email pull --folder sent'
 Valid folders: inbox (default), sent, untrust.
 To limit the number of emails downloaded, add '--limit <N>' (e.g. '--limit 20'). Use '--offset <N>' to skip emails for pagination.
 Example: '${cmdPrefix()} email pull --status unread --limit 20 --offset 0'
 
-Each email is saved to '${tempDir("alook-emails")}/${task.workspaceId}/${task.agentId}/<emailId>/' with:
+Each email is saved to '${tempDir("onecaptain-emails")}/${task.workspaceId}/${task.agentId}/<emailId>/' with:
 - 'metadata.json' — sender, recipient, subject, date, status, message_id, in_reply_to, references
 - 'body.txt' — plain text body
 - 'body.html' — HTML body (if available)
@@ -188,7 +188,7 @@ Before starting to process an INBOX email, mark it as read:
 #### Sending a new email
 Write the HTML body to a file first, then send it. The body is forwarded as-is (HTML).
 - Run '${cmdPrefix()} email send --to <ADDRESS> --subject "<SUBJECT>" --body-file <PATH_TO_HTML>'
-- To send from a specific mailbox, add '--from <YOUR_EMAIL_ADDRESS>'. Without '--from', the default Alook address is used.
+- To send from a specific mailbox, add '--from <YOUR_EMAIL_ADDRESS>'. Without '--from', the default OneCaptain address is used.
 - Attach files with '--attachment <PATH>' — repeat the flag for multiple attachments. Each file is uploaded before sending.
 - Example: '${cmdPrefix()} email send --to foo@bar.com --subject "Weekly report" --body-file /tmp/body.html --from alice@company.com --attachment /tmp/report.pdf'
 
@@ -196,7 +196,7 @@ Write the HTML body to a file first, then send it. The body is forwarded as-is (
 To reply to an email, add '--in-reply-to <EMAIL_ID>' to the send command. This sets the correct email threading headers so the recipient's email client groups the reply into the same conversation thread.
 - Use 'Re: <original subject>' as the subject.
 - Quote the original email body in your reply (wrap it in a blockquote).
-- The <EMAIL_ID> is the Alook email id from metadata.json (not the message_id header).
+- The <EMAIL_ID> is the OneCaptain email id from metadata.json (not the message_id header).
 - Example: '${cmdPrefix()} email send --to sender@example.com --subject "Re: Bug report" --body-file /tmp/reply.html --in-reply-to <EMAIL_ID>'
 Tips:
 - If you think the task will take a while, consider sending a short "I'm on it" style email reply first to reassure the sender.
@@ -218,8 +218,8 @@ Manage which email addresses are allowed to send you emails.
 
   content += `\n### Artifacts
 Upload files for your owner to review in the app.
-- Your current conversation id is available via env var: $ALOOK_CONVERSATION_ID
-- Run '${cmdPrefix()} sync upload-artifact --conversation_id $ALOOK_CONVERSATION_ID --file <PATH>'
+- Your current conversation id is available via env var: $ONECAPTAIN_CONVERSATION_ID
+- Run '${cmdPrefix()} sync upload-artifact --conversation_id $ONECAPTAIN_CONVERSATION_ID --file <PATH>'
 - Use this after generating plans, reports, or any file the owner should review.
 - You response will be rendered in remote server, so don't output link format with local path in your response (cause user can click it and jump to nowheres)
 - If you think user may need to know any file detail, use upload-artifact tool to send the file to user.
@@ -242,7 +242,7 @@ Don't bundle everything into one giant message at the end. The user shouldn't ha
 
 **If the user sends you a message while you're working** — especially questions like "are you there?", "what's the status?", or unrelated requests — **respond to them immediately**. Don't finish your current task first and then reply. The user reached out because they need your attention NOW. Acknowledge them right away, then resume your work.
 
-\`${cmdPrefix()} sync send-dm --message "…"\` for short messages. For longer or markdown-rich messages, write to a file first and use \`--message-file <path>\` — this preserves formatting and avoids shell escaping issues. The conversation is in $ALOOK_CONVERSATION_ID, so you usually need no flags. You can send several times in one task.
+\`${cmdPrefix()} sync send-dm --message "…"\` for short messages. For longer or markdown-rich messages, write to a file first and use \`--message-file <path>\` — this preserves formatting and avoids shell escaping issues. The conversation is in $ONECAPTAIN_CONVERSATION_ID, so you usually need no flags. You can send several times in one task.
 
 Your messages are rendered as **markdown** in the user's app. Use formatting to make your responses clear and scannable — headers, bullet lists, code blocks, bold for key points. Don't send a wall of plain text when structure would help the reader. For anything beyond a one-liner, prefer \`--message-file\` so you can write proper markdown without fighting shell escaping.
 
@@ -263,12 +263,12 @@ Recruit new colleague agents directly from the CLI. The server auto-generates a 
   - '--relationship-file <path>' — alternative: read relationship from a file (mutually exclusive with --relationship)
   - '--json' — output full JSON response
 - Example: '${cmdPrefix()} agent recruit --instructions "You are a QA engineer..." --relationship "DELEGATE when: code is ready for review"'
-- Output: 'Recruited Felix (felix@alook.ai) — ag_xK9mPq2z'
+- Output: 'Recruited Felix (felix@onecaptain.ai) — ag_xK9mPq2z'
 - The new agent shares your runtime, is automatically linked as your colleague, and receives a welcome task.
 
 Set or update the relationship with an EXISTING colleague (create-or-replace):
 - Run '${cmdPrefix()} agent link --to <handleOrId> --relationship "<DELEGATION_CRITERIA>"'
-  - '--to <handleOrId>' — target agent by email handle ('coder' or 'coder@alook.ai') or agent id ('ag_...')
+  - '--to <handleOrId>' — target agent by email handle ('coder' or 'coder@onecaptain.ai') or agent id ('ag_...')
   - '--relationship <text>' — the delegation criteria both of you see (replaces it if a link already exists)
   - '--relationship-file <path>' — alternative: read relationship from a file (mutually exclusive with --relationship)
   - '--json' — output the link object incl. a 'created' boolean

@@ -76,7 +76,7 @@ describe("extractInviteTokens", () => {
   })
 
   it("extracts a full-origin URL token", () => {
-    expect(extractInviteTokens("https://alook.ai/c/invite/xY9k2vW7aQ")).toEqual([
+    expect(extractInviteTokens("https://onecaptain.ai/c/invite/xY9k2vW7aQ")).toEqual([
       "xY9k2vW7aQ",
     ])
   })

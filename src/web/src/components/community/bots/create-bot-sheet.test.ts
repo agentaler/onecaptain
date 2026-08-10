@@ -9,7 +9,7 @@ import {
   firstHealthyRuntimeId,
   firstOnlineMachineId,
 } from "./create-bot-sheet"
-import type { CommunityMachineSummary } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
 
 function machine(over: Partial<CommunityMachineSummary>): CommunityMachineSummary {
   return {

@@ -13,8 +13,8 @@
  */
 
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries, createLogger, WS_EVENTS, withD1Retry } from "@alook/shared"
-import type { CommunityWsEvent, Database } from "@alook/shared"
+import { queries, createLogger, WS_EVENTS, withD1Retry } from "@onecaptain/shared"
+import type { CommunityWsEvent, Database } from "@onecaptain/shared"
 import { getDb } from "../db"
 import { broadcastToUser, broadcastToUsers } from "../broadcast"
 import { enqueueBotWakes, type WakeMessageRow } from "./wake-producer"

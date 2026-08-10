@@ -101,9 +101,35 @@ export const workspace = sqliteTable("workspace", {
   name: text("name").notNull(),
   slug: text("slug").unique().notNull(),
   onboarded: integer("onboarded").notNull().default(0),
+  // Billing plan — one of WORKSPACE_PLANS ("free" | "pro" | "enterprise").
+  // PLAN_LIMITS keys off this for per-tenant quotas (agents, seats).
+  // Hand-maintained in lockstep with migration 0084.
+  plan: text("plan").notNull().default("free"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
+
+// workspace_audit_log — per-tenant record of administrative actions (member
+// and invite lifecycle, role changes, workspace settings, deletions).
+// `workspaceId` is deliberately NOT a foreign key: audit rows must survive
+// workspace deletion (the `workspace.deleted` row would otherwise cascade
+// away with the tenant it documents).
+export const workspaceAuditLog = sqliteTable(
+  "workspace_audit_log",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "wal_" + nanoid()),
+    workspaceId: text("workspace_id").notNull(),
+    /** Null for system-initiated actions. */
+    actorId: text("actor_id"),
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    /** JSON-encoded action-specific fields. */
+    changes: text("changes"),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [index("idx_workspace_audit_log_ws_created").on(t.workspaceId, t.createdAt)]
+);
 
 export const member = sqliteTable(
   "member",

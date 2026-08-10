@@ -5,7 +5,7 @@ declare namespace Cloudflare {
     COMMUNITY_MEDIA: R2Bucket
     WS_DO_WORKER: Fetcher
     EMAIL_WORKER: Fetcher
-    WAKE_QUEUE: Queue<import("@alook/shared").WakePayload>
+    WAKE_QUEUE: Queue<import("@onecaptain/shared").WakePayload>
     WAKE_WORKER: Fetcher
     WORKER_SELF_REFERENCE: Fetcher
     NEXT_INC_CACHE_R2_BUCKET: R2Bucket

@@ -4,7 +4,7 @@ import {
   parseNameAndTag,
   isBlocked,
   CommunityAgentFriendRequestSchema,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor } from "@/lib/middleware/community-actor"
 import type { BotActor, CommunityActor } from "@/lib/middleware/community-actor"

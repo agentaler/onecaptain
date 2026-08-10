@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import type { AgentRuntime as Runtime } from "@alook/shared";
+import type { AgentRuntime as Runtime } from "@onecaptain/shared";
 import { ProviderLogo } from "@/components/provider-logo";
 import {
   Select,

@@ -1,5 +1,5 @@
 import type { Msg } from "@/components/community/_types"
-import type { MentionType } from "@alook/shared"
+import type { MentionType } from "@onecaptain/shared"
 import { isInlineAttachmentContentType } from "@/lib/community/attachment-content-type"
 
 export const MAX_LIVE_MESSAGE_DELTAS = 500

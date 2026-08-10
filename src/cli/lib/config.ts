@@ -96,7 +96,7 @@ export function markWorkspaceDeletedInList(
 }
 
 export function configDir(): string {
-  return process.env.ALOOK_PROJECT_ROOT || join(homedir(), ".alook");
+  return process.env.ONECAPTAIN_PROJECT_ROOT || join(homedir(), ".onecaptain");
 }
 
 export function configPath(): string {

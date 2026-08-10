@@ -160,7 +160,7 @@ export function createPiSdkDriverDeps(ctx: LaunchContext, loadSdk: PiSdkLoader =
     async buildSpawnEnv(): Promise<NodeJS.ProcessEnv> {
       // Pi has no child process of its own, but its bash tool does — reuse the
       // exact same credential-voucher + PATH-link machinery every CLI driver
-      // gets via `prepareCliTransport`, so the agent's `alook` bash calls
+      // gets via `prepareCliTransport`, so the agent's `onecaptain` bash calls
       // authenticate the same zero-trust way.
       const cliConfig = ctx.agentCliPath ? { ...DEFAULT_CLI_CONFIG, hostCliPath: ctx.agentCliPath } : DEFAULT_CLI_CONFIG;
       const { spawnEnv } = await prepareCliTransport(ctx, {}, cliConfig);

@@ -17,7 +17,7 @@ describe("GET /.well-known/assetlinks.json", () => {
       relation: ["delegate_permission/common.handle_all_urls"],
       target: {
         namespace: "android_app",
-        package_name: "ai.alook.app",
+        package_name: "ai.onecaptain.app",
         sha256_cert_fingerprints: ["__PLACEHOLDER__"],
       },
     });

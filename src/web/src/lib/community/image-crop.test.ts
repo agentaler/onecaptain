@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { MAX_ICON_SOURCE_FILE_SIZE_BYTES } from "@alook/shared"
+import { MAX_ICON_SOURCE_FILE_SIZE_BYTES } from "@onecaptain/shared"
 import { validateIconSourceFile, deriveCroppedFileName, buildCroppedIconFile } from "./image-crop"
 
 function fakeFile(name: string, type: string, size: number): File {

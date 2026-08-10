@@ -48,13 +48,13 @@ export interface PerfSwitchMark {
 declare global {
   interface Window {
     /** Bounded ring buffer of captured render/commit events. */
-    __ALOOK_PERF__?: PerfEventRecord[]
+    __ONECAPTAIN_PERF__?: PerfEventRecord[]
     /** Switch-click anchors, in click order. */
-    __ALOOK_PERF_MARKS__?: PerfSwitchMark[]
+    __ONECAPTAIN_PERF_MARKS__?: PerfSwitchMark[]
     /** Set true if react-scan's profiling hooks are unavailable. */
-    __ALOOK_PERF_DEGRADED__?: boolean
+    __ONECAPTAIN_PERF_DEGRADED__?: boolean
     /** Set once when instrument() has been installed, to guard double-install. */
-    __ALOOK_PERF_INSTALLED__?: boolean
+    __ONECAPTAIN_PERF_INSTALLED__?: boolean
   }
 }
 
@@ -67,11 +67,11 @@ export const PERF_RING_MAX = 5000
  * a plain object standing in for `window`.
  */
 export function pushPerfEvent(
-  target: { __ALOOK_PERF__?: PerfEventRecord[] },
+  target: { __ONECAPTAIN_PERF__?: PerfEventRecord[] },
   record: PerfEventRecord,
   max: number = PERF_RING_MAX,
 ): void {
-  const buf = target.__ALOOK_PERF__ ?? (target.__ALOOK_PERF__ = [])
+  const buf = target.__ONECAPTAIN_PERF__ ?? (target.__ONECAPTAIN_PERF__ = [])
   buf.push(record)
   if (buf.length > max) buf.splice(0, buf.length - max)
 }

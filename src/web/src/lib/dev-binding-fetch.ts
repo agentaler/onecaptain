@@ -1,4 +1,4 @@
-import type { Logger } from "@alook/shared"
+import type { Logger } from "@onecaptain/shared"
 
 interface FetcherLike {
   fetch(input: string, init?: RequestInit): Promise<Response>

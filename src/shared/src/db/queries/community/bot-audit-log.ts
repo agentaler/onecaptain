@@ -242,7 +242,7 @@ export async function insertBotAuditSessionReset(
 }
 
 /**
- * Nap audit write — the agent reset ITS OWN session via `alook nap`. Actor is
+ * Nap audit write — the agent reset ITS OWN session via `onecaptain nap`. Actor is
  * the bot itself (self-initiated), so no `actorId`; `trigger` is the constant
  * `"nap"` so my-bots reads "slept" vs a "was reset". Written when the reborn
  * agent's `agent_session` lands (completion), NOT at dispatch — so a nap that

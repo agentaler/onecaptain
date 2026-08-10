@@ -1,7 +1,7 @@
 import {
   MAX_ICON_SOURCE_FILE_SIZE_BYTES,
   ALLOWED_ICON_SOURCE_MIME_TYPES,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 
 export type CropPixels = { x: number; y: number; width: number; height: number }
 

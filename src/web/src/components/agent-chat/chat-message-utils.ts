@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Artifact, Message, TaskApi as Task } from "@alook/shared";
+import type { Artifact, Message, TaskApi as Task } from "@onecaptain/shared";
 
 type EventIconType = "issue" | "email" | "calendar";
 

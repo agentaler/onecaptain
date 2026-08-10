@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
-import { seedTestData, cleanupTestData, type TestSeed, sqlRun, sqlQuery, postEmail } from "@alook/test-utils"
+import { seedTestData, cleanupTestData, type TestSeed, sqlRun, sqlQuery, postEmail } from "@onecaptain/test-utils"
 import { randomUUID } from "crypto"
 
 let seed: TestSeed
@@ -42,8 +42,8 @@ describe("whitelist bypass for same-workspace agents", () => {
     sqlRun(`INSERT INTO agent (id, workspace_id, name, runtime_id, email_handle, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, siblingAgentId, seed.workspaceId, 'Sibling Agent', seed.runtimeId, siblingHandle, seed.userId, now, now)
 
     try {
-      const from = `${siblingHandle}@alook.ai`
-      const to = `${seed.agentEmailHandle}@alook.ai`
+      const from = `${siblingHandle}@onecaptain.ai`
+      const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
       const res = await postEmail(from, to, "E2E bypass test", "Hello from sibling")
       expect(res.status).toBe(200)
@@ -57,8 +57,8 @@ describe("whitelist bypass for same-workspace agents", () => {
   })
 
   it("agent emailing itself is treated as whitelisted", async () => {
-    const from = `${seed.agentEmailHandle}@alook.ai`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const from = `${seed.agentEmailHandle}@onecaptain.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
     const res = await postEmail(from, to, "E2E self-email test", "Hello self")
     expect(res.status).toBe(200)
@@ -69,8 +69,8 @@ describe("whitelist bypass for same-workspace agents", () => {
   })
 
   it("different-workspace agent email is NOT treated as whitelisted", async () => {
-    const from = `${seedOther.agentEmailHandle}@alook.ai`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const from = `${seedOther.agentEmailHandle}@onecaptain.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
     await postEmail(from, to, "E2E cross-workspace test", "Cross workspace")
 
@@ -79,9 +79,9 @@ describe("whitelist bypass for same-workspace agents", () => {
     expect(row!.is_whitelisted).toBe(0)
   })
 
-  it("@alook.ai email with nonexistent handle is NOT whitelisted", async () => {
-    const from = `nonexistent-handle-${nanoid()}@alook.ai`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+  it("@onecaptain.ai email with nonexistent handle is NOT whitelisted", async () => {
+    const from = `nonexistent-handle-${nanoid()}@onecaptain.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
     await postEmail(from, to, "E2E nonexistent handle test", "Ghost agent")
 
@@ -92,7 +92,7 @@ describe("whitelist bypass for same-workspace agents", () => {
 
   it("regular whitelist entries still work (existing behavior)", async () => {
     const from = `${seed.userId}@test.local`
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
     const res = await postEmail(from, to, "E2E regular whitelist test", "Regular whitelisted")
     expect(res.status).toBe(200)
@@ -104,7 +104,7 @@ describe("whitelist bypass for same-workspace agents", () => {
 
   it("non-whitelisted non-agent email is rejected (existing behavior)", async () => {
     const from = "random-stranger@gmail.com"
-    const to = `${seed.agentEmailHandle}@alook.ai`
+    const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
     await postEmail(from, to, "E2E stranger test", "Stranger")
 
@@ -119,11 +119,11 @@ describe("whitelist bypass for same-workspace agents", () => {
     const now = new Date().toISOString()
     const wlId = `wl_${nanoid()}`
     sqlRun(`INSERT INTO agent (id, workspace_id, name, runtime_id, email_handle, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, siblingAgentId, seed.workspaceId, 'Both Agent', seed.runtimeId, siblingHandle, seed.userId, now, now)
-    sqlRun(`INSERT INTO agent_whitelist (id, agent_id, workspace_id, email, created_at) VALUES (?, ?, ?, ?, ?)`, wlId, seed.agentId, seed.workspaceId, `${siblingHandle}@alook.ai`, now)
+    sqlRun(`INSERT INTO agent_whitelist (id, agent_id, workspace_id, email, created_at) VALUES (?, ?, ?, ?, ?)`, wlId, seed.agentId, seed.workspaceId, `${siblingHandle}@onecaptain.ai`, now)
 
     try {
-      const from = `${siblingHandle}@alook.ai`
-      const to = `${seed.agentEmailHandle}@alook.ai`
+      const from = `${siblingHandle}@onecaptain.ai`
+      const to = `${seed.agentEmailHandle}@onecaptain.ai`
 
       const res = await postEmail(from, to, "E2E both paths test", "Both paths")
       expect(res.status).toBe(200)

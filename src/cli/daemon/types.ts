@@ -150,7 +150,7 @@ export interface RuntimeSessionDescriptor {
 }
 
 /** Convert a validated TaskApi (snake_case wire format) to the internal Task type. */
-export function fromApiTask(api: import("@alook/shared").TaskApi): Task {
+export function fromApiTask(api: import("@onecaptain/shared").TaskApi): Task {
   return {
     id: api.id,
     agentId: api.agent_id,

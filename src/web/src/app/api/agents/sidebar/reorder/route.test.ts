@@ -9,8 +9,8 @@ vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 const mockGetAllAgents = vi.fn();
 const mockListPins = vi.fn();
 const mockReorder = vi.fn();
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     queries: {

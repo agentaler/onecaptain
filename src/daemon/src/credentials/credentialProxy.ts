@@ -35,7 +35,7 @@
  * HOST-NEUTRAL. This module hardcodes no platform. The runner key (per `mint`),
  * the upstream base URL, the voucher prefix, and the header names all come from
  * the host via `mint(...)` / `CredentialBrokerConfig`. The defaults are generic
- * (`vch_`, `X-Agent-*`); an Alook deployment passes its own.
+ * (`vch_`, `X-Agent-*`); an OneCaptain deployment passes its own.
  */
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -227,7 +227,7 @@ function parseBearer(authHeader: string | undefined): string | null {
 
 /**
  * Map an inbound request path to the capability it requires, so the proxy can
- * enforce scoping. Host-overridable; the default maps the common Alook endpoints.
+ * enforce scoping. Host-overridable; the default maps the common OneCaptain endpoints.
  * Returns `undefined` when a path needs no specific capability.
  */
 export type CapabilityResolver = (method: string, pathname: string) => Capability | undefined;

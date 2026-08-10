@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
-import { isTauri, isDesktop, tauriInvoke } from "@alook/shared";
+import { isTauri, isDesktop, tauriInvoke } from "@onecaptain/shared";
 
 export function TauriThemeSync() {
   const { resolvedTheme } = useTheme();

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { queries, isValidHandle, isOnline, CreateAgentRequestSchema, TASK_TYPES } from "@alook/shared"
+import { queries, isValidHandle, isOnline, CreateAgentRequestSchema, TASK_TYPES, getPlanLimits } from "@onecaptain/shared"
+import { logWorkspaceAudit, WORKSPACE_AUDIT_ACTIONS } from "@/lib/workspace-audit";
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { withWorkspaceMember } from "@/lib/middleware/workspace";
@@ -59,6 +60,15 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     return writeError("runtime not found in workspace", 404);
   }
 
+  // Per-plan agent quota — scoped to the tenant, checked before create.
+  const [plan, agentCount] = await Promise.all([
+    queries.workspace.getWorkspacePlan(db, ws.workspaceId),
+    queries.agent.countAgentsForWorkspace(db, ws.workspaceId),
+  ]);
+  if (agentCount >= getPlanLimits(plan).maxAgents) {
+    return writeError("PLAN_AGENT_LIMIT_REACHED", 403);
+  }
+
   const rc = body.runtime_config;
   const sanitizedRc: Record<string, unknown> | null = rc
     ? { ...(typeof rc.model === "string" ? { model: rc.model } : {}) }
@@ -103,7 +113,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         newAgent.id,
         conv.id,
         ws.workspaceId,
-        `You have just been created by your owner (${ctx.email}). Please send them a welcome email introducing yourself as "${name}". In the email: 1) Introduce yourself warmly — your name, your email address, and what you can help with. 2) Briefly introduce the Alook platform — a personal AI agent platform where agents can handle emails, schedule tasks, and work autonomously. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise.`,
+        `You have just been created by your owner (${ctx.email}). Please send them a welcome email introducing yourself as "${name}". In the email: 1) Introduce yourself warmly — your name, your email address, and what you can help with. 2) Briefly introduce the OneCaptain platform — a personal AI agent platform where agents can handle emails, schedule tasks, and work autonomously. 3) Let them know they can chat with you directly or email you anytime. Be warm, professional, and concise.`,
         TASK_TYPES.EMAIL_NOTIFICATION,
       );
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -125,5 +135,13 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     if (updated) return writeJSON(agentToResponse(updated), 201);
   }
 
+  logWorkspaceAudit(db, {
+    workspaceId: ws.workspaceId,
+    actorId: ctx.userId,
+    action: WORKSPACE_AUDIT_ACTIONS.AGENT_CREATED,
+    targetType: "agent",
+    targetId: newAgent.id,
+    changes: JSON.stringify({ name, runtimeId }),
+  });
   return writeJSON(agentToResponse(newAgent), 201);
 });

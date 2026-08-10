@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Publish @alook/daemon to npm
+    name: Publish @onecaptain/daemon to npm
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -28,9 +28,9 @@ jobs:
       - name: Check if version already published
         id: check
         run: |
-          if npm view "@alook/daemon@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
+          if npm view "@onecaptain/daemon@${{ steps.version.outputs.version }}" version >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::@alook/daemon@${{ steps.version.outputs.version }} already on npm — skipping"
+            echo "::notice::@onecaptain/daemon@${{ steps.version.outputs.version }} already on npm — skipping"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi

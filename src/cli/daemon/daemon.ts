@@ -8,7 +8,7 @@ import { buildPrompt, buildMergedPrompt } from "./prompt.js";
 import { loadCLIConfigForProfile, saveCLIConfigForProfile, activeWorkspaces, markWorkspaceDeletedInList } from "../lib/config.js";
 import { createLogger } from "../lib/logger.js";
 import { DaemonWsClient } from "./ws-client.js";
-import type { DaemonPushMessage } from "@alook/shared";
+import type { DaemonPushMessage } from "@onecaptain/shared";
 
 const log = createLogger({ module: "daemon" });
 import { cmdPrefix } from "../lib/env.js";
@@ -30,7 +30,7 @@ import {
   waitForAck,
   inboxDir as steeringInboxDir,
 } from "./steering/mailbox.js";
-import { TASK_TYPES } from "@alook/shared";
+import { TASK_TYPES } from "@onecaptain/shared";
 import { readDirectoryTree, readFileContent, validatePath } from "./workspace-files.js";
 import { startSkillScanner, stopSkillScanner } from "./skill-scanner.js";
 import { resolveLoginShellEnv } from "../lib/shell-env.js";
@@ -837,7 +837,7 @@ export async function startDaemon(
     stopSkillScanner();
     wsClient?.close();
 
-    const shutdownMs = restartRequested ? 30000 : (Number(process.env.ALOOK_SHUTDOWN_TIMEOUT_MS) || 5000);
+    const shutdownMs = restartRequested ? 30000 : (Number(process.env.ONECAPTAIN_SHUTDOWN_TIMEOUT_MS) || 5000);
     const timeout = setTimeout(() => process.exit(1), shutdownMs);
 
     try {
@@ -1041,7 +1041,7 @@ async function handleFileRequest(
  *
  * Backstop only: the session-runner's own SIGTERM handler is what reaps the
  * inner agent's process group. The verify window must EXCEED the session-runner
- * grace (ALOOK_KILL_GRACE_MS) so the runner gets to group-kill the inner agent
+ * grace (ONECAPTAIN_KILL_GRACE_MS) so the runner gets to group-kill the inner agent
  * before we force-kill the runner — otherwise SIGKILLing the runner first could
  * orphan the inner agent. Inner agents are spawned in their own detached group
  * (agent/*.ts) so even a SIGKILLed runner does not leave the group un-reapable.
@@ -1058,7 +1058,7 @@ async function killAndVerify(pid: number): Promise<boolean> {
   // the runner gets to reap the inner agent's group before we force-kill it.
   // Enforce that invariant rather than trusting operators to keep the env vars
   // ordered (see the doc comment above).
-  const verifyMs = Math.max(Number(process.env.ALOOK_KILL_VERIFY_MS) || 3000, killGraceMs() + 500);
+  const verifyMs = Math.max(Number(process.env.ONECAPTAIN_KILL_VERIFY_MS) || 3000, killGraceMs() + 500);
   const deadline = Date.now() + verifyMs;
   while (Date.now() < deadline) {
     if (!isAlive(pid)) return true;
@@ -1095,8 +1095,8 @@ async function handleTask(
     const timelineDir = join(agentBaseDir, ".context_timeline");
 
     // Retry loop: session-runner may not have written its timeline entry yet
-    const MAX_WAIT_MS = Number(process.env.ALOOK_KILL_TASK_MAX_WAIT_MS) || 15_000;
-    const POLL_MS = Number(process.env.ALOOK_KILL_TASK_POLL_MS) || 200;
+    const MAX_WAIT_MS = Number(process.env.ONECAPTAIN_KILL_TASK_MAX_WAIT_MS) || 15_000;
+    const POLL_MS = Number(process.env.ONECAPTAIN_KILL_TASK_POLL_MS) || 200;
     const waitStart = Date.now();
     let pid: number | null = null;
     while (Date.now() - waitStart < MAX_WAIT_MS) {

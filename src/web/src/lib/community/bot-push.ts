@@ -1,10 +1,10 @@
-import { createLogger } from "@alook/shared"
+import { createLogger } from "@onecaptain/shared"
 import type {
   BotAddedFrame,
   BotUpdatedFrame,
   BotRemovedFrame,
   RuntimeConfig,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { wsDoFetch } from "@/lib/broadcast"
 
 const log = createLogger({ service: "community-bot-push" })

@@ -43,7 +43,7 @@ jobs:
         run: |
           xcrun altool --upload-app \
             --type ios \
-            --file src/desktop/src-tauri/gen/apple/build/arm64/alook.ipa \
+            --file src/desktop/src-tauri/gen/apple/build/arm64/onecaptain.ipa \
             --apiKey ${{ secrets.APP_STORE_API_KEY }} \
             --apiIssuer ${{ secrets.APP_STORE_API_ISSUER }}
 
@@ -105,6 +105,6 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-          packageName: ai.alook.desktop
+          packageName: ai.onecaptain.desktop
           releaseFiles: src/desktop/src-tauri/gen/android/app/build/outputs/bundle/release/*.aab
           track: internal

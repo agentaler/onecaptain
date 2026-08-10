@@ -18,9 +18,9 @@ import {
   type ScenarioId,
 } from "@/components/studio-onboarding/scenario-presets";
 
-import type { AgentRuntime as Runtime } from "@alook/shared";
-import type { WsMessage } from "@alook/shared";
-import { isTauri, isDesktop, tauriInvoke } from "@alook/shared";
+import type { AgentRuntime as Runtime } from "@onecaptain/shared";
+import type { WsMessage } from "@onecaptain/shared";
+import { isTauri, isDesktop, tauriInvoke } from "@onecaptain/shared";
 import { listRuntimes, createMachineToken } from "@/lib/api";
 import { useUserWs } from "@/lib/use-user-ws";
 import { ConnectMachineSteps } from "@/components/connect-machine-steps";

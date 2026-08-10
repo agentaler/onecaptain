@@ -1,7 +1,7 @@
 /**
  * Agent-facing CLI name decoupling — via the filesystem, not a forwarding script.
  *
- * The agent always invokes a stable `cliName` (e.g. `alook`). We make that name
+ * The agent always invokes a stable `cliName` (e.g. `onecaptain`). We make that name
  * resolve to the host's real CLI entrypoint by placing a link in a per-launch
  * `bin` dir that gets prepended to PATH:
  *

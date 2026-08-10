@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth";
 import { writeJSON, writeError, parseBody } from "@/lib/middleware/helpers";
 import { taskToResponse } from "@/lib/api/responses";
 import { TaskService } from "@/lib/services/task";
-import { CompleteTaskRequestSchema } from "@alook/shared";
+import { CompleteTaskRequestSchema } from "@onecaptain/shared";
 import { broadcastToUser } from "@/lib/broadcast";
 import { invalidate, invalidateInboxCounts, cacheKeys } from "@/lib/cache";
 

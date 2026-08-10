@@ -32,8 +32,8 @@ function makeFakeDb() {
 }
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => makeFakeDb()) }));
 
-vi.mock("@alook/shared", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@alook/shared")>()
+vi.mock("@onecaptain/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@onecaptain/shared")>()
   return {
     ...actual,
     createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -408,7 +408,7 @@ describe("createAuth databaseHooks — user.create.before", () => {
     const createAuth = await loadCreateAuth()
     const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
     const beforeHook = opts.databaseHooks!.user!.create!.before!
-    const { computeDiscriminator } = await import("@alook/shared")
+    const { computeDiscriminator } = await import("@onecaptain/shared")
     const a = await beforeHook({ id: "u_fixed_id", name: "x", email: "x@example.com" })
     const b = await beforeHook({ id: "u_fixed_id", name: "y", email: "y@example.com" })
     expect(a.data.discriminator).toBe(b.data.discriminator)
@@ -420,7 +420,7 @@ describe("createAuth databaseHooks — user.create.before", () => {
     const createAuth = await loadCreateAuth()
     const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
     const beforeHook = opts.databaseHooks!.user!.create!.before!
-    const { computeDiscriminator } = await import("@alook/shared")
+    const { computeDiscriminator } = await import("@onecaptain/shared")
     const unsalted = computeDiscriminator("u_collide")
     // First probe (unsalted discriminator) reports a live collision; the
     // salted retry's probe reports the coast is clear.

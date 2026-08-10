@@ -16,7 +16,7 @@ describe("daemonStop — event-loop friendly (no spin loop)", () => {
   let pidfile: string;
 
   beforeEach(() => {
-    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-daemonstop-"));
+    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-daemonstop-"));
   });
   afterEach(() => {
     fs.rmSync(baseDir, { recursive: true, force: true });

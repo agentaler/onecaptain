@@ -1,5 +1,5 @@
 {
-  "name": "@alook/test-utils",
+  "name": "@onecaptain/test-utils",
   "version": "0.0.103",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@alook/shared": "workspace:*",
+    "@onecaptain/shared": "workspace:*",
     "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {

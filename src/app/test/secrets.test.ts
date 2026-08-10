@@ -3,7 +3,7 @@ import { writeFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const testDir = join(tmpdir(), `alook-test-secrets-${process.pid}`);
+const testDir = join(tmpdir(), `onecaptain-test-secrets-${process.pid}`);
 
 vi.mock("../src/lib/constants.js", () => ({
   SELF_HOSTED_DIR: testDir,

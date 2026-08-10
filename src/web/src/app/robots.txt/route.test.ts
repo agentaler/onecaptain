@@ -8,7 +8,7 @@ describe("GET /robots.txt", () => {
 
     expect(res.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
     expect(body).toContain("Disallow: /api/");
-    expect(body).toContain("Sitemap: https://alook.ai/sitemap.xml");
-    expect(body).toContain("https://alook.ai/llms.txt");
+    expect(body).toContain("Sitemap: https://onecaptain.ai/sitemap.xml");
+    expect(body).toContain("https://onecaptain.ai/llms.txt");
   });
 });

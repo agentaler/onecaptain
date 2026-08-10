@@ -1,5 +1,5 @@
-import { queries } from "@alook/shared"
-import type { Database } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
+import type { Database } from "@onecaptain/shared"
 import { requireNotBlocked } from "./permissions"
 
 export type GuardDmOpenResult =

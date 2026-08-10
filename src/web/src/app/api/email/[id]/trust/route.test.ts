@@ -18,8 +18,8 @@ vi.mock("@opennextjs/cloudflare", () => ({
 }));
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual("@onecaptain/shared");
   return {
     ...actual,
     createDb: vi.fn(() => ({})),
@@ -95,7 +95,7 @@ const baseEmail = {
   agentId: "a1",
   workspaceId: "ws1",
   fromEmail: "sender@test.com",
-  toEmail: "agent@alook.ai",
+  toEmail: "agent@onecaptain.ai",
   subject: "Test email",
   r2Key: "emails/fake/raw",
   isWhitelisted: false,

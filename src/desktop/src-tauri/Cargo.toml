@@ -2,13 +2,13 @@
 members = ["plugins/tauri-plugin-push"]
 
 [package]
-name = "alook-desktop"
+name = "onecaptain-desktop"
 version = "0.0.160"
 edition = "2021"
-description = "Alook — Your Personal Company"
+description = "OneCaptain — Your Personal Company"
 
 [lib]
-name = "alook_desktop_lib"
+name = "onecaptain_desktop_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]

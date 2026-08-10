@@ -12,8 +12,8 @@ const mockListBotsForMachine = vi.fn();
 const mockGetLatestUnreadMessageForAgent = vi.fn();
 const mockDispatchOneUnreadWake = vi.fn();
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<any>("@alook/shared");
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<any>("@onecaptain/shared");
   return {
     ...actual,
     dispatchOneUnreadWake: (...a: unknown[]) => mockDispatchOneUnreadWake(...a),

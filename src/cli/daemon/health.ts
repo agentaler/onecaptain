@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 
-const DEFAULT_HEALTH_PORT = Number(process.env.ALOOK_HEALTH_PORT) || 19514;
+const DEFAULT_HEALTH_PORT = Number(process.env.ONECAPTAIN_HEALTH_PORT) || 19514;
 
 export function createHealthServer(port: number = DEFAULT_HEALTH_PORT) {
   let runtimeCount = 0;

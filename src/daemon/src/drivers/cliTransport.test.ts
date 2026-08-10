@@ -105,7 +105,7 @@ describe("prepareCliTransport — layered spawn env", () => {
     );
     // capabilities.join(",") on an empty array = "" → the env var is present
     // but empty, and the proxy reads that as "no capabilities granted".
-    expect(spawnEnv.ALOOK_ACTIVE_CAPABILITIES).toBe("");
+    expect(spawnEnv.ONECAPTAIN_ACTIVE_CAPABILITIES).toBe("");
     // The minted voucher must reject every capability check (the Set is empty).
     const voucher = fs.readFileSync(tokenFile, "utf8");
     expect(cred.check(`Bearer ${voucher}`, "send").ok).toBe(false);
@@ -121,11 +121,11 @@ describe("prepareCliTransport — layered spawn env", () => {
 
   it("injects the typed <PREFIX>_* contract + voucher path", async () => {
     const { spawnEnv, tokenFile } = await prepareCliTransport(baseCtx(mkTmp()), {}, undefined, "linux");
-    expect(spawnEnv.ALOOK_ID).toBe("agent_1");
-    expect(spawnEnv.ALOOK_CLI).toBe("alook");
-    expect(spawnEnv.ALOOK_LAUNCH_ID).toBe("launch_1");
-    expect(spawnEnv.ALOOK_PROXY_URL).toBe("http://127.0.0.1:9/proxy");
-    expect(spawnEnv.ALOOK_PROXY_TOKEN_FILE).toBe(tokenFile);
+    expect(spawnEnv.ONECAPTAIN_ID).toBe("agent_1");
+    expect(spawnEnv.ONECAPTAIN_CLI).toBe("onecaptain");
+    expect(spawnEnv.ONECAPTAIN_LAUNCH_ID).toBe("launch_1");
+    expect(spawnEnv.ONECAPTAIN_PROXY_URL).toBe("http://127.0.0.1:9/proxy");
+    expect(spawnEnv.ONECAPTAIN_PROXY_TOKEN_FILE).toBe(tokenFile);
   });
 
   it("provider-derived keys (protected) survive a colliding driver/user env", async () => {
@@ -167,7 +167,7 @@ describe("prepareCliTransport — layered spawn env", () => {
     });
     const { spawnEnv } = await prepareCliTransport(ctx, {}, undefined, "linux");
     expect(spawnEnv.GIT_AUTHOR_NAME).toBe("Melisa");
-    expect(spawnEnv.GIT_AUTHOR_EMAIL).toBe("melisa.1043@alook.ai");
+    expect(spawnEnv.GIT_AUTHOR_EMAIL).toBe("melisa.1043@onecaptain.ai");
     expect(spawnEnv.GIT_COMMITTER_NAME).toBe("Melisa");
     expect(spawnEnv.GIT_COMMITTER_EMAIL).toBe(spawnEnv.GIT_AUTHOR_EMAIL);
   });
@@ -176,8 +176,8 @@ describe("prepareCliTransport — layered spawn env", () => {
     // config: {} (baseCtx default) — degraded/unknown-bot spawn with no name
     // and no discriminator, so identity falls back to the generic value.
     const { spawnEnv } = await prepareCliTransport(baseCtx(mkTmp()), {}, undefined, "linux");
-    expect(spawnEnv.GIT_AUTHOR_NAME).toBe("Alook Agent");
-    expect(spawnEnv.GIT_AUTHOR_EMAIL).toBe("alook-agent@alook.ai");
+    expect(spawnEnv.GIT_AUTHOR_NAME).toBe("OneCaptain Agent");
+    expect(spawnEnv.GIT_AUTHOR_EMAIL).toBe("onecaptain-agent@onecaptain.ai");
     expect(spawnEnv.GIT_AUTHOR_NAME).not.toBe("");
   });
 
@@ -201,16 +201,16 @@ describe("prepareCliTransport — layered spawn env", () => {
     expect(spawnEnv.GIT_AUTHOR_NAME).toBe("Gus");
     expect(spawnEnv.GIT_AUTHOR_EMAIL).toBe("gus@example.com");
     expect(spawnEnv.GIT_COMMITTER_NAME).toBe("Melisa");
-    expect(spawnEnv.GIT_COMMITTER_EMAIL).toBe("melisa.1043@alook.ai");
+    expect(spawnEnv.GIT_COMMITTER_EMAIL).toBe("melisa.1043@onecaptain.ai");
   });
 
   it("creates a symlink when hostCliPath is set", async () => {
     const wd = mkTmp();
     const host = path.join(wd, "real.js");
     fs.writeFileSync(host, "#!/usr/bin/env node\n", { mode: 0o755 });
-    const cli: CliTransportConfig = { cliName: "alook", envPrefix: "ALOOK", stateDirName: ".alook", hostCliPath: host };
+    const cli: CliTransportConfig = { cliName: "onecaptain", envPrefix: "ONECAPTAIN", stateDirName: ".onecaptain", hostCliPath: host };
     const { stateDir } = await prepareCliTransport(baseCtx(wd), {}, cli, "linux");
-    const link = path.join(stateDir, "bin", "alook");
+    const link = path.join(stateDir, "bin", "onecaptain");
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
   });
 
@@ -226,7 +226,7 @@ describe("prepareCliTransport — layered spawn env", () => {
       undefined,
       "linux",
     );
-    const link = path.join(stateDir, "bin", "alook");
+    const link = path.join(stateDir, "bin", "onecaptain");
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
     expect(fs.realpathSync(link)).toBe(fs.realpathSync(host));
   });
@@ -234,7 +234,7 @@ describe("prepareCliTransport — layered spawn env", () => {
   it("FAILS LOUD on a real launch with no resolvable host CLI (not a silent empty bin)", async () => {
     // The bug shape: a real launch (not mock) whose agentCliPath didn't resolve.
     // Must throw, not silently leave an empty bin that PATH-falls-through to the
-    // host `alook` (which lacks the agent subcommands).
+    // host `onecaptain` (which lacks the agent subcommands).
     await expect(
       prepareCliTransport(baseCtx(mkTmp(), { agentCliPath: undefined, mockCliTransport: false }), {}, undefined, "linux"),
     ).rejects.toThrow(/no host CLI path/);
@@ -249,7 +249,7 @@ describe("prepareCliTransport — layered spawn env", () => {
     );
     const binDir = path.join(stateDir, "bin");
     expect(fs.existsSync(binDir)).toBe(true);
-    expect(fs.existsSync(path.join(binDir, "alook"))).toBe(false);
+    expect(fs.existsSync(path.join(binDir, "onecaptain"))).toBe(false);
   });
 
   it("revokes the agent's previous voucher before minting a new one on respawn", async () => {

@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 import { TEMPLATES, getTemplateById } from "@/lib/templates";
 import { TemplateDetailClient } from "./client";
 
-const SITE_URL = "https://alook.ai";
+const SITE_URL = "https://onecaptain.ai";
 
 export const dynamicParams = false;
 

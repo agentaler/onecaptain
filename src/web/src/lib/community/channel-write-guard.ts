@@ -1,4 +1,4 @@
-import { isMessageBearingSurface, isThread, isDm } from "@alook/shared"
+import { isMessageBearingSurface, isThread, isDm } from "@onecaptain/shared"
 
 type GuardOk = { ok: true }
 type GuardErr = { ok: false; status: 400; error: string }

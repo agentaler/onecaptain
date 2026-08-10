@@ -10,11 +10,11 @@ function capture() {
 const FIXED = () => "2026-06-25T12:00:00.000Z";
 
 describe("createLogger", () => {
-  it("emits `<iso> @alook/daemon <LEVEL> <message>` by default", () => {
+  it("emits `<iso> @onecaptain/daemon <LEVEL> <message>` by default", () => {
     const c = capture();
     const log = createLogger({ now: FIXED, ...c.sink });
     log.info("control plane OPEN");
-    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @alook/daemon INFO  control plane OPEN"]);
+    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @onecaptain/daemon INFO  control plane OPEN"]);
   });
 
   it("routes warn/error to stderr, info/debug to stdout", () => {
@@ -41,14 +41,14 @@ describe("createLogger", () => {
     const c = capture();
     const log = createLogger({ now: FIXED, ...c.sink }).child("daemon");
     log.info("up");
-    expect(c.out[0]).toBe("2026-06-25T12:00:00.000Z @alook/daemon:daemon INFO  up");
+    expect(c.out[0]).toBe("2026-06-25T12:00:00.000Z @onecaptain/daemon:daemon INFO  up");
   });
 
   it("honors a custom header", () => {
     const c = capture();
-    const log = createLogger({ header: "@alook/daemon:daemon", now: FIXED, ...c.sink });
+    const log = createLogger({ header: "@onecaptain/daemon:daemon", now: FIXED, ...c.sink });
     log.warn("careful");
-    expect(c.err[0]).toBe("2026-06-25T12:00:00.000Z @alook/daemon:daemon WARN  careful");
+    expect(c.err[0]).toBe("2026-06-25T12:00:00.000Z @onecaptain/daemon:daemon WARN  careful");
   });
 
   it("formats object args as key=value pairs", () => {
@@ -84,19 +84,19 @@ describe("createLogger", () => {
     const c = capture();
     const log = createLogger({ now: FIXED, ...c.sink });
     log.info("plain message");
-    expect(c.out[0]).toBe("2026-06-25T12:00:00.000Z @alook/daemon INFO  plain message");
+    expect(c.out[0]).toBe("2026-06-25T12:00:00.000Z @onecaptain/daemon INFO  plain message");
   });
 });
 
-describe("createLogger — ALOOK_LOG_LEVEL env fallback", () => {
-  const ORIGINAL = process.env.ALOOK_LOG_LEVEL;
+describe("createLogger — ONECAPTAIN_LOG_LEVEL env fallback", () => {
+  const ORIGINAL = process.env.ONECAPTAIN_LOG_LEVEL;
   afterEach(() => {
-    if (ORIGINAL === undefined) delete process.env.ALOOK_LOG_LEVEL;
-    else process.env.ALOOK_LOG_LEVEL = ORIGINAL;
+    if (ORIGINAL === undefined) delete process.env.ONECAPTAIN_LOG_LEVEL;
+    else process.env.ONECAPTAIN_LOG_LEVEL = ORIGINAL;
   });
 
-  it("ALOOK_LOG_LEVEL=warn suppresses info/debug and still emits warn/error", () => {
-    process.env.ALOOK_LOG_LEVEL = "warn";
+  it("ONECAPTAIN_LOG_LEVEL=warn suppresses info/debug and still emits warn/error", () => {
+    process.env.ONECAPTAIN_LOG_LEVEL = "warn";
     const c = capture();
     const log = createLogger({ now: FIXED, ...c.sink });
     log.debug("d");
@@ -108,19 +108,19 @@ describe("createLogger — ALOOK_LOG_LEVEL env fallback", () => {
   });
 
   it("an explicit options.level overrides the env var", () => {
-    process.env.ALOOK_LOG_LEVEL = "warn";
+    process.env.ONECAPTAIN_LOG_LEVEL = "warn";
     const c = capture();
     const log = createLogger({ now: FIXED, level: "debug", ...c.sink });
     log.debug("shown");
-    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @alook/daemon DEBUG shown"]);
+    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @onecaptain/daemon DEBUG shown"]);
   });
 
-  it("an invalid ALOOK_LOG_LEVEL value falls back to the info default", () => {
-    process.env.ALOOK_LOG_LEVEL = "not-a-level";
+  it("an invalid ONECAPTAIN_LOG_LEVEL value falls back to the info default", () => {
+    process.env.ONECAPTAIN_LOG_LEVEL = "not-a-level";
     const c = capture();
     const log = createLogger({ now: FIXED, ...c.sink });
     log.debug("hidden");
     log.info("shown");
-    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @alook/daemon INFO  shown"]);
+    expect(c.out).toEqual(["2026-06-25T12:00:00.000Z @onecaptain/daemon INFO  shown"]);
   });
 });

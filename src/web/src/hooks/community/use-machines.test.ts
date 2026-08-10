@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { QueryClient } from "@tanstack/react-query"
 import { communityKeys } from "@/lib/query-keys"
-import type { CommunityMachineSummary } from "@alook/shared"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
 
 // Mock apiFetch so we control the query function's payload without touching
 // the real network. The hook itself can't be rendered in the node vitest env

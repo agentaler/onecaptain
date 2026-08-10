@@ -8,8 +8,8 @@ import Mention from "@tiptap/extension-mention";
 import { Markdown } from "@tiptap/markdown";
 import { cn } from "@/lib/utils";
 import { isImeConfirming } from "@/lib/ime";
-import { isEmptyHtml, toAlookAddress } from "@alook/shared";
-import type { Agent } from "@alook/shared";
+import { isEmptyHtml, toOneCaptainAddress } from "@onecaptain/shared";
+import type { Agent } from "@onecaptain/shared";
 import { createPortal } from "react-dom";
 
 export { isEmptyHtml };
@@ -85,7 +85,7 @@ function MentionList({
             <span className="truncate font-medium">{agent.name}</span>
             {agent.email_handle && (
               <span className="truncate text-xs text-muted-foreground">
-                {toAlookAddress(agent.email_handle)}
+                {toOneCaptainAddress(agent.email_handle)}
               </span>
             )}
           </button>

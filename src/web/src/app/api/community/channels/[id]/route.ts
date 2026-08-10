@@ -12,7 +12,7 @@ import {
   MAX_CHANNEL_TOPIC_LENGTH,
   WS_EVENTS,
   slugify,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { fanOutToServerMembers, fanOutToChannel, broadcastToUserSafe } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireChannelAccess, requireChannelMember } from "@/lib/community/permissions"

@@ -7,7 +7,7 @@ import {
   isUniqueConstraintError,
   MAX_CATEGORY_NAME_LENGTH,
   WS_EVENTS,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { fanOutToServerMembers } from "@/lib/community/fanout"
 import { logAudit } from "@/lib/community/audit"
 import { requireServerAdmin, requireServerMember } from "@/lib/community/permissions"

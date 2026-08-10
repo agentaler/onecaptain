@@ -1,11 +1,11 @@
-import { resolveMode, cliCommand, getBaseUrl } from "@alook/shared";
+import { resolveMode, cliCommand, getBaseUrl } from "@onecaptain/shared";
 import { NextResponse } from "next/server";
 
 function buildOnboardMarkdown(baseUrl: string, cliPrefix: string): string {
   return `---
-name: alook-onboard
-description: Install Alook CLI, authenticate, and set up your AI workspace.
-keywords: [alook, agent, workspace, CLI, onboarding]
+name: onecaptain-onboard
+description: Install OneCaptain CLI, authenticate, and set up your AI workspace.
+keywords: [onecaptain, agent, workspace, CLI, onboarding]
 ---
 
 ## 1. Login
@@ -82,13 +82,13 @@ ${baseUrl}/w/{slug}/home
 
 export async function GET() {
   const baseUrl = getBaseUrl({
-    serverUrl: process.env.ALOOK_SERVER_URL,
+    serverUrl: process.env.ONECAPTAIN_SERVER_URL,
     appUrl: process.env.NEXT_PUBLIC_APP_URL,
     nodeEnv: process.env.NODE_ENV,
   });
   const mode = resolveMode({
-    serverUrl: process.env.ALOOK_SERVER_URL,
-    cmdPrefix: process.env.ALOOK_CMD_PREFIX,
+    serverUrl: process.env.ONECAPTAIN_SERVER_URL,
+    cmdPrefix: process.env.ONECAPTAIN_CMD_PREFIX,
     nodeEnv: process.env.NODE_ENV,
   });
   const cliPrefix = cliCommand(mode);

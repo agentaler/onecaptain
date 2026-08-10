@@ -269,7 +269,7 @@ export function findRunningPidByTaskId(
  * can never wedge if a session-runner dies before the agent-started marker lands.
  */
 export function steerWarmupGraceMs(): number {
-  const raw = process.env.ALOOK_STEER_WARMUP_GRACE_MS;
+  const raw = process.env.ONECAPTAIN_STEER_WARMUP_GRACE_MS;
   const parsed = raw != null ? Number(raw) : NaN;
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30_000;
 }

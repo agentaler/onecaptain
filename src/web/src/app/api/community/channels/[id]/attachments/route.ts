@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { queries, createLogger } from "@alook/shared"
+import { queries, createLogger } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withCommunityActor, requireBot, type CommunityActor } from "@/lib/middleware/community-actor"
 import { resolveTargetForMember, resolveErrorResponse } from "@/lib/community/resolve-ref"

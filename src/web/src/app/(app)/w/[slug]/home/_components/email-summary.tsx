@@ -3,7 +3,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type { WorkspaceOverview } from "@/lib/api";
-import type { Agent } from "@alook/shared";
+import type { Agent } from "@onecaptain/shared";
 
 interface EmailSummaryProps {
   overview: WorkspaceOverview;

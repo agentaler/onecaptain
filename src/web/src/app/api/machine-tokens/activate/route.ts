@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { queries, ActivateTokenRequestSchema, createLogger } from "@alook/shared";
+import { queries, ActivateTokenRequestSchema, createLogger } from "@onecaptain/shared";
 import { getDb } from "@/lib/db"
 import { withEnv } from "@/lib/middleware/env";
 import { writeJSON } from "@/lib/middleware/helpers";

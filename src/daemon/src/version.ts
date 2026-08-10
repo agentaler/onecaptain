@@ -1,11 +1,11 @@
 /**
  * Daemon version + client-info helpers.
  *
- * These are read from `@alook/daemon`'s own `package.json` (the file loaded
+ * These are read from `@onecaptain/daemon`'s own `package.json` (the file loaded
  * via `createRequire` at `../package.json`, i.e. this workspace's package
  * manifest). Everything on the wire that identifies the daemon to a remote
  * runtime CLI (Kimi's `initialize.client`, Codex's `initialize.clientInfo`)
- * flows through `getDaemonClientInfo()` so nobody hand-types the pre-alook
+ * flows through `getDaemonClientInfo()` so nobody hand-types the pre-onecaptain
  * daemon-identity strings anymore.
  */
 import { createRequire } from "module";
@@ -33,5 +33,5 @@ export interface DaemonClientInfo {
  * now, but the freshness is essentially free).
  */
 export function getDaemonClientInfo(): DaemonClientInfo {
-  return { name: "alook-daemon", version: readDaemonVersion() };
+  return { name: "onecaptain-daemon", version: readDaemonVersion() };
 }

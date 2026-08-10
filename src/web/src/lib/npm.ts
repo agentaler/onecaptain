@@ -1,13 +1,13 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { resolveMode } from "@alook/shared"
+import { resolveMode } from "@onecaptain/shared"
 
 function getPackageName(): string {
   try {
     const { env } = getCloudflareContext()
     const mode = resolveMode({ nodeEnv: (env as unknown as Record<string, unknown>).NODE_ENV as string | undefined })
-    if (mode !== "production") return "@alook/app"
+    if (mode !== "production") return "@onecaptain/app"
   } catch {}
-  return "@alook/cli"
+  return "@onecaptain/cli"
 }
 
 export async function fetchLatestCliVersion(): Promise<{ version: string; package: string } | null> {

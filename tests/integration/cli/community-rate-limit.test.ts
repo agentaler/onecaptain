@@ -18,7 +18,7 @@ import {
   signIn,
   sqlRun,
   type TestSeed,
-} from "@alook/test-utils"
+} from "@onecaptain/test-utils"
 
 let seed: TestSeed
 let cookie: string

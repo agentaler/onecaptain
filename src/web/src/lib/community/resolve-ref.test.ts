@@ -13,8 +13,8 @@ const mockGetThreadChannelByParentMessage = vi.fn()
 const mockCreateThreadChannel = vi.fn()
 const mockIsUniqueConstraintError = vi.fn(() => false)
 
-vi.mock("@alook/shared", async () => {
-  const actual = await vi.importActual<typeof import("@alook/shared")>("@alook/shared")
+vi.mock("@onecaptain/shared", async () => {
+  const actual = await vi.importActual<typeof import("@onecaptain/shared")>("@onecaptain/shared")
   return {
     ...actual,
     isUniqueConstraintError: (...a: unknown[]) => mockIsUniqueConstraintError(...a),

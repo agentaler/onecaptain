@@ -12,7 +12,7 @@ import { Video, Plus, Square, Check, Clock, AlertCircle, Loader2, Trash2, Shield
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { listMeetings, createMeeting, stopMeeting, approveMeeting, deleteMeeting } from "@/lib/api";
-import type { MeetingSession } from "@alook/shared";
+import type { MeetingSession } from "@onecaptain/shared";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Clock }> = {
   pending: { label: "Pending", variant: "outline", icon: Clock },

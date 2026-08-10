@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { parseEmailHandle, stripMentionTokens, type Agent, type Artifact, type Message, type TaskApi as Task, type TaskMessageResponse } from "@alook/shared";
+import { parseEmailHandle, stripMentionTokens, type Agent, type Artifact, type Message, type TaskApi as Task, type TaskMessageResponse } from "@onecaptain/shared";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { toastApiError } from "@/lib/api/client"
-import { isPresenceOnline, type CommunityMachineSummary } from "@alook/shared"
+import { isPresenceOnline, type CommunityMachineSummary } from "@onecaptain/shared"
 import { machineName } from "@/lib/community/machine-name"
 import {
   Sheet,

@@ -4,7 +4,7 @@
  * When an agent is configured with a *custom* Anthropic-compatible provider
  * (custom `ANTHROPIC_BASE_URL` + `ANTHROPIC_API_KEY`), we must not let it read
  * or write the host user's global `~/.claude` config. We give it a private HOME
- * and CLAUDE_CONFIG_DIR under `.alook/claude-provider/`, symlinking the host's
+ * and CLAUDE_CONFIG_DIR under `.onecaptain/claude-provider/`, symlinking the host's
  * skills/commands so they remain available.
  *
  * No custom provider ⇒ empty env (use the host's normal Claude config).
@@ -14,10 +14,19 @@ import * as path from "path";
 import type { LaunchContext } from "../types.js";
 
 export function buildClaudeProviderIsolationEnv(ctx: LaunchContext): NodeJS.ProcessEnv {
-  const hasCustomProvider = Boolean(process.env.ANTHROPIC_BASE_URL && process.env.ANTHROPIC_API_KEY);
-  if (!hasCustomProvider) return {};
+  // Config-driven providers first: a per-agent custom endpoint OR a per-agent
+  // cloud Anthropic key must not read/write the host user's ~/.claude (the
+  // stored key, not the host's subscription auth, must win). Fall back to the
+  // daemon's own env for the legacy daemon-wide custom-provider setup.
+  const p = ctx.config.runtimeConfig?.provider;
+  const configProvider =
+    p?.kind === "custom" || (p?.kind === "cloud" && p.providerId === "anthropic");
+  const daemonEnvProvider = Boolean(
+    process.env.ANTHROPIC_BASE_URL && process.env.ANTHROPIC_API_KEY
+  );
+  if (!configProvider && !daemonEnvProvider) return {};
 
-  const root = path.join(ctx.workingDirectory, ".alook", "claude-provider");
+  const root = path.join(ctx.workingDirectory, ".onecaptain", "claude-provider");
   const home = path.join(root, "home");
   const configDir = path.join(home, ".claude");
   fs.mkdirSync(configDir, { recursive: true });

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, withD1Retry } from "@alook/shared"
+import { queries, withD1Retry } from "@onecaptain/shared"
 import { requireMessageSurfaceAccess } from "@/lib/community/permissions"
 
 /**

@@ -1,5 +1,11 @@
-# Alook
-Alook's main purpose is to make the cli agent always on, and give it a email address.
+# OneCaptain
+OneCaptain's main purpose is to make AI agents always on, and give each one an email address.
+Agents run either on local CLI runtimes (claude/codex/opencode/…) or against cloud LLM
+providers (Anthropic / OpenAI / OpenRouter) via per-agent API keys, encrypted at rest.
+
+OneCaptain is **proprietary, closed-source, multi-tenant SaaS** — see `LICENSE`. Never add
+open-source claims, badges, or licenses. Workspaces (and community servers) are tenants:
+every feature must be tenant-scoped, quota-aware (`PLAN_LIMITS`), and auditable.
 
 ## Navigation
 - `plans/`: place your dev plans (gitignored, local only)
@@ -37,11 +43,11 @@ git push origin main
 ```
 
 This triggers:
-- **CI** — typecheck, lint, tests, coverage (uploaded to Codecov)
+- **CI** — typecheck, lint, tests
 - **Auto-Tag & Release** — CI detects the `release: vX.Y.Z` commit message, creates the git tag, and creates a GitHub Release with generated changelog (`auto-tag-release.yml`)
-- **@alook/cli** → auto-published to npm via `publish-cli.yml` (watches `src/cli/package.json`)
-- **@alook/app** → auto-published to npm via `publish-app.yml` (watches `src/app/package.json`)
-- **@alook/daemon** → auto-published to npm via `publish-daemon.yml` (watches `src/daemon/package.json`)
+- **@onecaptain/cli** → auto-published to npm via `publish-cli.yml` (watches `src/cli/package.json`)
+- **@onecaptain/app** → auto-published to npm via `publish-app.yml` (watches `src/app/package.json`)
+- **@onecaptain/daemon** → auto-published to npm via `publish-daemon.yml` (watches `src/daemon/package.json`)
 - **CF Workers** → each module redeploys when its own `package.json` changes
 
 ### E2E UI (browser tests)
@@ -59,11 +65,11 @@ Playwright browser E2E for the web UI lives in `src/web/src/test/e2e-ui/` and ru
   - in `new deps` section, you must list all the new external dependencies that will be added.
   - use checklist in `TODOS` section, for each checkbox, you must have a clear description of what to do and list all the files that will be modified.
     - at the end of TODOS, you must include `test cases` sub section, use checklist format to list all the test cases that should be covered.
-  - `QA tests` section is REQUIRED. It must be a checklist of end-to-end user journeys the `alook-c-qa` agent will drive after implementation lands. For each journey: name it, list the routes/testids it exercises, and state the backend signal (D1 row, WS frame, worker log) that proves it worked. This section is the QA agent's brief — it will fail if the section is missing or vague.
+  - `QA tests` section is REQUIRED. It must be a checklist of end-to-end user journeys the `onecaptain-c-qa` agent will drive after implementation lands. For each journey: name it, list the routes/testids it exercises, and state the backend signal (D1 row, WS frame, worker log) that proves it worked. This section is the QA agent's brief — it will fail if the section is missing or vague.
 
 ## QA after every new /c feature
-- After any change that touches `src/web` (especially the `/c` surface), `src/ws-do`, or `src/shared` community queries/schema, you MUST launch the `alook-c-qa` subagent to verify the feature end-to-end before reporting the task complete. Typecheck + unit tests are necessary but not sufficient — a green build with a broken user journey is still a broken feature.
-- The QA agent lives at `.claude/agents/alook-c-qa.md`. Invoke it via the Agent tool with `subagent_type: alook-c-qa` and hand it the `QA tests` checklist from the plan. It boots (or reuses) the local dev stack, drives the browser, correlates against D1 + WS + worker logs, and reports PASS/FAIL/BLOCKED with evidence.
+- After any change that touches `src/web` (especially the `/c` surface), `src/ws-do`, or `src/shared` community queries/schema, you MUST launch the `onecaptain-c-qa` subagent to verify the feature end-to-end before reporting the task complete. Typecheck + unit tests are necessary but not sufficient — a green build with a broken user journey is still a broken feature.
+- The QA agent lives at `.claude/agents/onecaptain-c-qa.md`. Invoke it via the Agent tool with `subagent_type: onecaptain-c-qa` and hand it the `QA tests` checklist from the plan. It boots (or reuses) the local dev stack, drives the browser, correlates against D1 + WS + worker logs, and reports PASS/FAIL/BLOCKED with evidence.
 - If the QA agent returns FAIL or BLOCKED, treat that as an unfinished task — fix the defect and re-run the QA agent. Do not mark the plan checkbox complete on a failing journey. If a journey is genuinely out of scope for a change, say so in the report and skip it explicitly, don't silently drop it.
 - The QA agent is scoped to `/c` (community). For changes elsewhere in `src/web` (blog, marketing, calendar, etc.) it is not the right tool — run the relevant unit/E2E tests directly.
 
@@ -75,7 +81,8 @@ Playwright browser E2E for the web UI lives in `src/web/src/test/e2e-ui/` and ru
 
 ## Database — Cloudflare D1 (SQLite) + Drizzle ORM
 
-Schema lives in `src/shared/src/schema.ts` using `sqliteTable` from `drizzle-orm/sqlite-core`.
+Schema lives in `src/shared/src/db/` (`schema.ts`, `community-schema.ts`,
+`community-machine-schema.ts`) using `sqliteTable` from `drizzle-orm/sqlite-core`.
 Queries use the shared query modules in `src/shared/src/queries/`.
 
 Use Drizzle ORM operators for all queries. **Never use `sql` template literals** unless there is no ORM equivalent (atomic increment, upsert `excluded.*` references).

@@ -12,7 +12,7 @@ const PROVIDERS = [
     steps: [
       "Enable 2-Step Verification in your Google Account (Security > 2-Step Verification).",
       "Go to https://myaccount.google.com/apppasswords and generate an App Password.",
-      'Enter a name (e.g. "Alook") and click Generate.',
+      'Enter a name (e.g. "OneCaptain") and click Generate.',
       "Copy the 16-character password — use this as both IMAP and SMTP password.",
       "Username is your full Gmail address (e.g. you@gmail.com).",
     ],

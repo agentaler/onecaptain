@@ -4,7 +4,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api/client"
 import { communityKeys } from "@/lib/query-keys"
 import { avatarInitial } from "@/lib/community/avatar"
-import { isServerOwner, UNCATEGORIZED_CATEGORY_ID } from "@alook/shared"
+import { isServerOwner, UNCATEGORIZED_CATEGORY_ID } from "@onecaptain/shared"
 import type { Server, Category, Channel } from "@/components/community/_types"
 
 /**

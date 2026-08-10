@@ -1,5 +1,5 @@
-import type { LoginResponse, Workspace } from "@alook/shared";
-import { sanitizeSlug } from "@alook/shared";
+import type { LoginResponse, Workspace } from "@onecaptain/shared";
+import { sanitizeSlug } from "@onecaptain/shared";
 import { apiFetch, redirectToSignIn, wsQuery } from "./client";
 
 export const listWorkspaces = () => apiFetch<Workspace[]>("/api/workspaces");

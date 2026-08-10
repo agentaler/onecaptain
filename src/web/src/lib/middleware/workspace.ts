@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { cached, cacheKeys } from "@/lib/cache"
 import type { AuthContext } from "./auth"
@@ -49,19 +49,40 @@ export async function withWorkspaceMember(
   return { workspaceId, memberRole: membership.role }
 }
 
-export async function withWorkspaceOwner(
+/**
+ * Workspace roles, weakest → strongest. `withWorkspaceRole(req, auth, min)`
+ * admits any member whose role ranks at or above `min` — the single
+ * role-comparison implementation, so route gates can't drift on ordering.
+ */
+const WORKSPACE_ROLES = ["member", "admin", "owner"] as const
+export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number]
+
+function roleRank(role: string): number {
+  const idx = (WORKSPACE_ROLES as readonly string[]).indexOf(role)
+  return idx === -1 ? 0 : idx
+}
+
+export async function withWorkspaceRole(
   req: NextRequest,
-  auth: AuthContext & { params?: Record<string, string> }
+  auth: AuthContext & { params?: Record<string, string> },
+  minRole: WorkspaceRole
 ): Promise<{ workspaceId: string; memberRole: string } | NextResponse> {
   const result = await withWorkspaceMember(req, auth)
   if (result instanceof NextResponse) return result
 
-  if (result.memberRole !== "owner") {
+  if (roleRank(result.memberRole) < roleRank(minRole)) {
     return NextResponse.json(
-      { error: "owner access required" },
+      { error: `${minRole} access required` },
       { status: 403 }
     )
   }
 
   return result
+}
+
+export async function withWorkspaceOwner(
+  req: NextRequest,
+  auth: AuthContext & { params?: Record<string, string> }
+): Promise<{ workspaceId: string; memberRole: string } | NextResponse> {
+  return withWorkspaceRole(req, auth, "owner")
 }

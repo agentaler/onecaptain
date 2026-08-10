@@ -1,4 +1,4 @@
-import { DEFAULT_MESSAGE_PAGE_SIZE, MAX_MESSAGE_PAGE_SIZE } from "@alook/shared"
+import { DEFAULT_MESSAGE_PAGE_SIZE, MAX_MESSAGE_PAGE_SIZE } from "@onecaptain/shared"
 import { isInlineAttachmentContentType } from "./attachment-content-type"
 import { attachmentUrl } from "./storage"
 

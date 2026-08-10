@@ -19,7 +19,7 @@ vi.mock("@/lib/middleware/helpers", () => ({
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(() => ({ env: { DB: {} } })),
 }));
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   createDb: vi.fn(() => ({})),
   queries: {
     agent: { getAgent: (...args: any[]) => mockGetAgent(...args) },

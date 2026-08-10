@@ -25,7 +25,7 @@ const POLL_MS = 100;
  * before we kill it hard" answer is one number, not three drifting ones.
  *
  * MUST stay strictly below `daemonStart.ts`'s `STOP_GRACE_MS` (the window
- * `alook daemon stop` gives the DAEMON before SIGKILLing it). The daemon's
+ * `onecaptain daemon stop` gives the DAEMON before SIGKILLing it). The daemon's
  * SIGTERM handler awaits `manager.stopAll()`, which awaits these per-session
  * kills — so if the two windows were equal, an agent CLI that ignores SIGTERM
  * would still be inside its own grace when the outer SIGKILL lands, killing

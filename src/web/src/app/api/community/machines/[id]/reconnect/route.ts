@@ -1,11 +1,11 @@
-import { queries } from "@alook/shared"
+import { queries } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeError, writeJSON } from "@/lib/middleware/helpers"
 
 // Reconnect: mint a new pending pairing token bound to the existing
 // machineId. No `cmk_` rotation happens here — the daemon runs
-// `alook daemon start --machine-key <new cmt_>`, and /activate reuses the
+// `onecaptain daemon start --machine-key <new cmt_>`, and /activate reuses the
 // same machine row while inserting a fresh credential and revoking the
 // prior one (which force-closes the live DO).
 export const POST = withAuth(async (_req, ctx) => {

@@ -32,8 +32,8 @@
  * where "mentioned" = personal @ ∪ @everyone ∪ reply-to-me (the caller's full
  * mention set — @everyone counts, no split; Gener #28).
  */
-import { queries, WS_EVENTS, createLogger } from "@alook/shared"
-import type { Database, NotificationLevelValue } from "@alook/shared"
+import { queries, WS_EVENTS, createLogger } from "@onecaptain/shared"
+import type { Database, NotificationLevelValue } from "@onecaptain/shared"
 import { broadcastToUser } from "../broadcast"
 
 const log = createLogger({ service: "community-notify" })

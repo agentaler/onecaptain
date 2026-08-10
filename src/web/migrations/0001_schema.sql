@@ -1,4 +1,4 @@
--- Alook schema — single merged migration
+-- OneCaptain schema — single merged migration
 -- Tables match src/shared/src/db/schema.ts
 
 -- =========================================================================

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
 
-vi.mock("@alook/shared", () => ({
+vi.mock("@onecaptain/shared", () => ({
   TASK_TYPES: {
     USER_DM_MESSAGE: "user_dm_message",
     EMAIL_NOTIFICATION: "email_notification",
@@ -74,7 +74,7 @@ vi.mock("@/lib/api/responses", () => ({
 }));
 
 import { TaskService } from "./task";
-import { queries } from "@alook/shared";
+import { queries } from "@onecaptain/shared";
 import { broadcastToUser, broadcastToDaemon } from "@/lib/broadcast";
 import { log } from "@/lib/logger";
 

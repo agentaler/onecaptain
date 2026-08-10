@@ -5,9 +5,9 @@ import {
   ALLOWED_ICON_MIME_TYPES,
   queries,
   createLogger,
-} from "@alook/shared"
+} from "@onecaptain/shared"
 import { requireMessageBearingSurface, requireChildSurface } from "./channel-write-guard"
-import { isThread } from "@alook/shared"
+import { isThread } from "@onecaptain/shared"
 import { requireMessageSurfaceAccess } from "./permissions"
 import { writeError, writeJSON } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"

@@ -35,7 +35,7 @@ class MockWebSocket extends EventTarget {
 
 function makeClient(overrides: Partial<ConstructorParameters<typeof DaemonWsClient>[0]> = {}) {
   return new DaemonWsClient({
-    serverURL: "https://alook.ai",
+    serverURL: "https://onecaptain.ai",
     daemonId: "my-host",
     machineToken: "al_test123",
     onMessage: vi.fn(),
@@ -61,7 +61,7 @@ describe("DaemonWsClient", () => {
 
   it("constructs production URL correctly", () => {
     const client = makeClient();
-    expect(client.getUrl()).toBe("wss://alook.ai/api/ws/daemon?daemonId=my-host");
+    expect(client.getUrl()).toBe("wss://onecaptain.ai/api/ws/daemon?daemonId=my-host");
   });
 
   it("constructs local development URL correctly", () => {

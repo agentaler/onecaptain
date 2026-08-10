@@ -16,7 +16,7 @@ describe("daemonList — C3 fields", () => {
   let baseDir: string;
 
   beforeEach(() => {
-    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-daemonlist-"));
+    baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-daemonlist-"));
   });
   afterEach(() => {
     fs.rmSync(baseDir, { recursive: true, force: true });
@@ -116,7 +116,7 @@ describe("renderDaemonList — human table (C2)", () => {
 
 describe("daemonList — C0 per-daemon subdir layout + multi-daemon isolation", () => {
   let baseDir: string;
-  beforeEach(() => { baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-c0-")); });
+  beforeEach(() => { baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-c0-")); });
   afterEach(() => { fs.rmSync(baseDir, { recursive: true, force: true }); });
 
   // `running` defaults to all agents; pass fewer to mix in idle agents.
@@ -184,7 +184,7 @@ describe("daemonList — C0 per-daemon subdir layout + multi-daemon isolation", 
 
 describe("daemonList — C0.1 machineId anchor (cmt_ rotation doesn't drift)", () => {
   let baseDir: string;
-  beforeEach(() => { baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "alook-c01-")); });
+  beforeEach(() => { baseDir = fs.mkdtempSync(path.join(os.tmpdir(), "onecaptain-c01-")); });
   afterEach(() => { fs.rmSync(baseDir, { recursive: true, force: true }); });
 
   // Simulate a daemon whose dir is anchored on machineId; the pidfile's `key`

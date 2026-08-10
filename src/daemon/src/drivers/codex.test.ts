@@ -44,7 +44,7 @@ function baseCtx(): LaunchContext {
 }
 
 describe("CodexDriver initialize payload", () => {
-  it("sends alook-daemon identity via clientInfo (matches Codex's schema)", async () => {
+  it("sends onecaptain-daemon identity via clientInfo (matches Codex's schema)", async () => {
     const driver = new CodexDriver();
     const ctx = baseCtx();
     const { process: proc } = await driver.spawn(ctx);
@@ -57,7 +57,7 @@ describe("CodexDriver initialize payload", () => {
 
     expect(initPayload.jsonrpc).toBe("2.0");
     expect(initPayload.method).toBe("initialize");
-    expect(initPayload.params.clientInfo).toEqual({ name: "alook-daemon", version: readDaemonVersion() });
+    expect(initPayload.params.clientInfo).toEqual({ name: "onecaptain-daemon", version: readDaemonVersion() });
   });
 });
 

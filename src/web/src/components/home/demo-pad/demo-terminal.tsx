@@ -73,7 +73,7 @@ export function DemoTerminal({
       {/* Bottom status */}
       <div className="px-4 py-2 border-t border-neutral-800 flex items-center gap-2 text-[10px] text-neutral-500">
         <span className="text-green-400">●</span>
-        <span className="text-neutral-400">alook daemon</span>
+        <span className="text-neutral-400">onecaptain daemon</span>
         <span className="text-neutral-700">·</span>
         <span>1 workspace · 3 runtimes</span>
       </div>
