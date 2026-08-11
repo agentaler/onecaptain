@@ -53,7 +53,10 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   await queries.member.createMember(db, {
     workspaceId: invite.workspaceId,
     userId: ctx.userId,
-    role: "member",
+    // Email invites can grant admin (set by an admin at creation); link
+    // invites default to member. Never owner — ownership is not grantable
+    // through invitations.
+    role: invite.role === "admin" ? "admin" : "member",
   });
 
   logWorkspaceAudit(db, {

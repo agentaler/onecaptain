@@ -160,6 +160,8 @@ export const workspaceInvite = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     usedBy: text("used_by").references(() => user.id, { onDelete: "set null" }),
+    email: text("email"),
+    role: text("role").notNull().default("member"),
     usedAt: text("used_at"),
     expiresAt: text("expires_at").notNull(),
     createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),

@@ -474,6 +474,8 @@ CREATE TABLE "workspace_invite" (
 	"token" text NOT NULL,
 	"created_by" text NOT NULL,
 	"used_by" text,
+	"email" text,
+	"role" text DEFAULT 'member' NOT NULL,
 	"used_at" text,
 	"expires_at" text NOT NULL,
 	"created_at" text NOT NULL,

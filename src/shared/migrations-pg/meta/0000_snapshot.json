@@ -1,5 +1,5 @@
 {
-  "id": "684100b6-b21f-435e-8307-27763618f124",
+  "id": "bab10c09-586b-468c-815a-494e0bafbed3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -4837,6 +4837,19 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
         },
         "used_at": {
           "name": "used_at",
