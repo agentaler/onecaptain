@@ -31,6 +31,18 @@ typecheck + lint + unit + e2e, all run here.
 | Email invites | `src/web/src/app/api/workspaces/[id]/invites/route.test.ts` | 7 pass — email+role creation with delivery, owner-role and bad-email rejected, bare link preserved |
 | Tenant isolation | existing route suites (agents, tasks, members, invites, audit, files, community) | pass — every tenant route resolves membership via `withWorkspace(Role)` before queries; billing routes added under the same guard (member view / admin checkout) |
 
+## Windows CI flake — fixed at the root
+
+`Tests (windows-latest)` failed on four consecutive heads, always
+`@onecaptain/app` and always `test/services.test.ts:28`. Diagnosis from the
+job log: every test in that file imports the module graph dynamically (the
+`vi.mock` calls must register first), so the first test was charged for the
+cold transform — 14s on a loaded Windows runner — against its 15s budget,
+while the rest ran in ~200ms each off the cached transform. A `beforeAll`
+warm-up moves that cost into a hook (commit 50a0ec6); no assertion or
+per-test budget changed. **CI run 27 (head 50a0ec6) passed on the first
+attempt with no rerun**, so Windows is no longer a known-red check.
+
 ## E2E (server-driven, real stack)
 
 `pnpm test:e2e` — 40 files / 266 tests against the booted dev stack
