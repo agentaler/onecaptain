@@ -79,13 +79,17 @@ OAuth + integrations (web):
 
 ## Phase status
 
-- **Phase 0 (live):** one container runs the whole stack on workerd. The build step
-  compiles the real production bundle (`opennextjs-cloudflare build`) and the start
-  step serves it with `wrangler dev` against local D1/R2/DO state on `/data` — the
-  same thing `opennextjs-cloudflare preview` does, minus the rebuild. The
-  `email-worker`, `ws-do`, and `wake-worker` sidecars still run as `wrangler dev`.
-  Single-instance and file-backed, so it is not the Phase 1 target — but it serves
-  compiled, minified assets, not a dev server.
+- **Phase 0 (live, staging-grade):** the stack runs in containers exactly as CI's
+  E2E job runs it (`next dev` + `wrangler dev`, state persisted on `/data`).
+  Functional but uses dev servers — do not treat as production.
+
+  Serving the compiled bundle instead (`opennextjs-cloudflare build` at build time,
+  `wrangler dev` on the output at start) was tried and **reverted**: under the
+  compiled worker every authenticated POST fails with Better Auth
+  `INVALID_ORIGIN`, while the same code under `next dev` signs in fine. The
+  compiled worker's trusted-origin list comes out empty, so any request carrying
+  an `Origin` header is rejected and only header-less requests get through. Not
+  yet root-caused — do not re-land the build step until it is.
 - **Phase 1 (in progress):** web on plain Node + Postgres via the platform seam
   (drizzle `pg-core` schema port, transaction-based batch, tsvector search).
 - **Phase 2:** `ws-node` service replaces the WebSocket Durable Object.

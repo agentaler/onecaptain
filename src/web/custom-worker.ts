@@ -6,6 +6,8 @@ import openNextHandler from "./.open-next/worker.js"
 // @ts-ignore — generated at build time, may not exist yet
 export { DOQueueHandler } from "./.open-next/worker.js"
 
+import { withForwardedProto } from "./src/lib/forwarded-proto"
+
 const PRIVATE_PREFIXES = ["/w/", "/workspaces", "/dashboard", "/invite/", "/api/", "/_next/"]
 
 function isPublicRoute(pathname: string): boolean {
@@ -13,7 +15,11 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 const handler: ExportedHandler<CloudflareEnv> = {
-  async fetch(request, env, ctx) {
+  async fetch(originalRequest, env, ctx) {
+    // Must happen before anything reads the URL: behind a TLS-terminating
+    // proxy the scheme on the wire is http, and Next.js and Better Auth build
+    // origins, redirects and absolute URLs straight off request.url.
+    const request = withForwardedProto(originalRequest)
     const url = new URL(request.url)
     const isWsUpgrade = request.headers.get("Upgrade")?.toLowerCase() === "websocket"
     const isWsPath = url.pathname === "/api/ws" || url.pathname.startsWith("/api/ws/")

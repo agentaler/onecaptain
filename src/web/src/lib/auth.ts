@@ -17,6 +17,7 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import { getOtpSubject, renderOtpEmail, getLinkEmailSubject, renderLinkEmail } from "./email-templates"
 import { sendEmail } from "./send-email"
 import { syncPolarSubscription } from "./billing/sync"
+import { requestOrigin } from "./forwarded-proto"
 
 const log = createLogger({ service: "auth" })
 
@@ -79,6 +80,22 @@ export function createAuth(env: Env) {
 
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
+    // Behind a TLS-terminating proxy Better Auth cannot infer its own origin:
+    // the request arrives over plain http, so its derived trusted-origin list
+    // never matches the https `Origin` the browser sent and every POST fails
+    // with INVALID_ORIGIN. State the list instead of letting it be inferred —
+    // the configured base URL, plus the origin this very request was sent to.
+    trustedOrigins: (request?: Request) => {
+      const origins: string[] = []
+      if (env.BETTER_AUTH_URL) {
+        try {
+          origins.push(new URL(env.BETTER_AUTH_URL).origin)
+        } catch {}
+      }
+      const self = request && requestOrigin(request)
+      if (self && !origins.includes(self)) origins.push(self)
+      return origins
+    },
     database: env.DB,
     secret: env.BETTER_AUTH_SECRET,
     // Signed session-data cookie lets getSession() validate without hitting D1.
