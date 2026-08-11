@@ -62,8 +62,8 @@ OAuth + integrations (web):
 ## What the operator must provide
 
 1. **Railway project** with the GitHub repo connected (deploy on push to `main`), the
-   services above created from the monorepo root, volumes attached (`db` at
-   `/var/lib/sqld`, `web` at `/data`).
+   services above created from the monorepo root, the managed Postgres provisioned,
+   and the `web` volume attached at `/data`.
 2. **Domains + DNS**: `onecaptain.ai` (+`www`) points at the `landing` service,
    `app.onecaptain.ai` at the `web` service (canonical auth URL is
    `https://app.onecaptain.ai`), and `ws.onecaptain.ai` at the `ws` service (Phase 2).
