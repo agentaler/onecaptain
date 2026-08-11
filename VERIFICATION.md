@@ -1,5 +1,9 @@
 # Verification — SaaS completion (2026-08-11)
 
+Final fresh gate (after the invites phase): `pnpm typecheck` 7/7, `pnpm lint`
+4/4, `pnpm test` 10/10 turbo tasks — all green; Railway web deploy SUCCESS
+with the full change set.
+
 Fresh runs, workspace root, commit series on `claude/alook-onecaptain-cloud-llm-wxdfjx`.
 
 ## Static
@@ -23,7 +27,8 @@ typecheck + lint + unit + e2e, all run here.
 | Auto-provision | `src/shared/test/queries/ensure-personal-workspace.test.ts` | 4 pass (real migrated DB: create, idempotent, existing-membership, empty-name fallback) |
 | Subscription sync | `src/shared/test/queries/subscription.test.ts` | 5 pass (created→pro flip, idempotent replay, update-in-place, revoke→free, out-of-order generation guard) |
 | Webhook endpoint | `src/web/src/lib/billing/webhook.test.ts` | 7 pass — REAL mounted `/api/auth/polar/webhooks`: signed created/updated/canceled accepted + forwarded; wrong-secret, unsigned, tampered-body rejected; endpoint absent when unconfigured |
-| Plan gating | `src/web/src/app/api/invite/[token]/route.test.ts` | 13 pass — free seat cap 403 without consuming the invite; same seat count accepted on pro; full invite lifecycle (used/expired/dup-member) |
+| Plan gating + role grants | `src/web/src/app/api/invite/[token]/route.test.ts` | 15 pass — free seat cap 403 without consuming the invite; same seat count accepted on pro; admin role honored at accept; owner never grantable; full lifecycle |
+| Email invites | `src/web/src/app/api/workspaces/[id]/invites/route.test.ts` | 7 pass — email+role creation with delivery, owner-role and bad-email rejected, bare link preserved |
 | Tenant isolation | existing route suites (agents, tasks, members, invites, audit, files, community) | pass — every tenant route resolves membership via `withWorkspace(Role)` before queries; billing routes added under the same guard (member view / admin checkout) |
 
 ## E2E (server-driven, real stack)
