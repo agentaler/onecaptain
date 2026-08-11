@@ -40,8 +40,15 @@ workspace creation/scoping, invite accept lifecycle, member removal,
 multi-workspace task routing, protected-route 401s.
 
 Browser E2E (`pnpm test:e2e-ui`, Playwright) runs in CI on PRs touching
-web/shared; specs 09/03/15/17 are documented pre-existing base-branch
-failures (text-thread refetch loop, see PR #1) unrelated to this work.
+web/shared. Spec 09 fails on every run and specs 02/03/13/15/17 fail
+intermittently — all with the same signature (a posted message never
+appears in the feed after navigation), the documented pre-existing
+base-branch refetch loop (control-verified on unmodified `main`, see PR
+#1). Each newly-observed spec in that set was checked against the branch
+locally before being classified: 02 and 13 both pass locally, and spec
+13's popup test (`13-mentions.spec.ts:72`) exercises the `searchMembers`
+path touched by the `likeInsensitive` seam, so the seam is exonerated by
+a positive test rather than by assumption.
 
 ## Live smoke (Railway deployment)
 
