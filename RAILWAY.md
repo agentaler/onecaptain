@@ -79,17 +79,29 @@ OAuth + integrations (web):
 
 ## Phase status
 
-- **Phase 0 (live, staging-grade):** the stack runs in containers exactly as CI's
-  E2E job runs it (`next dev` + `wrangler dev`, state persisted on `/data`).
-  Functional but uses dev servers — do not treat as production.
+- **Phase 0 (live):** one container runs the whole stack on workerd. The build
+  step compiles the production bundle (`opennextjs-cloudflare build`); the start
+  step serves it with `wrangler dev` against local D1/R2/DO state on `/data` —
+  the same thing `opennextjs-cloudflare preview` does, minus the rebuild. The
+  `email-worker`, `ws-do` and `wake-worker` sidecars still run as `wrangler dev`.
+  Single-instance and file-backed, so not the Phase 1 target, but it serves
+  compiled, minified assets rather than a dev server.
 
-  Serving the compiled bundle instead (`opennextjs-cloudflare build` at build time,
-  `wrangler dev` on the output at start) was tried and **reverted**: under the
-  compiled worker every authenticated POST fails with Better Auth
-  `INVALID_ORIGIN`, while the same code under `next dev` signs in fine. The
-  compiled worker's trusted-origin list comes out empty, so any request carrying
-  an `Origin` header is rejected and only header-less requests get through. Not
-  yet root-caused — do not re-land the build step until it is.
+  **The origin trap.** A first attempt at this was reverted because every
+  authenticated POST came back `403 INVALID_ORIGIN`. The cause is specific to
+  running behind a TLS-terminating proxy: the container is reached over plain
+  http, and a browser's *same-origin* `https://<host>` Origin header is
+  rewritten to `http://<host>` before Better Auth compares it. A cross-origin
+  Origin passes through untouched — so the rewrite hits only the one origin that
+  has to be trusted, which is why it reads as "nothing is trusted". `baseURL` is
+  correct and does reach the worker; the trusted list is correct. `createAuth`
+  therefore names **both** schemes of the request's own Host (see
+  `requestOrigins`), which is a same-origin check, not a widening: an Origin
+  that disagrees with the Host it was sent to is still rejected.
+
+  Anything that changes how the web service boots must be verified against a
+  locally built worker driven through a simulated proxy — `Host: <host>` plus
+  `x-forwarded-proto: https` — because localhost alone cannot reproduce this.
 - **Phase 1 (in progress):** web on plain Node + Postgres via the platform seam
   (drizzle `pg-core` schema port, transaction-based batch, tsvector search).
 - **Phase 2:** `ws-node` service replaces the WebSocket Durable Object.

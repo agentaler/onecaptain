@@ -20,20 +20,24 @@ export function withForwardedProto<T extends Request>(request: T): T {
   return new Request(url, request) as unknown as T
 }
 
-// The origin the client actually used, reconstructed from what the proxy
-// forwarded. Better Auth compares the browser's `Origin` header against its
-// trusted list; when the app is reached over a proxy, the only reliable
-// statement of that origin is Host + x-forwarded-proto.
+// Every origin that means "this app, reached on the host this request was
+// sent to" — both schemes, because the request does not survive the proxy with
+// its scheme intact.
 //
-// Trusting Host here is a same-origin check, not a hole: a cross-site
-// attacker's request carries *their* origin, while Host is written by our own
-// edge. Requests whose Origin differs from the host they were sent to are
-// still rejected.
-export function requestOrigin(request: Request): string | undefined {
+// Behind the proxy, a browser's same-origin `https://<host>` Origin header is
+// rewritten to `http://<host>` before Better Auth sees it: the container is
+// reached over plain http, and the layer that normalizes a same-origin Origin
+// regenerates it from that scheme. A cross-origin Origin is passed through
+// untouched, so the downgrade lands only on the app's own origin — exactly the
+// one that must be trusted. Naming both schemes is what survives it.
+//
+// Trusting Host is a same-origin check, not a hole: a cross-site attacker's
+// request carries *their* origin, while Host is written by our own edge, so an
+// Origin that disagrees with the host it was sent to is still rejected. The
+// http form gives an attacker nothing either — middleware redirects plain http
+// to https before any handler runs.
+export function requestOrigins(request: Request): string[] {
   const host = request.headers.get("host")
-  if (!host) return undefined
-  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim()
-  const scheme = forwarded ?? new URL(request.url).protocol.replace(":", "")
-  if (scheme !== "http" && scheme !== "https") return undefined
-  return `${scheme}://${host}`
+  if (!host) return []
+  return [`https://${host}`, `http://${host}`]
 }

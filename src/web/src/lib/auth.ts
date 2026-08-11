@@ -17,7 +17,7 @@ import { checkRateLimit } from "@/lib/rate-limit"
 import { getOtpSubject, renderOtpEmail, getLinkEmailSubject, renderLinkEmail } from "./email-templates"
 import { sendEmail } from "./send-email"
 import { syncPolarSubscription } from "./billing/sync"
-import { requestOrigin } from "./forwarded-proto"
+import { requestOrigins } from "./forwarded-proto"
 
 const log = createLogger({ service: "auth" })
 
@@ -92,8 +92,9 @@ export function createAuth(env: Env) {
           origins.push(new URL(env.BETTER_AUTH_URL).origin)
         } catch {}
       }
-      const self = request && requestOrigin(request)
-      if (self && !origins.includes(self)) origins.push(self)
+      for (const self of request ? requestOrigins(request) : []) {
+        if (!origins.includes(self)) origins.push(self)
+      }
       return origins
     },
     database: env.DB,

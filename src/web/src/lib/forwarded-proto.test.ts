@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { withForwardedProto, requestOrigin } from "./forwarded-proto"
+import { withForwardedProto, requestOrigins } from "./forwarded-proto"
 
 describe("withForwardedProto", () => {
   it("upgrades the URL scheme when the proxy says the client used https", () => {
@@ -58,30 +58,39 @@ describe("withForwardedProto", () => {
   })
 })
 
-describe("requestOrigin", () => {
-  it("rebuilds the client-facing origin from Host + x-forwarded-proto", () => {
+describe("requestOrigins", () => {
+  it("names both schemes of the host the request was sent to", () => {
     const req = new Request("http://internal:3000/api/auth/sign-in/email", {
       headers: { host: "app.onecaptain.ai", "x-forwarded-proto": "https" },
     })
-    expect(requestOrigin(req)).toBe("https://app.onecaptain.ai")
+    expect(requestOrigins(req)).toEqual([
+      "https://app.onecaptain.ai",
+      "http://app.onecaptain.ai",
+    ])
   })
 
-  it("falls back to the request's own scheme with no proxy header", () => {
+  it("covers the http form — the one a proxied same-origin request arrives as", () => {
+    const req = new Request("http://app.onecaptain.ai/x", {
+      headers: { host: "app.onecaptain.ai", "x-forwarded-proto": "https" },
+    })
+    expect(requestOrigins(req)).toContain("http://app.onecaptain.ai")
+  })
+
+  it("keeps the port, so a dev host is not confused with its bare name", () => {
     const req = new Request("http://localhost:3000/x", { headers: { host: "localhost:3000" } })
-    expect(requestOrigin(req)).toBe("http://localhost:3000")
+    expect(requestOrigins(req)).toEqual(["https://localhost:3000", "http://localhost:3000"])
   })
 
-  it("honours a proxy that reports http", () => {
-    const req = new Request("http://app.onecaptain.ai/x", {
-      headers: { host: "app.onecaptain.ai", "x-forwarded-proto": "http" },
-    })
-    expect(requestOrigin(req)).toBe("http://app.onecaptain.ai")
+  it("names nothing when there is no Host to anchor to", () => {
+    const req = new Request("http://app.onecaptain.ai/x")
+    req.headers.delete("host")
+    expect(requestOrigins(req)).toEqual([])
   })
 
-  it("ignores a nonsense scheme rather than minting a bogus origin", () => {
+  it("never names a host other than the one the request was sent to", () => {
     const req = new Request("http://app.onecaptain.ai/x", {
-      headers: { host: "app.onecaptain.ai", "x-forwarded-proto": "javascript" },
+      headers: { host: "app.onecaptain.ai", origin: "https://evil.example" },
     })
-    expect(requestOrigin(req)).toBeUndefined()
+    expect(requestOrigins(req).join(" ")).not.toContain("evil.example")
   })
 })

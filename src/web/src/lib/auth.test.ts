@@ -465,14 +465,16 @@ describe("trustedOrigins behind a TLS-terminating proxy", () => {
       proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" }),
     )
     expect(origins).toContain("https://app.onecaptain.ai")
-    expect(origins).not.toContain("http://app.onecaptain.ai")
+    // The http form is deliberate: behind the proxy a browser's same-origin
+    // https Origin reaches Better Auth downgraded to http.
+    expect(origins).toContain("http://app.onecaptain.ai")
   })
 
   it("still yields the request's own origin when BETTER_AUTH_URL is unset", async () => {
     const env = makeEnv()
     delete (env as Record<string, unknown>).BETTER_AUTH_URL
     expect(await trustedFor(env, proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" })))
-      .toEqual(["https://app.onecaptain.ai"])
+      .toEqual(["https://app.onecaptain.ai", "http://app.onecaptain.ai"])
   })
 
   it("does not duplicate the origin when base URL and request agree", async () => {
@@ -480,7 +482,7 @@ describe("trustedOrigins behind a TLS-terminating proxy", () => {
       makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
       proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" }),
     )
-    expect(origins).toEqual(["https://app.onecaptain.ai"])
+    expect(origins).toEqual(["https://app.onecaptain.ai", "http://app.onecaptain.ai"])
   })
 
   it("keeps both when the app is reached on a host other than its base URL", async () => {
@@ -488,7 +490,11 @@ describe("trustedOrigins behind a TLS-terminating proxy", () => {
       makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
       proxied({ host: "onecaptain-web.up.railway.app", "x-forwarded-proto": "https" }),
     )
-    expect(origins).toEqual(["https://app.onecaptain.ai", "https://onecaptain-web.up.railway.app"])
+    expect(origins).toEqual([
+      "https://app.onecaptain.ai",
+      "https://onecaptain-web.up.railway.app",
+      "http://onecaptain-web.up.railway.app",
+    ])
   })
 
   it("never trusts an unrelated origin", async () => {
