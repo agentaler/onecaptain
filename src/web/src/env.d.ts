@@ -1,5 +1,6 @@
 declare namespace Cloudflare {
   interface Env {
+    AUTH_DEFAULT_METHOD?: string
     POLAR_ACCESS_TOKEN?: string
     POLAR_WEBHOOK_SECRET?: string
     POLAR_SERVER?: string

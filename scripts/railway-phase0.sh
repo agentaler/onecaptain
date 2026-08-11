@@ -19,7 +19,14 @@ if [ -d /data ]; then
   ln -sfn /data/wrangler-root src/web/.wrangler
 fi
 
+# The app decides prod-vs-dev auth behavior from NODE_ENV in its own env
+# (not the Next process env), so a Phase 0 container can run `next dev` while
+# still serving the production sign-in surface: OTP + email/password, no
+# shared dev-password path. Defaults to production for that reason — set
+# NODE_ENV=development on the service to get the dev sign-in form back.
 cat > src/web/.dev.vars <<EOF
+NODE_ENV=${NODE_ENV:-production}
+AUTH_DEFAULT_METHOD=${AUTH_DEFAULT_METHOD:-password}
 BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
 BETTER_AUTH_URL=${PUBLIC_URL}
 DEVICE_CLIENT_IDS=${DEVICE_CLIENT_IDS:-onecaptain-cli}

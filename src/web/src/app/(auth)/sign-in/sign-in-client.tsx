@@ -42,7 +42,7 @@ function safeRedirectUrl(redirect: string | null): string {
   return DEFAULT_POST_LOGIN
 }
 
-function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: boolean }) {
+function SignInForm({ postLoginUrl, isProd, defaultMethod }: { postLoginUrl: string; isProd: boolean; defaultMethod: "otp" | "password" }) {
   const [email, setEmail] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -51,7 +51,7 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
   const [step, setStep] = useState<"email" | "code">("email")
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
 
-  const [authMode, setAuthMode] = useState<"otp" | "password">("otp")
+  const [authMode, setAuthMode] = useState<"otp" | "password">(defaultMethod)
   const [isSignup, setIsSignup] = useState(false)
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
@@ -506,7 +506,7 @@ function ProductGallery() {
   )
 }
 
-export default function SignInPageClient({ isProd }: { isProd: boolean }) {
+export default function SignInPageClient({ isProd, defaultMethod = "otp" }: { isProd: boolean; defaultMethod?: "otp" | "password" }) {
   const searchParams = useSearchParams()
   const postLoginUrl = safeRedirectUrl(searchParams.get("redirect"))
 
@@ -521,7 +521,7 @@ export default function SignInPageClient({ isProd }: { isProd: boolean }) {
           <Card className="overflow-hidden p-0">
             <CardContent className="grid p-0 sm:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.35fr)]">
               <div className="flex flex-col justify-center p-6 sm:min-h-120 sm:p-8">
-                <SignInForm postLoginUrl={postLoginUrl} isProd={isProd} />
+                <SignInForm postLoginUrl={postLoginUrl} isProd={isProd} defaultMethod={defaultMethod} />
               </div>
               <div className="relative hidden min-h-120 overflow-hidden bg-muted sm:block">
                 <ProductGallery />
