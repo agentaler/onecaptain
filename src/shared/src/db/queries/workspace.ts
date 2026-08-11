@@ -1,6 +1,8 @@
 import { eq, and, asc } from "drizzle-orm";
 import { workspace, member } from "../schema";
 import type { Database } from "../index";
+import { generateWorkspaceSlug, slugSuffix } from "../../utils/slug";
+import { isUniqueConstraintError } from "../../utils/db-errors";
 
 export async function getWorkspace(db: Database, id: string, userId: string) {
   const rows = await db
@@ -80,4 +82,43 @@ export async function markOnboarded(db: Database, id: string) {
 export async function deleteWorkspace(db: Database, id: string) {
   const rows = await db.delete(workspace).where(eq(workspace.id, id)).returning();
   return rows[0] ?? null;
+}
+
+/**
+ * Auto-provisioning (plans/saas-completion.md P2): every user always has at
+ * least one workspace they own. Called from the auth user-create hook for new
+ * signups and lazily from the workspace list route for pre-existing users
+ * (DECISIONS.md #6). Returns the user's first workspace, creating
+ * "<name>'s Workspace" + owner membership when none exists. Slug collisions
+ * retry with random suffixes, mirroring POST /api/workspaces.
+ */
+export async function ensurePersonalWorkspace(
+  db: Database,
+  userId: string,
+  displayName: string,
+): Promise<{ id: string; slug: string; created: boolean }> {
+  const existing = await db
+    .select({ id: workspace.id, slug: workspace.slug })
+    .from(member)
+    .innerJoin(workspace, eq(member.workspaceId, workspace.id))
+    .where(eq(member.userId, userId))
+    .orderBy(asc(member.createdAt))
+    .limit(1);
+  if (existing[0]) return { ...existing[0], created: false };
+
+  const trimmed = displayName.trim();
+  const name = trimmed ? `${trimmed}'s Workspace` : "My Workspace";
+  const base = generateWorkspaceSlug();
+  const suffixLengths = [4, 4, 8, 8, 16];
+  let candidate = base;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const ws = await createWorkspace(db, { name, slug: candidate });
+      await db.insert(member).values({ workspaceId: ws.id, userId, role: "owner" });
+      return { id: ws.id, slug: ws.slug, created: true };
+    } catch (err) {
+      if (!isUniqueConstraintError(err) || attempt >= suffixLengths.length) throw err;
+      candidate = `${base}-${slugSuffix(suffixLengths[attempt])}`;
+    }
+  }
 }

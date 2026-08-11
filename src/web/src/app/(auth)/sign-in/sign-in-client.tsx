@@ -51,6 +51,11 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
   const [step, setStep] = useState<"email" | "code">("email")
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
 
+  const [authMode, setAuthMode] = useState<"otp" | "password">("otp")
+  const [isSignup, setIsSignup] = useState(false)
+  const [name, setName] = useState("")
+  const [password, setPassword] = useState("")
+
   useEffect(() => {
     if (retryAfter == null) return
     const id = setTimeout(() => {
@@ -116,6 +121,31 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
     setLoading(false)
   }
 
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+    if (isSignup) {
+      const { error } = await signUp.email(
+        { name: name.trim() || email.split("@")[0], email, password },
+        { onError: () => {} },
+      )
+      if (error) {
+        setError(error.message ?? "Couldn't create the account")
+        setLoading(false)
+        return
+      }
+    } else {
+      const { error } = await signIn.email({ email, password }, { onError: () => {} })
+      if (error) {
+        setError(error.message ?? "Wrong email or password")
+        setLoading(false)
+        return
+      }
+    }
+    window.location.href = postLoginUrl
+  }
+
   async function handleDevSignIn(e: React.FormEvent) {
     e.preventDefault()
     setError("")
@@ -168,7 +198,84 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
       )}
       {error && !isCoolingDown && <FieldError>{error}</FieldError>}
 
-      {isProd ? (
+      {isProd && authMode === "password" ? (
+        <form onSubmit={handlePasswordSubmit}>
+          <FieldGroup>
+            {isSignup && (
+              <Field>
+                <FieldLabel htmlFor="name">Name</FieldLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+              </Field>
+            )}
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </Field>
+            <Field>
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                {!isSignup && (
+                  <a
+                    href="/forgot-password"
+                    className="text-xs text-muted-foreground underline underline-offset-4"
+                  >
+                    Forgot password?
+                  </a>
+                )}
+              </div>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                autoComplete={isSignup ? "new-password" : "current-password"}
+              />
+            </Field>
+            <Field>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading
+                  ? isSignup ? "Creating account…" : "Signing in…"
+                  : isSignup ? "Create account" : "Sign in"}
+              </Button>
+            </Field>
+            <p className="text-center text-sm text-muted-foreground">
+              {isSignup ? "Already have an account?" : "New here?"}{" "}
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => { setIsSignup(!isSignup); setError("") }}
+              >
+                {isSignup ? "Sign in" : "Create an account"}
+              </button>
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => { setAuthMode("otp"); setError("") }}
+              >
+                Use a sign-in code instead
+              </button>
+            </p>
+          </FieldGroup>
+        </form>
+      ) : isProd ? (
         step === "email" ? (
           <form onSubmit={handleSendCode}>
             <FieldGroup>
@@ -193,6 +300,15 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
                   {sendLabel}
                 </Button>
               </Field>
+              <p className="text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => { setAuthMode("password"); setError("") }}
+                >
+                  Use a password instead
+                </button>
+              </p>
             </FieldGroup>
           </form>
         ) : (

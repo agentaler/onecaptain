@@ -12,7 +12,8 @@ import {
 } from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { checkRateLimit } from "@/lib/rate-limit"
-import { getOtpSubject, renderOtpEmail } from "./email-templates"
+import { getOtpSubject, renderOtpEmail, getLinkEmailSubject, renderLinkEmail } from "./email-templates"
+import { sendEmail } from "./send-email"
 
 const log = createLogger({ service: "auth" })
 
@@ -65,9 +66,34 @@ export function createAuth(env: Env) {
         maxAge: isProd ? 5 * 60 : 60 * 60,
       },
     },
+    // Email+password is a first-class prod method alongside OTP/social
+    // (DECISIONS.md #2). Verification mail goes out on signup but does not
+    // gate access — possession-of-inbox is already the OTP/social precedent.
+    // Reset also serves OTP-created accounts wanting to add a password.
     emailAndPassword: {
-      enabled: !isProd,
+      enabled: true,
       requireEmailVerification: false,
+      minPasswordLength: isProd ? 8 : 1,
+      async sendResetPassword({ user, url }) {
+        await sendEmail(env, {
+          to: user.email,
+          subject: getLinkEmailSubject("password-reset-link"),
+          html: renderLinkEmail("password-reset-link", url),
+          actionUrl: url,
+        })
+      },
+    },
+    emailVerification: {
+      sendOnSignUp: isProd,
+      autoSignInAfterVerification: true,
+      async sendVerificationEmail({ user, url }) {
+        await sendEmail(env, {
+          to: user.email,
+          subject: getLinkEmailSubject("email-verification-link"),
+          html: renderLinkEmail("email-verification-link", url),
+          actionUrl: url,
+        })
+      },
     },
     user: {
       additionalFields: {
@@ -148,11 +174,29 @@ export function createAuth(env: Env) {
             return { data: { ...user, id, name, discriminator } }
           },
           after: async (user, ctx) => {
+            // Auto-provision the personal workspace (DECISIONS.md #6) for every
+            // real signup, regardless of method. Bots never reach here (the
+            // before-hook rejects the bot email domain for public signups, and
+            // bot rows are inserted outside better-auth). Failure must not
+            // abort signup — the lazy ensure on the workspace list route
+            // provisions on first app load instead.
+            if (!user.isBot) {
+              try {
+                await queries.workspace.ensurePersonalWorkspace(
+                  getDb(env.DB),
+                  user.id,
+                  user.name ?? "",
+                )
+              } catch (err) {
+                log.error("personal workspace provisioning failed", { userId: user.id, err })
+              }
+            }
             if (!ctx) return
             const path = ctx.request?.url ? new URL(ctx.request.url).pathname : ""
             let method = "unknown"
             if (path.includes("email-otp")) method = "email"
             else if (path.includes("github")) method = "github"
+            else if (path.includes("password") || path.includes("sign-up")) method = "password"
             else if (path.includes("google")) method = "google"
             ctx.setCookie("is_new_signup", method, {
               maxAge: 60,

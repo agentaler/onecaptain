@@ -339,12 +339,21 @@ describe("createAuth databaseHooks — user.create.after", () => {
     expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "google", expect.anything())
   })
 
-  it("sets method=unknown for unrecognized path", async () => {
+  it("sets method=password for password signup", async () => {
     const createAuth = await loadCreateAuth()
     const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
     const afterHook = opts.databaseHooks!.user!.create!.after!
     const ctx = makeCtx("http://localhost:3000/api/auth/sign-up/email")
     await afterHook({ id: "u4" }, ctx)
+    expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "password", expect.anything())
+  })
+
+  it("sets method=unknown for unrecognized path", async () => {
+    const createAuth = await loadCreateAuth()
+    const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
+    const afterHook = opts.databaseHooks!.user!.create!.after!
+    const ctx = makeCtx("http://localhost:3000/api/auth/callback/mystery")
+    await afterHook({ id: "u5" }, ctx)
     expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "unknown", expect.anything())
   })
 
