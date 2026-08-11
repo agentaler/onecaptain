@@ -121,6 +121,23 @@ function startService(name: string, filter: string, healthUrl: string): ManagedS
 // time and its `waitForURL` can time out. Pre-hit the hot routes so they're
 // warm before any spec runs. Best-effort: any response (even a redirect to
 // /sign-in) has already triggered compilation, so status is ignored.
+// One route, warmed for real: keep asking until the dev server answers, so a
+// connection refused/reset while it is still settling doesn't leave the route
+// cold. A swallowed failure here is invisible — the cost lands later as an
+// unexplained 30s element timeout in whichever spec hits the route first.
+async function warmRoute(path: string, timeoutMs: number): Promise<boolean> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await fetch(`${WEB_URL}${path}`, { redirect: "manual" })
+      return true
+    } catch {
+      await new Promise((r) => setTimeout(r, 500))
+    }
+  }
+  return false
+}
+
 async function warmUpRoutes(): Promise<void> {
   // Include the DYNAMIC route segments the first specs land on — `next dev`
   // compiles per route *file*, not per id, so a placeholder id triggers the
@@ -128,12 +145,20 @@ async function warmUpRoutes(): Promise<void> {
   // and `/c/channels/x/y` (channel) are the ones create-server waits for; the
   // server-root page also runs a data-gated redirect, so warming its chunk is
   // what keeps that first `waitForURL` from eating cold-compile time.
-  const routes = ["/c", "/sign-in", "/c/me", "/c/channels/warmup", "/c/channels/warmup/warmup"]
-  await Promise.all(
-    routes.map((path) =>
-      fetch(`${WEB_URL}${path}`, { redirect: "manual" }).catch(() => {}),
-    ),
-  )
+  //
+  // Warmed one at a time: firing all of them at a just-booted dev server made
+  // the burst itself the thing that failed, and `next dev` compiles under
+  // contention anyway, so the parallelism bought nothing.
+  const routes = ["/sign-in", "/c", "/c/me", "/c/channels/warmup", "/c/channels/warmup/warmup"]
+  for (const path of routes) {
+    const warm = await warmRoute(path, 120_000)
+    // /sign-in is the one global-setup itself drives; every seeded user logs
+    // in through it before a single spec runs. Fail here with the real reason
+    // rather than letting it surface as a locator timeout.
+    if (!warm && path === "/sign-in") {
+      throw new Error(`web never answered ${path} — cannot seed users`)
+    }
+  }
 }
 
 export async function startServices(): Promise<ManagedService[]> {
