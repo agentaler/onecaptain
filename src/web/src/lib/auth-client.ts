@@ -1,10 +1,11 @@
 "use client"
 import { createAuthClient } from "better-auth/react"
 import { emailOTPClient, deviceAuthorizationClient } from "better-auth/client/plugins"
+import { polarClient } from "@polar-sh/better-auth"
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL || "",
-  plugins: [emailOTPClient(), deviceAuthorizationClient()],
+  plugins: [emailOTPClient(), deviceAuthorizationClient(), polarClient()],
 })
 
 export const { signIn, signUp, signOut, useSession } = authClient

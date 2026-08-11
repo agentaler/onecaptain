@@ -241,7 +241,11 @@ describe("device-code-flow workspace reuse", () => {
     const wsListRes = await sessionRequest("/api/workspaces", wsCookie)
     const wsList = await wsListRes.json() as { id: string }[]
     expect(wsList.length).toBeGreaterThanOrEqual(1)
-    expect(wsList[0].id).toBe(originalWorkspaceId)
+    // The list may also contain the auto-provisioned personal workspace;
+    // what matters for CLI reuse is that the original one is still there
+    // and the login created no NEW workspace beyond it.
+    expect(wsList.map((w) => w.id)).toContain(originalWorkspaceId)
+    const countBeforeCli = wsList.length
 
     // Create machine token tied to existing workspace (use Bearer session token)
     const mtRes = await tokenRequest(
@@ -269,11 +273,14 @@ describe("device-code-flow workspace reuse", () => {
     expect(activateBody.workspace_id).toBe(originalWorkspaceId)
     expect(activateBody.daemon_id).toBe("e2e-test-host")
 
-    // Verify user still has exactly 1 workspace (activate uses existing workspace from token)
+    // Verify the CLI flow created no NEW workspace (activate uses the
+    // existing workspace from the token; the auto-provisioned personal
+    // workspace from signup may also be present — the count must simply
+    // not have grown).
     const wsAfterRes = await sessionRequest("/api/workspaces", wsCookie)
     const wsAfter = await wsAfterRes.json() as { id: string }[]
-    expect(wsAfter).toHaveLength(1)
-    expect(wsAfter[0].id).toBe(originalWorkspaceId)
+    expect(wsAfter).toHaveLength(countBeforeCli)
+    expect(wsAfter.map((w) => w.id)).toContain(originalWorkspaceId)
   })
 
   afterAll(() => {

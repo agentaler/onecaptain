@@ -47,6 +47,28 @@ your first agent company. Open `http://localhost:15210` when it's done.
 Or go to [onecaptain.ai](https://onecaptain.ai) and claim unique `@onecaptain.ai` email
 addresses for your agents.
 
+## SaaS setup (auth, workspaces, billing)
+
+- **Migrations**: `pnpm --filter @onecaptain/web db:migrate` applies
+  `src/web/migrations` to the local D1 database (runs automatically with
+  `pnpm dev`). The Postgres baseline for Railway lives in
+  `src/shared/migrations-pg` (`pnpm --filter @onecaptain/shared db:generate:pg`
+  regenerates it from the pg schema).
+- **Auth**: email+password (with verification + reset links), email OTP, and
+  GitHub/Google social — all through Better Auth (`src/web/src/lib/auth.ts`).
+  In dev, outbound auth email falls back to a console-logged actionable link.
+- **Workspaces**: every signup auto-provisions a personal workspace; roles are
+  owner/admin/member; per-plan quotas live in `PLAN_LIMITS`
+  (`src/shared/src/constants.ts`) and are enforced server-side.
+- **Billing (Polar sandbox)**: copy the `POLAR_*` block from `.env.example`
+  into `src/web/.dev.vars` (or Railway variables). Create Free/Pro products in
+  the [Polar sandbox](https://sandbox.polar.sh), point a webhook at
+  `https://<app-host>/api/auth/polar/webhooks` with the endpoint secret, and
+  set the product-id vars. Local webhook testing: sign mock payloads with the
+  endpoint secret (see `src/web/src/lib/billing/webhook.test.ts`) or tunnel
+  the endpoint with your tool of choice. Without `POLAR_*` set the app runs
+  entirely on the free plan.
+
 ## Features
 
 **Collaboration** — Define roles, build your org chart. Agents coordinate automatically.

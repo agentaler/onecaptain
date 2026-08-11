@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth"
 import { emailOTP, deviceAuthorization, bearer } from "better-auth/plugins"
+import { polar, portal, webhooks } from "@polar-sh/better-auth"
+import { Polar } from "@polar-sh/sdk"
 import { nanoid } from "nanoid"
 import {
   createLogger,
@@ -14,6 +16,7 @@ import { getDb } from "@/lib/db"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { getOtpSubject, renderOtpEmail, getLinkEmailSubject, renderLinkEmail } from "./email-templates"
 import { sendEmail } from "./send-email"
+import { syncPolarSubscription } from "./billing/sync"
 
 const log = createLogger({ service: "auth" })
 
@@ -40,6 +43,39 @@ export function createAuth(env: Env) {
     const allowed = (env.DEVICE_CLIENT_IDS || "").split(",").map((s) => s.trim()).filter(Boolean)
     return allowed.includes(clientId)
   }
+
+  // Polar billing (plans/saas-completion.md P4). Mounted only when
+  // configured — dev/test without POLAR_* boots exactly as before. The
+  // plugin owns customer auto-creation, the customer portal, and the
+  // signature-verified webhook endpoint (/polar/webhooks under the auth
+  // route); checkout is deliberately NOT the plugin's — it goes through
+  // the role-gated workspace billing route so only owner/admin can start
+  // one.
+  const polarPlugins = (() => {
+    if (!env.POLAR_ACCESS_TOKEN || !env.POLAR_WEBHOOK_SECRET) return []
+    const client = new Polar({
+      accessToken: env.POLAR_ACCESS_TOKEN,
+      server: env.POLAR_SERVER === "production" ? "production" : "sandbox",
+    })
+    return [
+      polar({
+        client,
+        createCustomerOnSignUp: true,
+        use: [
+          portal(),
+          webhooks({
+            secret: env.POLAR_WEBHOOK_SECRET,
+            onSubscriptionCreated: (p) => syncPolarSubscription(env, p.data as never),
+            onSubscriptionUpdated: (p) => syncPolarSubscription(env, p.data as never),
+            onSubscriptionActive: (p) => syncPolarSubscription(env, p.data as never),
+            onSubscriptionCanceled: (p) => syncPolarSubscription(env, p.data as never),
+            onSubscriptionRevoked: (p) => syncPolarSubscription(env, p.data as never),
+            onSubscriptionUncanceled: (p) => syncPolarSubscription(env, p.data as never),
+          }),
+        ],
+      }),
+    ]
+  })()
 
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
@@ -312,10 +348,12 @@ export function createAuth(env: Env) {
               }
             },
           }),
+          ...polarPlugins,
         ]
       : [
           deviceAuthorization({ verificationUri: "/device", validateClient, expiresIn: "5m", schema: {} }),
           bearer(),
+          ...polarPlugins,
         ],
   })
 }

@@ -381,6 +381,21 @@ CREATE TABLE "session" (
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
+CREATE TABLE "subscription" (
+	"id" text PRIMARY KEY NOT NULL,
+	"workspace_id" text NOT NULL,
+	"polar_subscription_id" text,
+	"polar_customer_id" text,
+	"product_id" text,
+	"plan" text DEFAULT 'free' NOT NULL,
+	"status" text DEFAULT 'none' NOT NULL,
+	"current_period_end" text,
+	"cancel_at_period_end" boolean DEFAULT false NOT NULL,
+	"created_at" text NOT NULL,
+	"updated_at" text NOT NULL,
+	CONSTRAINT "subscription_workspace_unique" UNIQUE("workspace_id")
+);
+--> statement-breakpoint
 CREATE TABLE "task_message" (
 	"id" text PRIMARY KEY NOT NULL,
 	"task_id" text NOT NULL,
@@ -824,6 +839,7 @@ ALTER TABLE "message_flag" ADD CONSTRAINT "message_flag_message_id_message_id_fk
 ALTER TABLE "message_flag" ADD CONSTRAINT "message_flag_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_flag" ADD CONSTRAINT "message_flag_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_userId_user_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription" ADD CONSTRAINT "subscription_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "task_message" ADD CONSTRAINT "task_message_task_id_agent_task_queue_id_fk" FOREIGN KEY ("task_id") REFERENCES "public"."agent_task_queue"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user" ADD CONSTRAINT "user_ownerUserId_user_id_fk" FOREIGN KEY ("ownerUserId") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workspace_file_request" ADD CONSTRAINT "workspace_file_request_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -935,6 +951,7 @@ CREATE INDEX "idx_message_conversation_status" ON "message" USING btree ("conver
 CREATE INDEX "idx_message_flag_ws_user_created" ON "message_flag" USING btree ("workspace_id","user_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_message_flag_message_user" ON "message_flag" USING btree ("message_id","user_id");--> statement-breakpoint
 CREATE INDEX "idx_session_token_expires" ON "session" USING btree ("token","expiresAt");--> statement-breakpoint
+CREATE INDEX "idx_subscription_polar_id" ON "subscription" USING btree ("polar_subscription_id");--> statement-breakpoint
 CREATE INDEX "idx_task_message_task_seq" ON "task_message" USING btree ("task_id","seq");--> statement-breakpoint
 CREATE INDEX "idx_task_message_task_created" ON "task_message" USING btree ("task_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_user_ownerUserId_isBot" ON "user" USING btree ("ownerUserId","isBot");--> statement-breakpoint
