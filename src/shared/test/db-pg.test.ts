@@ -17,13 +17,18 @@ const MIGRATIONS_DIR = join(__dirname, "..", "migrations-pg");
 // Postgres engine without a server.
 let db: PgAppDatabase;
 
+// WASM engine boot + a 64-table baseline replay are slow on loaded CI
+// runners (every package tests in parallel there) — well past vitest's 5s
+// default.
+const SLOW = 120_000;
+
 beforeAll(async () => {
   const client = new PGlite();
   db = drizzle(client, { schema: pgSchema }) as unknown as PgAppDatabase;
-});
+}, SLOW);
 
 describe("applyPgMigrations", () => {
-  it("applies the baseline to an empty database", async () => {
+  it("applies the baseline to an empty database", { timeout: SLOW }, async () => {
     const ran = await applyPgMigrations(db, MIGRATIONS_DIR);
     expect(ran.length).toBeGreaterThan(0);
   });
