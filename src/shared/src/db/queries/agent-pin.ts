@@ -1,6 +1,7 @@
 import { eq, and, asc, sql } from "drizzle-orm";
 import { agentPin } from "../schema";
 import type { Database } from "../index";
+import { batchAll } from "../batch";
 
 export async function listPins(db: Database, workspaceId: string, userId: string) {
   return db
@@ -44,7 +45,7 @@ export async function reorderPins(
   userId: string,
   orderedAgentIds: string[],
 ) {
-  await (db as any).batch(
+  await batchAll(db, 
     orderedAgentIds.map((id, i) =>
       db
         .update(agentPin)

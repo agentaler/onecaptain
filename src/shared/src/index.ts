@@ -557,6 +557,7 @@ export { withD1Retry, readOrStale, isRetryableD1Error } from "./db/resilience";
 export type { RetryOpts } from "./db/resilience";
 export * as schema from "./db/schema";
 export * as queries from "./db/queries-index";
+export { batchAll } from "./db/batch";
 export { communityServer, communityServerInvite, communityFriendship, communityServerMember, communityServerFolder, communityServerFolderItem, communityBotActivityEvent, communityBotDailyActivity } from "./db/community-schema";
 
 // Logger

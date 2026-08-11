@@ -10,6 +10,7 @@ import { escapeLikePattern } from "../../../utils/sql-like";
 import { canSeePrivateChannel, reachIsParticipantSet } from "../../../utils/community-roles";
 import { resolveChannelAccessContext } from "./channel";
 import { isThreadParticipant } from "./thread";
+import { batchAll } from "../../batch";
 
 export async function addMember(
   db: Database,
@@ -55,7 +56,7 @@ export async function removeMemberAndOwnerBots(
     )
     .returning();
   const removeBots = removeOwnerBotsFromServerStatement(db, serverId, botUserIds);
-  const results = (await db.batch([removeTarget, removeBots] as any)) as any[];
+  const results = (await batchAll(db, [removeTarget, removeBots] as any)) as any[];
   return (results[0] as Array<typeof communityServerMember.$inferSelect>)[0] ?? null;
 }
 
@@ -162,7 +163,7 @@ export async function bulkUpdateRailOrder(
         )
       )
   );
-  await db.batch(statements as [typeof statements[0], ...typeof statements]);
+  await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
 }
 
 export async function listMemberServerIds(db: Database, userId: string) {

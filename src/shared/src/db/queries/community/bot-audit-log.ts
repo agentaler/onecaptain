@@ -11,6 +11,7 @@ import { and, desc, eq, isNull, lt, notInArray, or } from "drizzle-orm";
 import { communityBotActivityEvent } from "../../community-schema";
 import { user } from "../../schema";
 import type { Database } from "../../index";
+import { batchAll } from "../../batch";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -68,7 +69,7 @@ export async function insertBotActivityEventAndPrune(
 ): Promise<{ id: string; createdAt: string } | null> {
   const insert = insertBotActivityEventStatement(db, data);
   const prune = pruneBotActivityEventsStatement(db, data.botId);
-  const results = (await db.batch([insert, prune, ...extraStatements] as any)) as any[];
+  const results = (await batchAll(db, [insert, prune, ...extraStatements] as any)) as any[];
   const insertResult = results?.[0];
   const rows: Array<{ id: string; createdAt: string }> = Array.isArray(insertResult)
     ? insertResult
@@ -81,7 +82,7 @@ export async function insertBotActivityEventAndPrune(
 /**
  * Insert a single event. Prefer the atomic batch (insert + prune) invoked from
  * ws-do; this is exposed as a Drizzle statement builder so ws-do can compose
- * it into a `db.batch([...])` call.
+ * it into a `batchAll(db, [...])` call.
  */
 export function insertBotActivityEventStatement(
   db: Database,
@@ -105,7 +106,7 @@ export function insertBotActivityEventStatement(
 /**
  * Delete rows older than the top-500 (by createdAt DESC, id DESC) for a bot.
  * Uses a `NOT IN (subquery)` shape built via Drizzle operators so the returned
- * value is a real Drizzle statement that composes into `db.batch([...])` —
+ * value is a real Drizzle statement that composes into `batchAll(db, [...])` —
  * `db.run(sql\`...\`)` returns a Promise, which is NOT batchable and would
  * throw `Cannot read properties of undefined (reading 'bind')` when D1's
  * batch adapter tries to call `.bind()` on it.

@@ -11,6 +11,7 @@ import { user } from "../../schema";
 import type { Database } from "../../index";
 import { createLogger } from "../../../logger";
 import { chunk, D1_MAX_IN_PARAMS } from "../_chunk";
+import { batchAll } from "../../batch";
 
 /**
  * Atomically claim the next seq value for a channel. A single top-level UPSERT
@@ -197,7 +198,7 @@ async function insertMessageRow(db: Database, data: CreateMessageData, seq: numb
     .returning();
 
   // Message insert + channel counter/timestamp bump commit atomically via
-  // `db.batch(...)`. DMs are channels now, so this is always a channel update.
+  // `batchAll(db, ...)`. DMs are channels now, so this is always a channel update.
   const scopeUpdate = db
     .update(communityChannel)
     .set({
@@ -211,7 +212,7 @@ async function insertMessageRow(db: Database, data: CreateMessageData, seq: numb
   // ride this same batch — appended AFTER insert+scope so the message row is
   // index 0. They share the batch's all-or-nothing commit.
   const batchStatements = [insertMsg, scopeUpdate, ...(data.extraStatements ?? [])];
-  const results = (await db.batch(batchStatements as any)) as any[];
+  const results = (await batchAll(db, batchStatements as any)) as any[];
   const msg = (results[0] as InsertedMessage[])[0]!;
 
   // Author read-watermark: advance the sender's own read-state to this
@@ -331,7 +332,7 @@ export async function hardDeleteMessage(db: Database, messageId: string) {
         .where(readStateWhere)
     : db.delete(communityReadState).where(readStateWhere);
 
-  await db.batch([deleteMsg, scopeUpdate, readStateStmt] as any);
+  await batchAll(db, [deleteMsg, scopeUpdate, readStateStmt] as any);
 }
 
 // Shared select projection for the three list-messages paths (`listMessages`,

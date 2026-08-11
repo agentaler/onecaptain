@@ -1,6 +1,7 @@
 import { eq, and, isNull, or } from "drizzle-orm";
 import { agentSkill } from "../schema";
 import type { Database } from "../index";
+import { batchAll } from "../batch";
 
 interface SkillRow {
   name: string;
@@ -37,7 +38,7 @@ export async function syncGlobalSkills(
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     statements.push(db.insert(agentSkill).values(rows.slice(i, i + BATCH_SIZE)));
   }
-  await db.batch(statements as [any, ...any[]]);
+  await batchAll(db, statements as [any, ...any[]]);
 }
 
 export async function syncAgentSkills(
@@ -67,7 +68,7 @@ export async function syncAgentSkills(
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     statements.push(db.insert(agentSkill).values(rows.slice(i, i + BATCH_SIZE)));
   }
-  await db.batch(statements as [any, ...any[]]);
+  await batchAll(db, statements as [any, ...any[]]);
 }
 
 export async function getSkills(

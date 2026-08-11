@@ -6,6 +6,7 @@ import {
 } from "../../community-schema";
 import { user } from "../../schema";
 import type { Database } from "../../index";
+import { batchAll } from "../../batch";
 
 export async function createInvite(
   db: Database,
@@ -165,7 +166,7 @@ export async function useInvite(
         ),
       ),
     );
-  const batchResults = (await db.batch([insertMember, incrementUse] as any)) as any[];
+  const batchResults = (await batchAll(db, [insertMember, incrementUse] as any)) as any[];
   const insertedMember = (batchResults[0] as Array<typeof communityServerMember.$inferSelect>)[0];
   if (!insertedMember) return null;
 

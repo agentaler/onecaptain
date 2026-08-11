@@ -52,7 +52,7 @@ function buildTargetFilter(data: { userId: string; channelId: string }) {
  * accept an "unknown message" shape on purpose.
  *
  * Returns the Drizzle INSERT builder synchronously so it can be composed into
- * `db.batch([...])` alongside sibling writes (mention clear, for-you dismiss).
+ * `batchAll(db, [...])` alongside sibling writes (mention clear, for-you dismiss).
  *
  * `channelId` is the only scope; the upsert targets the plain unique
  * `(user_id, channel_id)`.

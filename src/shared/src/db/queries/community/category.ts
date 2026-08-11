@@ -1,6 +1,7 @@
 import { asc, eq, inArray, count } from "drizzle-orm";
 import { communityCategory, communityChannel } from "../../community-schema";
 import type { Database } from "../../index";
+import { batchAll } from "../../batch";
 
 export async function getCategoriesByIds(db: Database, categoryIds: string[]) {
   if (categoryIds.length === 0) return [];
@@ -103,6 +104,6 @@ export async function reorderCategories(
       .where(eq(communityCategory.id, id))
   );
   if (statements.length > 0) {
-    await db.batch(statements as [typeof statements[0], ...typeof statements]);
+    await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
   }
 }

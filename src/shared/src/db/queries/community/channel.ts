@@ -10,6 +10,7 @@ import type { Database } from "../../index";
 import { PARTICIPANT_SOURCE } from "../../../constants/community";
 import { canSeePrivateChannel, visibilityIsDmParticipant } from "../../../utils/community-roles";
 import { chunk, D1_MAX_IN_PARAMS } from "../_chunk";
+import { batchAll } from "../../batch";
 
 // Column selection shared by every read query.
 const CHANNEL_COLUMNS = {
@@ -422,7 +423,7 @@ export async function reorderChannels(
       .where(eq(communityChannel.id, id))
   );
   if (statements.length > 0) {
-    await db.batch(statements as [typeof statements[0], ...typeof statements]);
+    await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
   }
 }
 
@@ -596,7 +597,7 @@ export async function deleteChannelMemberAndChildParticipants(
         eq(communityChannelMember.relation, "notify"),
       ),
     );
-  const results = (await db.batch([removeAccess, removeChildParticipants] as any)) as any[];
+  const results = (await batchAll(db, [removeAccess, removeChildParticipants] as any)) as any[];
   return (results[0] as Array<typeof communityChannelMember.$inferSelect>)[0] ?? null;
 }
 

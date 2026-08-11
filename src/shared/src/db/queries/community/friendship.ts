@@ -1,4 +1,5 @@
 import { eq, and, or, isNull, inArray } from "drizzle-orm";
+import { batchAll } from "../../batch";
 import {
   communityFriendship,
   communityUserProfile,
@@ -380,7 +381,7 @@ export async function sendRequest(
 
   let inserted: FriendshipRow;
   try {
-    const results = (await db.batch([supersedeStmt, insertStmt] as any)) as any[];
+    const results = (await batchAll(db, [supersedeStmt, insertStmt] as any)) as any[];
     const rows = results[results.length - 1] as FriendshipRow[];
     inserted = rows[0]!;
   } catch (err) {

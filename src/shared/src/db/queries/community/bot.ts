@@ -37,6 +37,7 @@ import { communityBotSyntheticEmail } from "../../../constants";
 import { withUniqueDiscriminator } from "../user";
 import { nanoid } from "nanoid";
 import { chunk, D1_MAX_IN_PARAMS } from "../_chunk";
+import { batchAll } from "../../batch";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -585,7 +586,7 @@ export async function createBot(
           target: communityUserProfile.userId,
           set: { aboutMe: description },
         });
-      await db.batch([stmt1, stmt2, stmt3] as any);
+      await batchAll(db, [stmt1, stmt2, stmt3] as any);
       return discriminator;
     }
   );
@@ -641,7 +642,7 @@ export async function updateBot(
         target: communityUserProfile.userId,
         set: { aboutMe: data.description },
       });
-    const results = (await db.batch([s1, s2] as any)) as any[];
+    const results = (await batchAll(db, [s1, s2] as any)) as any[];
     rows = Array.isArray(results?.[0]) ? results[0] : [];
   } else {
     rows = await db
@@ -806,7 +807,7 @@ export async function touchBotRefreshContext(
  * wake_trigger audit batch, one bump per message the bot woke for) or `sent`
  * (rides the community_message insert batch, one bump per message the bot
  * sends). Exposed as a statement builder (not an awaited write) so it composes
- * into the SAME `db.batch([...])` as that existing write — no new hot-path
+ * into the SAME `batchAll(db, [...])` as that existing write — no new hot-path
  * round-trip. `day` MUST come from `utcDayKey` (the single day-boundary source)
  * so handled and sent for the same calendar day land in the same `(botId, day)`
  * row. Sharing the host batch's all-or-nothing fate is acceptable: a dropped +1
@@ -976,7 +977,7 @@ export async function softDeleteBot(
     .delete(communityBotBinding)
     .where(inArray(communityBotBinding.userId, ownerScopedIds));
 
-  const results = (await db.batch([s1, s2, s3, s4] as any)) as any[];
+  const results = (await batchAll(db, [s1, s2, s3, s4] as any)) as any[];
   // With RETURNING, statement 1 returns an array of matched rows. Zero rows
   // means the predicate didn't match (cross-owner or already-tombstoned).
   const firstRows = Array.isArray(results?.[0]) ? results[0] : [];

@@ -6,6 +6,7 @@ import {
 } from "../../community-schema";
 import type { Database } from "../../index";
 import { chunk, maxRowsPerInsert } from "../_chunk";
+import { batchAll } from "../../batch";
 
 // communityServerFolderItem emits 3 bind params/row (folder_id, server_id,
 // position), so a single INSERT caps at floor(100/3)=33 rows for D1's limit.
@@ -126,7 +127,7 @@ export async function reorderFolders(
       )
   );
   if (statements.length > 0) {
-    await db.batch(statements as [typeof statements[0], ...typeof statements]);
+    await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
   }
 }
 

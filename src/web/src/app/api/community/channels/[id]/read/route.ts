@@ -2,7 +2,8 @@ import { NextRequest } from "next/server"
 import { withAuth } from "@/lib/middleware/auth"
 import { writeJSON, writeError } from "@/lib/middleware/helpers"
 import { getDb } from "@/lib/db"
-import { queries, withD1Retry } from "@onecaptain/shared"
+import {
+  batchAll, queries, withD1Retry } from "@onecaptain/shared"
 import { requireMessageSurfaceAccess } from "@/lib/community/permissions"
 
 /**
@@ -90,7 +91,7 @@ export const PUT = withAuth(async (req: NextRequest, ctx) => {
   // inbox inconsistent (mark-read succeeded but the mention clear didn't, or
   // vice versa). D1 batches are atomic per SQLite guarantees.
   await withD1Retry(
-    () => db.batch([
+    () => batchAll(db, [
       queries.communityReadState.markReadToMessageBuilder(db, {
         userId: ctx.userId,
         channelId,
