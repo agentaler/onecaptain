@@ -1,8 +1,8 @@
-import { eq, inArray, sql, and, ne, isNull } from "drizzle-orm";
+import { eq, inArray, and, ne, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { user } from "../schema";
 import type { Database } from "../index";
-import { escapeLikePattern } from "../../utils/sql-like";
+import { escapeLikePattern, likeInsensitive } from "../../utils/sql-like";
 import { computeDiscriminator } from "../../lib/discriminator";
 import { isUniqueConstraintError } from "../../utils/db-errors";
 
@@ -163,7 +163,7 @@ export async function getUserByNameCaseInsensitive(
   const rows = await db
     .select(publicUserColumns)
     .from(user)
-    .where(and(sql`${user.name} LIKE ${pattern} ESCAPE '\\'`, isNull(user.deletedAt)));
+    .where(and(likeInsensitive(user.name, pattern), isNull(user.deletedAt)));
   return (rows[0] as PublicUser | undefined) ?? null;
 }
 
@@ -185,7 +185,7 @@ export async function searchUsersByName(
     conditions.push(eq(user.discriminator, opts.discriminator));
   } else {
     const pattern = `%${escapeLikePattern(name)}%`;
-    conditions.push(sql`${user.name} LIKE ${pattern} ESCAPE '\\'`);
+    conditions.push(likeInsensitive(user.name, pattern));
   }
   if (opts?.excludeUserId) {
     conditions.push(ne(user.id, opts.excludeUserId));
@@ -216,7 +216,7 @@ export async function getUserByNameAndDiscriminator(
     .from(user)
     .where(
       and(
-        sql`${user.name} LIKE ${pattern} ESCAPE '\\'`,
+        likeInsensitive(user.name, pattern),
         eq(user.discriminator, discriminator),
         isNull(user.deletedAt)
       )

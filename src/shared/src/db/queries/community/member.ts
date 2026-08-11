@@ -1,4 +1,4 @@
-import { eq, and, ne, inArray, count, asc, or, gt, like, isNull, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, count, asc, or, gt, isNull, sql } from "drizzle-orm";
 import { communityServerMember, communityUserProfile } from "../../community-schema";
 import { user } from "../../schema";
 import type { Database } from "../../index";
@@ -6,7 +6,7 @@ import {
   DEFAULT_MEMBERS_PAGE_SIZE,
   MAX_MEMBERS_PAGE_SIZE,
 } from "../../../constants/community";
-import { escapeLikePattern } from "../../../utils/sql-like";
+import { escapeLikePattern, likeInsensitive } from "../../../utils/sql-like";
 import { canSeePrivateChannel, reachIsParticipantSet } from "../../../utils/community-roles";
 import { resolveChannelAccessContext } from "./channel";
 import { isThreadParticipant } from "./thread";
@@ -310,8 +310,8 @@ export async function searchMembers(
       and(
         eq(communityServerMember.serverId, serverId),
         or(
-          like(user.name, pattern),
-          like(user.email, pattern)
+          likeInsensitive(user.name, pattern),
+          likeInsensitive(user.email, pattern)
         )
       )
     )
