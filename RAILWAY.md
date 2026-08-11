@@ -12,7 +12,7 @@ Every repo-built service deploys from the monorepo root with the shared
 
 | Railway service | `SERVICE_ROLE` | Source | Runs | Notes |
 | --- | --- | --- | --- | --- |
-| `web` | `web` (default) | `src/web` | Next.js app (`ONECAPTAIN_PLATFORM=node`) | public domain `app.onecaptain.ai` |
+| `web` | `web` (default) | `src/web` | Next.js app (`ONECAPTAIN_PLATFORM=node`) | public domain `app.onecaptain.ai`; Phase 0 serves the compiled worker bundle |
 | `landing` | `landing` | `src/landing` | `node src/landing/server.mjs` — static waitlist page, zero deps, no install/build | public domain `onecaptain.ai` (+`www`); non-landing paths 308 to the app host (`APP_URL`) |
 | `Postgres` | — | Railway managed Postgres | the production database | own volume; **private networking only, no public domain** |
 | `ws` | `ws` (Phase 2) | `src/ws-node` | WebSocket + daemon forward routes | public domain (wss) |
@@ -79,9 +79,13 @@ OAuth + integrations (web):
 
 ## Phase status
 
-- **Phase 0 (available now, staging only):** the stack can run in containers exactly as
-  CI's E2E job runs it (`next dev` + `wrangler dev` with `--persist-to /data/wrangler`).
-  Functional but uses dev servers — do not treat as production.
+- **Phase 0 (live):** one container runs the whole stack on workerd. The build step
+  compiles the real production bundle (`opennextjs-cloudflare build`) and the start
+  step serves it with `wrangler dev` against local D1/R2/DO state on `/data` — the
+  same thing `opennextjs-cloudflare preview` does, minus the rebuild. The
+  `email-worker`, `ws-do`, and `wake-worker` sidecars still run as `wrangler dev`.
+  Single-instance and file-backed, so it is not the Phase 1 target — but it serves
+  compiled, minified assets, not a dev server.
 - **Phase 1 (in progress):** web on plain Node + Postgres via the platform seam
   (drizzle `pg-core` schema port, transaction-based batch, tsvector search).
 - **Phase 2:** `ws-node` service replaces the WebSocket Durable Object.

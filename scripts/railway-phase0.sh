@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 0 Railway boot — run the CI-proven dev-parity stack in one container.
+# Phase 0 Railway boot — run the CI-proven worker stack in one container.
 # See RAILWAY.md "Phase status": this is the interim runtime until the Phase 1
 # Node port lands. All wrangler state (D1 + R2 + DO storage) lives under
 # src/web/.wrangler by default — symlinking that onto the /data volume makes
@@ -19,26 +19,9 @@ if [ -d /data ]; then
   ln -sfn /data/wrangler-root src/web/.wrangler
 fi
 
-# The app decides prod-vs-dev auth behavior from NODE_ENV in its own env
-# (not the Next process env), so a Phase 0 container can run `next dev` while
-# still serving the production sign-in surface: OTP + email/password, no
-# shared dev-password path. Defaults to production for that reason — set
-# NODE_ENV=development on the service to get the dev sign-in form back.
-cat > src/web/.dev.vars <<EOF
-NODE_ENV=${NODE_ENV:-production}
-AUTH_DEFAULT_METHOD=${AUTH_DEFAULT_METHOD:-password}
-BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-BETTER_AUTH_URL=${PUBLIC_URL}
-DEVICE_CLIENT_IDS=${DEVICE_CLIENT_IDS:-onecaptain-cli}
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
-GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
-GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-EOF
-cat > src/email-worker/.dev.vars <<EOF
-ENCRYPTION_KEY=${ENCRYPTION_KEY}
-EOF
+# Rewrite with the runtime values — the build ran with whatever the build
+# environment had, which may lag a variable change made since.
+bash scripts/railway-dev-vars.sh
 
 export BETTER_AUTH_URL="$PUBLIC_URL"
 export BETTER_AUTH_SECRET ENCRYPTION_KEY
@@ -52,6 +35,8 @@ pnpm --filter @onecaptain/email-worker dev &
 pnpm --filter @onecaptain/ws-do dev &
 pnpm --filter @onecaptain/wake-worker dev &
 
-# Web on 3000 (the Railway service's PORT variable is set to 3000). If the
-# web process dies the container exits and Railway restarts everything.
-exec pnpm --filter @onecaptain/web exec next dev -H 0.0.0.0 -p 3000
+# Serve the bundle built by scripts/railway-build.sh. `wrangler dev` runs the
+# real production worker under workerd against local D1/R2/DO state — the same
+# thing `opennextjs-cloudflare preview` does, minus the rebuild. If the web
+# process dies the container exits and Railway restarts everything.
+exec pnpm --filter @onecaptain/web exec wrangler dev --ip 0.0.0.0 --port 3000
