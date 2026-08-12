@@ -53,14 +53,36 @@ multi-workspace task routing, protected-route 401s.
 
 Browser E2E (`pnpm test:e2e-ui`, Playwright) runs in CI on PRs touching
 web/shared. Spec 09 fails on every run and specs 02/03/13/15/17 fail
-intermittently — all with the same signature (a posted message never
-appears in the feed after navigation), the documented pre-existing
-base-branch refetch loop (control-verified on unmodified `main`, see PR
-#1). Each newly-observed spec in that set was checked against the branch
-locally before being classified: 02 and 13 both pass locally, and spec
-13's popup test (`13-mentions.spec.ts:72`) exercises the `searchMembers`
-path touched by the `likeInsensitive` seam, so the seam is exonerated by
-a positive test rather than by assumption.
+intermittently, all with the same visible signature: a message that is
+known to exist never appears in the feed, and the composer never mounts.
+Each newly-observed spec was checked against the branch locally before
+being classified: 02 and 13 both pass locally, and spec 13's popup test
+(`13-mentions.spec.ts:72`) exercises the `searchMembers` path touched by
+the `likeInsensitive` seam, so the seam is exonerated by a positive test
+rather than by assumption.
+
+**The "refetch loop" label on this was wrong.** Reading the Playwright
+trace of a failing spec 09 run shows only ~21–25 API requests for the
+whole journey — there is no loop. Two separate causes hide behind the one
+signature:
+
+1. *Cold-route fan-out.* Opening a channel fires ~7 API routes at once.
+   Under `next dev` each pays a ~3s first compile and the dev server
+   compiles them serially, so a cold set costs ~20s of wall clock —
+   longer than the specs' own waits. The requests are still in flight when
+   the spec gives up, which is why it reads as "the message never
+   appeared". Measured directly: hitting those seven routes sequentially
+   on a cold server takes 2.6–4.3s each. The setup warm-up now pre-builds
+   them, and after that change every request in the trace completes.
+
+2. *A real 500.* With the fan-out warmed, the same run shows
+   `GET /api/community/servers/:id/unreads` returning **500**, after which
+   the channel view never issues its `/messages` request at all — hence an
+   empty feed and no composer. This is a product bug, not a harness one,
+   and it is the remaining cause of the red. It is NOT yet fixed: the
+   route wraps its queries in `readOrStale` with a fallback, so the throw
+   is coming from outside that guard (`getDb`, `requireServerMember`, or
+   `withAuth`) and still needs to be pinned down.
 
 ## Live smoke (Railway deployment)
 
