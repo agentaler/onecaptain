@@ -42,7 +42,7 @@ function safeRedirectUrl(redirect: string | null): string {
   return DEFAULT_POST_LOGIN
 }
 
-function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: boolean }) {
+function SignInForm({ postLoginUrl, isProd, defaultMethod }: { postLoginUrl: string; isProd: boolean; defaultMethod: "otp" | "password" }) {
   const [email, setEmail] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -50,6 +50,11 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
   const [code, setCode] = useState("")
   const [step, setStep] = useState<"email" | "code">("email")
   const [retryAfter, setRetryAfter] = useState<number | null>(null)
+
+  const [authMode, setAuthMode] = useState<"otp" | "password">(defaultMethod)
+  const [isSignup, setIsSignup] = useState(false)
+  const [name, setName] = useState("")
+  const [password, setPassword] = useState("")
 
   useEffect(() => {
     if (retryAfter == null) return
@@ -116,6 +121,31 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
     setLoading(false)
   }
 
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError("")
+    setLoading(true)
+    if (isSignup) {
+      const { error } = await signUp.email(
+        { name: name.trim() || email.split("@")[0], email, password },
+        { onError: () => {} },
+      )
+      if (error) {
+        setError(error.message ?? "Couldn't create the account")
+        setLoading(false)
+        return
+      }
+    } else {
+      const { error } = await signIn.email({ email, password }, { onError: () => {} })
+      if (error) {
+        setError(error.message ?? "Wrong email or password")
+        setLoading(false)
+        return
+      }
+    }
+    window.location.href = postLoginUrl
+  }
+
   async function handleDevSignIn(e: React.FormEvent) {
     e.preventDefault()
     setError("")
@@ -168,7 +198,84 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
       )}
       {error && !isCoolingDown && <FieldError>{error}</FieldError>}
 
-      {isProd ? (
+      {isProd && authMode === "password" ? (
+        <form onSubmit={handlePasswordSubmit}>
+          <FieldGroup>
+            {isSignup && (
+              <Field>
+                <FieldLabel htmlFor="name">Name</FieldLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+              </Field>
+            )}
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </Field>
+            <Field>
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                {!isSignup && (
+                  <a
+                    href="/forgot-password"
+                    className="text-xs text-muted-foreground underline underline-offset-4"
+                  >
+                    Forgot password?
+                  </a>
+                )}
+              </div>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                autoComplete={isSignup ? "new-password" : "current-password"}
+              />
+            </Field>
+            <Field>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading
+                  ? isSignup ? "Creating account…" : "Signing in…"
+                  : isSignup ? "Create account" : "Sign in"}
+              </Button>
+            </Field>
+            <p className="text-center text-sm text-muted-foreground">
+              {isSignup ? "Already have an account?" : "New here?"}{" "}
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => { setIsSignup(!isSignup); setError("") }}
+              >
+                {isSignup ? "Sign in" : "Create an account"}
+              </button>
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              <button
+                type="button"
+                className="underline underline-offset-4"
+                onClick={() => { setAuthMode("otp"); setError("") }}
+              >
+                Use a sign-in code instead
+              </button>
+            </p>
+          </FieldGroup>
+        </form>
+      ) : isProd ? (
         step === "email" ? (
           <form onSubmit={handleSendCode}>
             <FieldGroup>
@@ -193,6 +300,15 @@ function SignInForm({ postLoginUrl, isProd }: { postLoginUrl: string; isProd: bo
                   {sendLabel}
                 </Button>
               </Field>
+              <p className="text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  className="underline underline-offset-4"
+                  onClick={() => { setAuthMode("password"); setError("") }}
+                >
+                  Use a password instead
+                </button>
+              </p>
             </FieldGroup>
           </form>
         ) : (
@@ -390,7 +506,7 @@ function ProductGallery() {
   )
 }
 
-export default function SignInPageClient({ isProd }: { isProd: boolean }) {
+export default function SignInPageClient({ isProd, defaultMethod = "otp" }: { isProd: boolean; defaultMethod?: "otp" | "password" }) {
   const searchParams = useSearchParams()
   const postLoginUrl = safeRedirectUrl(searchParams.get("redirect"))
 
@@ -405,7 +521,7 @@ export default function SignInPageClient({ isProd }: { isProd: boolean }) {
           <Card className="overflow-hidden p-0">
             <CardContent className="grid p-0 sm:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.35fr)]">
               <div className="flex flex-col justify-center p-6 sm:min-h-120 sm:p-8">
-                <SignInForm postLoginUrl={postLoginUrl} isProd={isProd} />
+                <SignInForm postLoginUrl={postLoginUrl} isProd={isProd} defaultMethod={defaultMethod} />
               </div>
               <div className="relative hidden min-h-120 overflow-hidden bg-muted sm:block">
                 <ProductGallery />

@@ -1,8 +1,8 @@
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { communityMessage, communityChannel } from "../../community-schema";
 import { user } from "../../schema";
 import type { Database } from "../../index";
-import { escapeLikePattern } from "../../../utils/sql-like";
+import { escapeLikePattern, likeInsensitive } from "../../../utils/sql-like";
 import { chunk, D1_MAX_IN_PARAMS } from "../_chunk";
 
 const DEFAULT_LIMIT = 50;
@@ -44,7 +44,7 @@ export async function searchMessages(
   }
 
   const pattern = `%${escapeLikePattern(opts.query)}%`;
-  const conditions = [sql`${communityMessage.content} LIKE ${pattern} ESCAPE '\\'`];
+  const conditions = [likeInsensitive(communityMessage.content, pattern)];
   if (opts.channelId) {
     conditions.push(eq(communityMessage.channelId, opts.channelId));
   }
@@ -79,7 +79,7 @@ export async function searchMessagesInServer(
 
   const pattern = `%${escapeLikePattern(opts.query)}%`;
   const baseConditions = [
-    sql`${communityMessage.content} LIKE ${pattern} ESCAPE '\\'`,
+    likeInsensitive(communityMessage.content, pattern),
     eq(communityChannel.serverId, opts.serverId),
   ];
 

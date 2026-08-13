@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createAuth } from "@/lib/auth"
+import { resolveHostRoute } from "@/lib/host-routing"
 
 function isSafeRedirect(path: string): boolean {
   // Must be a relative path. Reject scheme-relative ("//evil.com") and
@@ -22,6 +23,10 @@ const PUBLIC_PREFIXES = ["/c/invite/"]
 
 export async function middleware(request: NextRequest) {
   if (
+    // The health endpoint must answer on the scheme it was probed on —
+    // platform-internal healthchecks (e.g. Railway's) arrive over plain HTTP
+    // and treat a 301 as unhealthy.
+    request.nextUrl.pathname !== "/api/health" &&
     request.headers.get("x-forwarded-proto") === "http" &&
     !request.nextUrl.hostname.startsWith("localhost") &&
     !request.nextUrl.hostname.startsWith("127.")
@@ -32,6 +37,19 @@ export async function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl
+
+  // Domain split: the landing service owns the apex; here only the app host
+  // gets special treatment. Hosts outside the two configured domains
+  // (localhost, CI, *.railway.app) fall through.
+  const hostRoute = resolveHostRoute(
+    request.headers.get("host"),
+    pathname,
+    request.nextUrl.search,
+  )
+  if (hostRoute.kind === "redirect") {
+    return NextResponse.redirect(hostRoute.url, 308)
+  }
+
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
   const needsAuth = !isPublic && (pathname === "/c" || AUTH_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p)))
 

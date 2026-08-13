@@ -799,7 +799,7 @@ export async function revokeRunnerKeysForMachine(
 
 /**
  * Statement-returning variant scoped by owner via subquery. Composed into
- * `db.batch([...])` inside the bot soft-delete flow so the revoke commits
+ * `batchAll(db, [...])` inside the bot soft-delete flow so the revoke commits
  * atomically with the user-flag and member-row updates.
  *
  * Uses a subquery on `user.ownerUserId` rather than a plain `agentId = :id`

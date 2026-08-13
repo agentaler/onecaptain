@@ -2,6 +2,7 @@ import { eq, and, inArray, asc } from "drizzle-orm";
 import { communityMessage, communityMessageTag } from "../../community-schema";
 import type { Database } from "../../index";
 import { chunk, D1_MAX_IN_PARAMS } from "../_chunk";
+import { batchAll } from "../../batch";
 
 // Idempotent add. UNIQUE(messageId, tag) makes re-adding the same tag a
 // no-op, so `onConflictDoNothing` keeps this safe to call twice without a
@@ -47,7 +48,7 @@ export async function replaceMessageTags(
       db.insert(communityMessageTag).values({ messageId: data.messageId, tag })
     ),
   ];
-  await db.batch(statements as any);
+  await batchAll(db, statements as any);
 }
 
 // This message's own tag set, unordered (callers sort if they need a

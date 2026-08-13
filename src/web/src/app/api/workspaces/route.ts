@@ -8,7 +8,14 @@ import { workspaceToResponse } from "@/lib/api/responses";
 export const GET = withAuth(async (_req, ctx) => {
   const db = getDb(ctx.env.DB)
 
-  const workspaces = await queries.workspace.listWorkspaces(db, ctx.userId);
+  let workspaces = await queries.workspace.listWorkspaces(db, ctx.userId);
+  if (workspaces.length === 0) {
+    // Lazy personal-workspace provisioning for accounts that predate the
+    // signup hook (DECISIONS.md #6) — a user is never left workspace-less.
+    const u = await queries.user.getUserInternal(db, ctx.userId);
+    await queries.workspace.ensurePersonalWorkspace(db, ctx.userId, u?.name ?? "");
+    workspaces = await queries.workspace.listWorkspaces(db, ctx.userId);
+  }
   return writeJSON(workspaces.map(workspaceToResponse));
 });
 

@@ -2,6 +2,7 @@ import { eq, and, asc, sql } from "drizzle-orm";
 import { channel, conversation } from "../schema";
 import type { Database } from "../index";
 import { deleteUnreadByChannel } from "./inbox";
+import { batchAll } from "../batch";
 
 export async function createChannel(
   db: Database,
@@ -66,7 +67,7 @@ export async function deleteChannel(
   if (!row) return null;
 
   await deleteUnreadByChannel(db, workspaceId, row.name);
-  await db.batch([
+  await batchAll(db, [
     db
       .delete(conversation)
       .where(
@@ -92,7 +93,7 @@ export async function renameChannel(
   const row = await getChannelById(db, id, workspaceId);
   if (!row) return null;
 
-  await db.batch([
+  await batchAll(db, [
     db
       .update(conversation)
       .set({ channel: newName })
@@ -116,7 +117,7 @@ export async function reorderChannels(
   workspaceId: string,
   orderedChannelIds: string[],
 ) {
-  await (db as any).batch(
+  await batchAll(db, 
     orderedChannelIds.map((id, i) =>
       db
         .update(channel)

@@ -1,6 +1,7 @@
 import { eq, and, asc } from "drizzle-orm";
 import { agentSidebarOrder } from "../schema";
 import type { Database } from "../index";
+import { batchAll } from "../batch";
 
 export async function listOrder(db: Database, workspaceId: string, userId: string) {
   return db
@@ -16,7 +17,7 @@ export async function reorder(
   userId: string,
   orderedAgentIds: string[],
 ) {
-  await (db as any).batch([
+  await batchAll(db, [
     db
       .delete(agentSidebarOrder)
       .where(

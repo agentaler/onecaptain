@@ -149,7 +149,7 @@ export async function markChannelMentionsRead(db: Database, userId: string, chan
 /**
  * Batch-friendly builder version of `markChannelMentionsRead`. Collapses the
  * two-step "select-ids-then-update" into a single UPDATE with a correlated
- * subquery, so it can be composed into `db.batch([...])`.
+ * subquery, so it can be composed into `batchAll(db, [...])`.
  *
  * Note: this always fires the UPDATE — even when there are no matching rows,
  * the statement is a no-op. That's fine for a batch; the batch cost is one

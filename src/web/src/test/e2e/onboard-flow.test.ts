@@ -58,10 +58,12 @@ describe("onboard flow — simplified model", () => {
       expect(meRes.status).toBe(200)
     })
 
-    it("new user has no workspaces initially", async () => {
+    it("new user starts with exactly the auto-provisioned personal workspace", async () => {
+      // Signup auto-creates "<name>'s Workspace" (plans/saas-completion.md P2)
       const wsRes = await sessionRequest("/api/workspaces", sessionCookie)
-      const workspaces = await wsRes.json() as Array<{ id: string }>
-      expect(workspaces).toHaveLength(0)
+      const workspaces = await wsRes.json() as Array<{ id: string; name: string }>
+      expect(workspaces).toHaveLength(1)
+      expect(workspaces[0].name).toMatch(/Workspace$/)
     })
 
     it("create workspace", async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { mkdirSync, existsSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -13,6 +13,21 @@ vi.mock("../src/lib/constants.js", () => ({
 }));
 
 describe("services", () => {
+  // Cold-transforming this module graph costs >10s on a loaded Windows CI
+  // runner, and every test imports it dynamically (the mocks above must be
+  // registered first). Without this warm-up the FIRST test is charged for the
+  // whole transform and times out, while the rest run in ~200ms off the cached
+  // result — the recurring "Tests (windows-latest)" failure. Paying it once in
+  // a hook keeps the per-test budgets meaningful; vi.resetModules() clears the
+  // module registry but not the transform cache, so later imports stay cheap.
+  beforeAll(async () => {
+    await Promise.all([
+      import("../src/lib/services.js"),
+      import("../src/lib/pid.js"),
+      import("../src/lib/constants.js"),
+    ]);
+  }, 120_000);
+
   beforeEach(() => {
     mkdirSync(testDir, { recursive: true });
   });

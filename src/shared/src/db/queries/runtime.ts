@@ -1,6 +1,7 @@
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 import { agentRuntime, agent, machine } from "../schema";
 import type { Database } from "../index";
+import { batchAll } from "../batch";
 
 export type UpsertAgentRuntimeInput = {
   workspaceId: string;
@@ -57,7 +58,7 @@ export async function batchUpsertAgentRuntimes(
     return [await upsertAgentRuntime(db, items[0]!)];
   }
   const statements = items.map((item) => upsertAgentRuntimeStatement(db, item));
-  const results = await db.batch(statements as [typeof statements[0], ...typeof statements]);
+  const results = await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
   return results.flatMap((rows) => (Array.isArray(rows) ? rows : [rows]));
 }
 

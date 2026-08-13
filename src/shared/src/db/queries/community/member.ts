@@ -1,4 +1,4 @@
-import { eq, and, ne, inArray, count, asc, or, gt, like, isNull, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, count, asc, or, gt, isNull, sql } from "drizzle-orm";
 import { communityServerMember, communityUserProfile } from "../../community-schema";
 import { user } from "../../schema";
 import type { Database } from "../../index";
@@ -6,10 +6,11 @@ import {
   DEFAULT_MEMBERS_PAGE_SIZE,
   MAX_MEMBERS_PAGE_SIZE,
 } from "../../../constants/community";
-import { escapeLikePattern } from "../../../utils/sql-like";
+import { escapeLikePattern, likeInsensitive } from "../../../utils/sql-like";
 import { canSeePrivateChannel, reachIsParticipantSet } from "../../../utils/community-roles";
 import { resolveChannelAccessContext } from "./channel";
 import { isThreadParticipant } from "./thread";
+import { batchAll } from "../../batch";
 
 export async function addMember(
   db: Database,
@@ -55,7 +56,7 @@ export async function removeMemberAndOwnerBots(
     )
     .returning();
   const removeBots = removeOwnerBotsFromServerStatement(db, serverId, botUserIds);
-  const results = (await db.batch([removeTarget, removeBots] as any)) as any[];
+  const results = (await batchAll(db, [removeTarget, removeBots] as any)) as any[];
   return (results[0] as Array<typeof communityServerMember.$inferSelect>)[0] ?? null;
 }
 
@@ -162,7 +163,7 @@ export async function bulkUpdateRailOrder(
         )
       )
   );
-  await db.batch(statements as [typeof statements[0], ...typeof statements]);
+  await batchAll(db, statements as [typeof statements[0], ...typeof statements]);
 }
 
 export async function listMemberServerIds(db: Database, userId: string) {
@@ -309,8 +310,8 @@ export async function searchMembers(
       and(
         eq(communityServerMember.serverId, serverId),
         or(
-          like(user.name, pattern),
-          like(user.email, pattern)
+          likeInsensitive(user.name, pattern),
+          likeInsensitive(user.email, pattern)
         )
       )
     )

@@ -78,6 +78,7 @@ function makeEnv(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 type AuthOptions = {
+  trustedOrigins?: (request?: Request) => string[]
   user?: {
     additionalFields?: Record<
       string,
@@ -339,12 +340,21 @@ describe("createAuth databaseHooks — user.create.after", () => {
     expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "google", expect.anything())
   })
 
-  it("sets method=unknown for unrecognized path", async () => {
+  it("sets method=password for password signup", async () => {
     const createAuth = await loadCreateAuth()
     const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
     const afterHook = opts.databaseHooks!.user!.create!.after!
     const ctx = makeCtx("http://localhost:3000/api/auth/sign-up/email")
     await afterHook({ id: "u4" }, ctx)
+    expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "password", expect.anything())
+  })
+
+  it("sets method=unknown for unrecognized path", async () => {
+    const createAuth = await loadCreateAuth()
+    const opts = (createAuth(makeEnv({ NODE_ENV: "production" }) as never) as { __options: AuthOptions }).__options
+    const afterHook = opts.databaseHooks!.user!.create!.after!
+    const ctx = makeCtx("http://localhost:3000/api/auth/callback/mystery")
+    await afterHook({ id: "u5" }, ctx)
     expect(ctx.setCookie).toHaveBeenCalledWith("is_new_signup", "unknown", expect.anything())
   })
 
@@ -433,5 +443,74 @@ describe("createAuth databaseHooks — user.create.before", () => {
     // Salt scheme is now `id:width:attempt`; the first retry stays at width 4.
     expect(result.data.discriminator).toBe(computeDiscriminator("u_collide:4:1", 4))
     expect(result.data.discriminator).toMatch(/^\d{4}$/)
+  })
+})
+
+
+describe("trustedOrigins behind a TLS-terminating proxy", () => {
+  async function trustedFor(env: Record<string, unknown>, request?: Request) {
+    const createAuth = await loadCreateAuth()
+    const opts = (createAuth(env as never) as { __options: AuthOptions }).__options
+    return opts.trustedOrigins!(request)
+  }
+
+  function proxied(headers: Record<string, string>) {
+    // What actually reaches the container: https on the wire, http in the URL.
+    return new Request("http://app.onecaptain.ai/api/auth/sign-in/email", { headers })
+  }
+
+  it("trusts the https origin the browser used, not the http one the proxy delivered", async () => {
+    const origins = await trustedFor(
+      makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
+      proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" }),
+    )
+    expect(origins).toContain("https://app.onecaptain.ai")
+    // The http form is deliberate: behind the proxy a browser's same-origin
+    // https Origin reaches Better Auth downgraded to http.
+    expect(origins).toContain("http://app.onecaptain.ai")
+  })
+
+  it("still yields the request's own origin when BETTER_AUTH_URL is unset", async () => {
+    const env = makeEnv()
+    delete (env as Record<string, unknown>).BETTER_AUTH_URL
+    expect(await trustedFor(env, proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" })))
+      .toEqual(["https://app.onecaptain.ai", "http://app.onecaptain.ai"])
+  })
+
+  it("does not duplicate the origin when base URL and request agree", async () => {
+    const origins = await trustedFor(
+      makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
+      proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" }),
+    )
+    expect(origins).toEqual(["https://app.onecaptain.ai", "http://app.onecaptain.ai"])
+  })
+
+  it("keeps both when the app is reached on a host other than its base URL", async () => {
+    const origins = await trustedFor(
+      makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
+      proxied({ host: "onecaptain-web.up.railway.app", "x-forwarded-proto": "https" }),
+    )
+    expect(origins).toEqual([
+      "https://app.onecaptain.ai",
+      "https://onecaptain-web.up.railway.app",
+      "http://onecaptain-web.up.railway.app",
+    ])
+  })
+
+  it("never trusts an unrelated origin", async () => {
+    const origins = await trustedFor(
+      makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" }),
+      proxied({ host: "app.onecaptain.ai", "x-forwarded-proto": "https" }),
+    )
+    expect(origins).not.toContain("https://evil.example")
+  })
+
+  it("falls back to the configured base URL alone when there is no request", async () => {
+    expect(await trustedFor(makeEnv({ BETTER_AUTH_URL: "https://app.onecaptain.ai" })))
+      .toEqual(["https://app.onecaptain.ai"])
+  })
+
+  it("survives a malformed BETTER_AUTH_URL instead of throwing at request time", async () => {
+    expect(await trustedFor(makeEnv({ BETTER_AUTH_URL: "not a url" }))).toEqual([])
   })
 })

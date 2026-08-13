@@ -12,17 +12,22 @@
     "./utils/community-roles": "./src/utils/community-roles.ts",
     "./lib/discriminator": "./src/lib/discriminator.ts",
     "./lib/invite-link": "./src/lib/invite-link.ts",
-    "./db/resilience-testing": "./src/db/resilience-testing.ts"
+    "./db/resilience-testing": "./src/db/resilience-testing.ts",
+    "./db-node": "./src/db/node.ts",
+    "./db-pg": "./src/db/pg/index.ts"
   },
   "scripts": {
     "knip": "knip",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate:pg": "drizzle-kit generate --config drizzle-pg.config.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "drizzle-orm": "^0.45.2",
     "nanoid": "^5.1.16",
-    "zod": "^4.4"
+    "zod": "^4.4",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",
@@ -32,6 +37,9 @@
     "knip": "^6.31.0",
     "playwright-core": "^1.62.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@types/pg": "^8.15.4",
+    "@electric-sql/pglite": "^0.3.14",
+    "drizzle-kit": "^0.31.4"
   }
 }

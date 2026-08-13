@@ -4,7 +4,7 @@ import type { Database } from "../index";
 
 export async function createInvite(
   db: Database,
-  data: { workspaceId: string; createdBy: string; expiresAt: string }
+  data: { workspaceId: string; createdBy: string; expiresAt: string; email?: string | null; role?: string }
 ) {
   const rows = await db
     .insert(workspaceInvite)
@@ -12,6 +12,8 @@ export async function createInvite(
       workspaceId: data.workspaceId,
       createdBy: data.createdBy,
       expiresAt: data.expiresAt,
+      email: data.email ?? null,
+      role: data.role ?? "member",
     })
     .returning();
   return rows[0]!;
@@ -28,6 +30,8 @@ export async function getInviteByToken(db: Database, token: string) {
       usedAt: workspaceInvite.usedAt,
       expiresAt: workspaceInvite.expiresAt,
       createdAt: workspaceInvite.createdAt,
+      email: workspaceInvite.email,
+      role: workspaceInvite.role,
       workspaceName: workspace.name,
       workspaceSlug: workspace.slug,
       creatorName: user.name,
@@ -66,6 +70,15 @@ export async function redeemInvite(db: Database, token: string, userId: string) 
       )
     )
     .returning();
+  return rows[0] ?? null;
+}
+
+export async function getInvite(db: Database, inviteId: string, workspaceId: string) {
+  const rows = await db
+    .select()
+    .from(workspaceInvite)
+    .where(and(eq(workspaceInvite.id, inviteId), eq(workspaceInvite.workspaceId, workspaceId)))
+    .limit(1);
   return rows[0] ?? null;
 }
 

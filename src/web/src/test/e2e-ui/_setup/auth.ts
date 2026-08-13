@@ -23,7 +23,14 @@ export async function loginAndSaveState(
     await page.goto(`${WEB_URL}/c`)
     await page.waitForURL(/\/sign-in/, { timeout: 30_000 , waitUntil: "commit" })
 
-    await page.getByRole("textbox", { name: "Email" }).fill(email)
+    // `next dev` compiles on demand and the setup warm-up only guarantees the
+    // route answered once — on a loaded runner the form can still be a few
+    // seconds behind the navigation. Wait on a compile-sized budget instead of
+    // Playwright's 30s action default, which turned a slow compile into an
+    // opaque "locator.fill timeout" that looked like a broken sign-in page.
+    const emailField = page.getByRole("textbox", { name: "Email" })
+    await emailField.waitFor({ state: "visible", timeout: 120_000 })
+    await emailField.fill(email)
     await page.getByRole("button", { name: "Sign in", exact: true }).click()
 
     // Land somewhere authenticated — community shell or the default workspace.

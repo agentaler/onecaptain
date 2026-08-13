@@ -160,6 +160,8 @@ export const workspaceInvite = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     usedBy: text("used_by").references(() => user.id, { onDelete: "set null" }),
+    email: text("email"),
+    role: text("role").notNull().default("member"),
     usedAt: text("used_at"),
     expiresAt: text("expires_at").notNull(),
     createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
@@ -869,5 +871,31 @@ export const inboxUnread = sqliteTable(
   (t) => [
     unique("inbox_unread_conv_user").on(t.conversationId, t.userId),
     index("idx_inbox_unread_user_ws").on(t.userId, t.workspaceId, t.taskType, t.completedAt),
+  ]
+);
+
+// Polar billing state — one row per workspace, written ONLY by the webhook
+// sync (plans/saas-completion.md P4, DECISIONS.md #4). The request path reads
+// workspace.plan; the sync updates both together so gating never calls Polar.
+export const subscription = sqliteTable(
+  "subscription",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "sub_" + nanoid()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    polarSubscriptionId: text("polar_subscription_id"),
+    polarCustomerId: text("polar_customer_id"),
+    productId: text("product_id"),
+    plan: text("plan").notNull().default("free"),
+    status: text("status").notNull().default("none"),
+    currentPeriodEnd: text("current_period_end"),
+    cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    unique("subscription_workspace_unique").on(t.workspaceId),
+    index("idx_subscription_polar_id").on(t.polarSubscriptionId),
   ]
 );

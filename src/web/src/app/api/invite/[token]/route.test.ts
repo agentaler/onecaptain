@@ -148,6 +148,50 @@ describe("POST /api/invite/[token]", () => {
     expect(mockCreateMember).not.toHaveBeenCalled();
   });
 
+  it("grants the invite's role at acceptance (admin email invite)", async () => {
+    mockGetInviteByToken.mockResolvedValue({ ...sampleInvite, role: "admin" });
+    mockGetMemberByUserAndWorkspace.mockResolvedValue(null);
+    mockRedeemInvite.mockResolvedValue({ ...sampleInvite, usedBy: "u1" });
+    mockCreateMember.mockResolvedValue({ id: "m-new" });
+
+    const req = new NextRequest("http://localhost/api/invite/tok-abc", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ token: "tok-abc" }) } as any);
+    expect(res.status).toBe(200);
+    expect(mockCreateMember).toHaveBeenCalledWith(
+      {},
+      { workspaceId: "w1", userId: "u1", role: "admin" }
+    );
+  });
+
+  it("never grants owner via an invite even if the row says so", async () => {
+    mockGetInviteByToken.mockResolvedValue({ ...sampleInvite, role: "owner" });
+    mockGetMemberByUserAndWorkspace.mockResolvedValue(null);
+    mockRedeemInvite.mockResolvedValue({ ...sampleInvite, usedBy: "u1" });
+    mockCreateMember.mockResolvedValue({ id: "m-new" });
+
+    const req = new NextRequest("http://localhost/api/invite/tok-abc", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ token: "tok-abc" }) } as any);
+    expect(res.status).toBe(200);
+    expect(mockCreateMember).toHaveBeenCalledWith(
+      {},
+      { workspaceId: "w1", userId: "u1", role: "member" }
+    );
+  });
+
+  it("lifts the seat quota on the pro plan (same seat count that blocks free)", async () => {
+    mockGetInviteByToken.mockResolvedValue(sampleInvite);
+    mockGetMemberByUserAndWorkspace.mockResolvedValue(null);
+    mockGetWorkspacePlan.mockResolvedValueOnce("pro");
+    mockCountMembers.mockResolvedValueOnce(5);
+    mockRedeemInvite.mockResolvedValue({ ...sampleInvite, usedBy: "u1" });
+    mockCreateMember.mockResolvedValue({ id: "m-new" });
+
+    const req = new NextRequest("http://localhost/api/invite/tok-abc", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ token: "tok-abc" }) } as any);
+    expect(res.status).toBe(200);
+    expect(mockCreateMember).toHaveBeenCalled();
+  });
+
   it("accepts a valid invite and creates membership", async () => {
     mockGetInviteByToken.mockResolvedValue(sampleInvite);
     mockGetMemberByUserAndWorkspace.mockResolvedValue(null);

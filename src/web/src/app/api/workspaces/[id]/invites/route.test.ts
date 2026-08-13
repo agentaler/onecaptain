@@ -3,6 +3,8 @@ import { NextRequest } from "next/server";
 
 const mockListActiveInvites = vi.fn();
 const mockCreateInvite = vi.fn();
+const mockGetWorkspace = vi.fn();
+const mockSendEmail = vi.fn(async () => {});
 
 vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: vi.fn(async () => ({ env: { DB: {} } })),
@@ -18,6 +20,9 @@ vi.mock("@onecaptain/shared", async () => {
       workspaceInvite: {
         listActiveInvites: (...args: unknown[]) => mockListActiveInvites(...args),
         createInvite: (...args: unknown[]) => mockCreateInvite(...args),
+      },
+      workspace: {
+        getWorkspace: (...args: unknown[]) => mockGetWorkspace(...args),
       },
     },
   };
@@ -42,6 +47,10 @@ vi.mock("@/lib/middleware/workspace", () => ({
 vi.mock("@/lib/api/responses", async () =>
   await vi.importActual<typeof import("@/lib/api/responses")>("@/lib/api/responses")
 );
+
+vi.mock("@/lib/send-email", () => ({
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+}));
 
 import { GET, POST } from "./route";
 
@@ -100,5 +109,65 @@ describe("POST /api/workspaces/[id]/invites", () => {
       {},
       expect.objectContaining({ workspaceId: "w1", createdBy: "u1" })
     );
+  });
+});
+
+describe("POST /api/workspaces/[id]/invites — email + role", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates an admin-role email invite and delivers the link", async () => {
+    mockCreateInvite.mockResolvedValue({ ...sampleInvite, email: "new@example.com", role: "admin" });
+    mockGetWorkspace.mockResolvedValue({ id: "w1", name: "Acme", slug: "acme" });
+
+    const req = new NextRequest("http://localhost/api/workspaces/w1/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "New@Example.com", role: "admin" }),
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: "w1" }) } as never);
+    expect(res.status).toBe(201);
+    expect(mockCreateInvite).toHaveBeenCalledWith({}, expect.objectContaining({
+      email: "new@example.com",
+      role: "admin",
+    }));
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    const [, mail] = mockSendEmail.mock.calls[0] as [unknown, { to: string; actionUrl: string }];
+    expect(mail.to).toBe("new@example.com");
+    expect(mail.actionUrl).toContain(`/invite/${sampleInvite.token}`);
+  });
+
+  it("rejects an owner-role invite", async () => {
+    const req = new NextRequest("http://localhost/api/workspaces/w1/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "x@example.com", role: "owner" }),
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: "w1" }) } as never);
+    expect(res.status).toBe(400);
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed email", async () => {
+    const req = new NextRequest("http://localhost/api/workspaces/w1/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "not-an-email" }),
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: "w1" }) } as never);
+    expect(res.status).toBe(400);
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+  });
+
+  it("bare POST still creates a shareable member link without email delivery", async () => {
+    mockCreateInvite.mockResolvedValue(sampleInvite);
+    const req = new NextRequest("http://localhost/api/workspaces/w1/invites", { method: "POST" });
+    const res = await POST(req, { params: Promise.resolve({ id: "w1" }) } as never);
+    expect(res.status).toBe(201);
+    expect(mockCreateInvite).toHaveBeenCalledWith({}, expect.objectContaining({
+      email: null,
+      role: "member",
+    }));
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 });
