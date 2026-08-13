@@ -5,6 +5,7 @@ import { createNodeClient, createNodeDb, applyMigrations } from "../../src/db/no
 import type { Database } from "../../src/db";
 import { user } from "../../src/db/schema";
 import { communityBotBinding, communityMachine } from "../../src/db/community-machine-schema";
+import { member, workspace } from "../../src/db/schema";
 
 /**
  * Migration 0090 rebuilds `community_bot_binding` to make `machine_id`
@@ -108,6 +109,48 @@ describe("community_bot_binding after 0090", () => {
       .then(() => null as unknown, (e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
     expect(causeChain(err)).toMatch(/FOREIGN KEY constraint failed/i);
+  });
+
+  it("carries the workspace that pays for the agent", async () => {
+    // Without this the cloud runtime has no tenant: nothing to resolve a
+    // workspace credential against and nothing to attribute usage to.
+    const [ws] = await db
+      .insert(workspace)
+      .values({ name: "Tenant", slug: "tenant-a" })
+      .returning();
+    const [bot] = await db
+      .insert(user)
+      .values({
+        id: "user_bot_ws",
+        name: "Cloud bot",
+        email: "cloudbot@example.com",
+        emailVerified: false,
+        isBot: true,
+        ownerUserId: ownerId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    await db.insert(communityBotBinding).values({
+      userId: bot.id,
+      machineId: null,
+      workspaceId: ws.id,
+      runtime: "cloud",
+    });
+
+    const [row] = await db
+      .select()
+      .from(communityBotBinding)
+      .where(eq(communityBotBinding.userId, bot.id));
+    expect(row.workspaceId).toBe(ws.id);
+    expect(row.machineId).toBeNull();
+  });
+
+  it("keeps the workspace index the credential lookup relies on", async () => {
+    const rows = await db.all<{ name: string }>(
+      sql`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'community_bot_binding'`
+    );
+    expect(rows.map((r) => r.name)).toContain("idx_community_bot_binding_workspace");
   });
 
   it("keeps the machine index the wake-dispatch lookups rely on", async () => {

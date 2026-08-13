@@ -362,6 +362,7 @@ export type BotWakeContext =
       name: string;
       discriminator: string;
       machineId: string;
+      workspaceId: string | null;
       runtime: string;
       modelName: string | null;
       providerKind: string | null;
@@ -380,6 +381,7 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
       deletedAt: user.deletedAt,
       ownerUserId: user.ownerUserId,
       machineId: communityBotBinding.machineId,
+      workspaceId: communityBotBinding.workspaceId,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
       providerKind: communityBotBinding.providerKind,
@@ -400,6 +402,7 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
     name: r.name,
     discriminator: r.discriminator,
     machineId: r.machineId,
+    workspaceId: r.workspaceId ?? null,
     runtime: r.runtime,
     modelName: r.modelName ?? null,
     providerKind: r.providerKind ?? null,
@@ -534,6 +537,13 @@ export type CreateBotInput = {
   runtime: string;
   image?: string | null;
   modelName?: string | null;
+  /**
+   * The tenant that pays for and quotas this agent. Optional only so existing
+   * machine-only callers keep compiling; a bot created without one cannot run
+   * in the cloud, because there is no workspace whose credential it could use
+   * or whose usage it could be billed to.
+   */
+  workspaceId?: string | null;
 };
 
 /**
@@ -576,6 +586,7 @@ export async function createBot(
       const stmt2 = db.insert(communityBotBinding).values({
         userId: botId,
         machineId: data.machineId,
+        workspaceId: data.workspaceId ?? null,
         runtime: data.runtime,
         modelName: data.modelName ?? null,
         createdAt: nowIso,
