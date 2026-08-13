@@ -10,7 +10,11 @@ export {
   removeCommunityLlmProvider,
   verifyCommunityLlmProvider,
 } from "./llm-providers";
-export type { LlmProviderEntry, LlmProviderVerifyResult } from "./llm-providers";
+export type {
+  LlmProviderEntry,
+  LlmProviderVerifyResult,
+  CommunityLlmProviders,
+} from "./llm-providers";
 export { fetchModelOptions, getMinCliVersion, fetchLatestCliVersion } from "./config";
 export {
   listAgents,

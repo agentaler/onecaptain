@@ -49,11 +49,18 @@ export const verifyLlmProvider = (workspaceId: string, kind: string, model: stri
 /**
  * Community-surface variants. `/c` carries no workspace, so these resolve the
  * caller's primary workspace server-side — see `primary-workspace.ts`.
+ *
+ * `platformFallback` is whether OneCaptain has a key that would serve this
+ * workspace, so the UI can tell "no key anywhere" apart from "no key of your
+ * own" — only the first is a reason to block creating an agent.
  */
+export interface CommunityLlmProviders {
+  providers: LlmProviderEntry[];
+  platformFallback: boolean;
+}
+
 export const listCommunityLlmProviders = () =>
-  apiFetch<{ providers: LlmProviderEntry[] }>("/api/community/llm-providers").then(
-    (r) => r.providers,
-  );
+  apiFetch<CommunityLlmProviders>("/api/community/llm-providers");
 
 export const saveCommunityLlmProvider = (
   kind: string,

@@ -23,7 +23,7 @@ export default function MeLlmPage() {
   const uiHandlers = useUiHandlers()
   const api = useMemo(
     () => ({
-      list: listCommunityLlmProviders,
+      list: () => listCommunityLlmProviders().then((r) => r.providers),
       save: saveCommunityLlmProvider,
       remove: removeCommunityLlmProvider,
       verify: verifyCommunityLlmProvider,

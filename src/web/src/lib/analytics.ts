@@ -125,7 +125,7 @@ export function trackRuntimeConnected(params: {
   sendGTMEvent({ event: "runtime_connected", ...params });
 }
 
-export type CommunityOnboardingStage = "machine" | "bot" | "dm" | "server";
+export type CommunityOnboardingStage = "bot" | "dm" | "server";
 
 export function trackCommunityOnboardingStarted() {
   sendGTMEvent({ event: "community_onboarding_started" });

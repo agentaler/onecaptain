@@ -6,12 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { GeneratedAvatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { driver, type Driver } from "driver.js";
-import { isPresenceOnline, type CommunityMachineSummary } from "@onecaptain/shared";
-import { useMachines } from "@/hooks/community/use-machines";
-import { useBots, type BotSummary } from "@/hooks/community/use-bots";
 import {
-  advanceCommunityOnboarding,
-  recoverCommunityOnboardingMachine,
   skipCommunityOnboarding,
   type CommunityOnboardingState,
   useCommunityOnboarding,
@@ -25,91 +20,46 @@ type GuideCopy = {
 };
 
 type GuideTarget = {
-  name: "channel-composer" | "connect-machine" | "reconnect-machine" | "create-bot" | "dm-composer" | "add-server";
+  name: "channel-composer" | "create-bot" | "dm-composer" | "add-server";
   resourceId?: string;
 };
 
 type GuidePopoverSide = "top" | "right" | "bottom";
-
-type GuideContext = {
-  machines: Pick<CommunityMachineSummary, "id" | "status">[];
-  bots: Pick<BotSummary, "id" | "machineId">[];
-};
 
 const target = (name: GuideTarget["name"], resourceId?: string): GuideTarget => ({
   name,
   ...(resourceId ? { resourceId } : {}),
 });
 
-function stableOfflineMachine(machines: GuideContext["machines"]) {
-  return machines
-    .filter((machine) => !isPresenceOnline(machine.status))
-    .sort((a, b) => a.id.localeCompare(b.id))[0];
-}
-
-function recoveryCopy(machine: GuideContext["machines"][number], eyebrow: string): GuideCopy {
-  return {
-    target: target("reconnect-machine", machine.id),
-    eyebrow,
-    title: "Bring your machine back online",
-    route: "/c/me/machines",
-  };
-}
-
-export function guideCopy(
-  state: CommunityOnboardingState,
-  { machines, bots }: GuideContext,
-): GuideCopy | null {
-  if (state.stage === "machine") {
-    if (machines.some((machine) => isPresenceOnline(machine.status))) return null;
-    const offlineMachine = stableOfflineMachine(machines);
-    if (offlineMachine) return recoveryCopy(offlineMachine, "Step 1 of 4");
-    return {
-      target: target("connect-machine"),
-      eyebrow: "Step 1 of 4",
-      title: "Give your bot a place to run",
-      route: "/c/me/machines",
-    };
-  }
+/**
+ * What the guide is pointing at right now.
+ *
+ * Depends on the onboarding state alone. It used to also take the workspace's
+ * machines and bots, because step 1 was "connect a machine" and step 2 refused
+ * to let anyone create an agent until one was online — which stalled the whole
+ * guide for anyone who had not installed the daemon. An agent runs on an LLM
+ * key now, and a workspace with no key of its own falls back to OneCaptain's,
+ * so there is nothing to connect before creating one.
+ *
+ * Dropping those inputs is what makes the guide honest: with no query to wait
+ * on, step 1 can never render as "still loading" and can never be rewritten
+ * into a prerequisite the user cannot satisfy.
+ */
+export function guideCopy(state: CommunityOnboardingState): GuideCopy | null {
   if (state.stage === "bot") {
-    const boundMachineId = state.botId
-      ? bots.find((bot) => bot.id === state.botId)?.machineId
-      : undefined;
-    const boundMachine = boundMachineId
-      ? machines.find((machine) => machine.id === boundMachineId)
-      : undefined;
-    if (boundMachine && !isPresenceOnline(boundMachine.status)) {
-      return recoveryCopy(boundMachine, "Step 2 of 4");
-    }
-    if (!machines.some((machine) => isPresenceOnline(machine.status))) {
-      const offlineMachine = stableOfflineMachine(machines);
-      if (offlineMachine) return recoveryCopy(offlineMachine, "Step 2 of 4");
-      return {
-        target: target("connect-machine"),
-        eyebrow: "Step 2 of 4",
-        title: "Give your bot a place to run",
-        route: "/c/me/machines",
-      };
-    }
-    if (state.botId) {
-      return {
-        target: target("create-bot"),
-        eyebrow: "Step 2 of 4",
-        title: "Meet your bot in chat",
-        route: "/c/me/bots",
-      };
-    }
     return {
       target: target("create-bot"),
-      eyebrow: "Step 2 of 4",
-      title: "Create a bot with a voice of its own",
+      eyebrow: "Step 1 of 3",
+      title: state.botId
+        ? "Meet your bot in chat"
+        : "Create a bot with a voice of its own",
       route: "/c/me/bots",
     };
   }
   if (state.stage === "dm") {
     return {
       target: target("dm-composer"),
-      eyebrow: "Step 3 of 4",
+      eyebrow: "Step 2 of 3",
       title: "Start a conversation with your bot",
       route: state.dmId ? `/c/me/${state.dmId}` : undefined,
     };
@@ -117,7 +67,7 @@ export function guideCopy(
   const recovering = Boolean(state.serverId);
   return {
     target: target("add-server"),
-    eyebrow: "Step 4 of 4",
+    eyebrow: "Step 3 of 3",
     title: recovering
       ? "Bring your bot into the server"
       : "Make a shared home for friends and family",
@@ -429,8 +379,6 @@ function GuideCard({
 export function CommunityOnboardingGuide() {
   const router = useRouter();
   const pathname = usePathname();
-  const machinesQuery = useMachines();
-  const botsQuery = useBots();
   const state = useCommunityOnboarding();
   const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(null);
   const [targetAvatarContainer, setTargetAvatarContainer] = useState<HTMLElement | null>(null);
@@ -438,26 +386,7 @@ export function CommunityOnboardingGuide() {
   const targetAvatarRef = useRef<HTMLElement | null>(null);
   const routedGuideRef = useRef<string | null>(null);
 
-  const copy = useMemo(
-    () => {
-      if (!state) return null;
-      if ((state.stage === "machine" || state.stage === "bot") && !machinesQuery.isSuccess) {
-        return null;
-      }
-      if (
-        state.stage === "bot" &&
-        state.botId &&
-        !botsQuery.isSuccess
-      ) {
-        return null;
-      }
-      return guideCopy(state, {
-        machines: machinesQuery.machines,
-        bots: botsQuery.bots,
-      });
-    },
-    [state, machinesQuery.isSuccess, machinesQuery.machines, botsQuery.isSuccess, botsQuery.bots],
-  );
+  const copy = useMemo(() => (state ? guideCopy(state) : null), [state]);
   const destroyGuide = useCallback(() => {
     const instance = driverRef.current;
     driverRef.current = null;
@@ -468,25 +397,6 @@ export function CommunityOnboardingGuide() {
     setPopoverContainer(null);
     setTargetAvatarContainer(null);
   }, []);
-
-  useEffect(() => {
-    if (
-      state?.status !== "active" ||
-      state.stage !== "machine" ||
-      !machinesQuery.isSuccess ||
-      !machinesQuery.machines.some((machine) => isPresenceOnline(machine.status))
-    ) {
-      return;
-    }
-    advanceCommunityOnboarding("machine", "bot");
-  }, [state, machinesQuery.isSuccess, machinesQuery.machines]);
-
-  useEffect(() => {
-    const recoveryTarget =
-      copy?.target.name === "connect-machine" || copy?.target.name === "reconnect-machine";
-    if (!recoveryTarget || state?.status !== "active" || state.stage !== "bot" || state.machineRecovery) return;
-    recoverCommunityOnboardingMachine();
-  }, [copy, state]);
 
   useLayoutEffect(() => {
     if (!popoverContainer) return;

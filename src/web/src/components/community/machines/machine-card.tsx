@@ -116,8 +116,6 @@ export function MachineCard({
           <Button
             variant="outline"
             size="sm"
-            data-onboarding-target="reconnect-machine"
-            data-onboarding-id={machine.id}
             onClick={onReconnect}
           >
             Reconnect

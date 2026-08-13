@@ -24,6 +24,16 @@ declare namespace Cloudflare {
     BETTER_AUTH_SECRET: string
     BETTER_AUTH_URL: string
     ENCRYPTION_KEY: string
+    /**
+     * OneCaptain's own provider account — what a workspace that brings no key
+     * of its own runs on (`resolveAgentProvider` source `"platform"`, the only
+     * source that produces a billable call). Optional: a deployment without it
+     * simply has no free tier, and every agent then needs a workspace or agent
+     * key. Both values are needed together or the fallback does not exist.
+     */
+    PLATFORM_PROVIDER_KIND?: string
+    PLATFORM_PROVIDER_API_KEY?: string
+    PLATFORM_PROVIDER_API_URL?: string
     CACHE_KV: KVNamespace
     AUTH_OTP_RATE_LIMIT_MAX?: string
     AUTH_OTP_RATE_LIMIT_WINDOW_SEC?: string

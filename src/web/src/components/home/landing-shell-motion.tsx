@@ -1369,7 +1369,6 @@ function MachineScene({
             </div>
             <div className="flex items-center gap-2">
               <Button
-                data-onboarding-target="connect-machine"
                 data-motion-target="connect"
                 className={targetClass(snapshot, "connect")}
               >

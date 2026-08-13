@@ -15,7 +15,6 @@ type JourneyResources = {
   dmId?: string;
   serverId?: string;
   generalId?: string;
-  machineRecovery?: boolean;
   guideAvatarSeed?: string;
 };
 
@@ -39,7 +38,7 @@ export function readCommunityOnboardingState() {
 
 export function startCommunityOnboarding(resources: Pick<JourneyResources, "guideAvatarSeed"> = {}) {
   if (currentState) return currentState;
-  const next: CommunityOnboardingState = { ...resources, status: "active", stage: "machine" };
+  const next: CommunityOnboardingState = { ...resources, status: "active", stage: "bot" };
   publish(next);
   trackCommunityOnboardingStarted();
   return next;
@@ -67,13 +66,6 @@ export function advanceCommunityOnboarding(
 export function updateCommunityOnboardingResources(resources: JourneyResources) {
   if (currentState?.status !== "active") return currentState;
   return publish({ ...currentState, ...resources });
-}
-
-export function recoverCommunityOnboardingMachine() {
-  if (currentState?.status !== "active" || currentState.stage !== "bot") {
-    return currentState;
-  }
-  return publish({ ...currentState, machineRecovery: true });
 }
 
 export function completeCommunityOnboarding() {
