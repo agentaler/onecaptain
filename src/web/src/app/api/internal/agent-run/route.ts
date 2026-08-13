@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { queries, createLogger, InternalAgentRunRequestSchema } from "@onecaptain/shared"
+import {
+  queries,
+  createLogger,
+  InternalAgentRunRequestSchema,
+  verifyInternalRun,
+} from "@onecaptain/shared"
 import { getDb } from "@/lib/db"
 import { runCloudAgentTurn } from "@/lib/community/cloud-agent-run"
 
@@ -18,39 +23,41 @@ const log = createLogger({ service: "internal-agent-run" })
  * platform seam the Postgres cutover requires, which is a separate project.
  *
  * NOT a user-facing route. It carries no session and must never be reachable
- * with one: authorization is a shared secret, compared in constant time, and
- * absent-secret means closed rather than open. The wake worker has already
- * established from current D1 state WHICH agent may speak in WHICH channel
- * (membership, read-state, access — see `buildUnreadWakeCommand`), so this
- * route deliberately does not redo that; it authenticates the caller, not the
- * agent.
+ * with one. The wake worker has already established from current D1 state WHICH
+ * agent may speak in WHICH channel (membership, read-state, access — see
+ * `buildUnreadWakeCommand`), so this route deliberately does not redo that; it
+ * authenticates the caller, not the agent.
+ *
+ * Authorization is a signature derived from `ENCRYPTION_KEY`, NOT a separately
+ * configured secret. See `internal-auth.ts` for why: a hand-set value would be
+ * per-deployment manual ops that fails silently when missed, which is the wrong
+ * shape for a multi-tenant SaaS.
+ *
+ * The body is parsed BEFORE the signature is checked because the signature
+ * covers the claims — verifying first would mean verifying a signature against
+ * fields we had not read yet, which is how signed requests end up authenticating
+ * something other than what they execute.
  */
-function secretsMatch(a: string, b: string): boolean {
-  // Length is not secret (both sides are fixed-length config), but the
-  // comparison still must not exit early on the first differing byte.
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
-}
-
 export async function POST(request: NextRequest): Promise<Response> {
   const { env } = getCloudflareContext()
-  const expected = env.INTERNAL_RUN_SECRET
-  const presented = request.headers.get("x-onecaptain-internal")
-
-  // Fail closed when unconfigured. An empty expected secret matching an empty
-  // header would turn this into an open door on any deploy that forgot to set
-  // it — the exact failure mode worth being paranoid about.
-  if (!expected || !presented || !secretsMatch(presented, expected)) {
-    return NextResponse.json({ error: "not found" }, { status: 404 })
-  }
 
   const parsed = InternalAgentRunRequestSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 })
   }
   const { botUserId, channelId } = parsed.data
+
+  const verdict = await verifyInternalRun(
+    env.ENCRYPTION_KEY,
+    request.headers.get("x-onecaptain-internal"),
+    { botUserId, channelId },
+    Date.now(),
+  )
+  if (!verdict.ok) {
+    // 404 rather than 401 — an unauthenticated caller learns nothing about
+    // whether this route exists.
+    return NextResponse.json({ error: "not found" }, { status: 404 })
+  }
 
   const db = getDb(env.DB)
   const channel = await queries.communityChannel.getChannel(db, channelId)

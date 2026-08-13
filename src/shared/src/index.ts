@@ -489,6 +489,9 @@ export {
 } from "./community/bot-provider";
 export type { BotProviderKind } from "./community/bot-provider";
 export { resolveAgentProvider } from "./community/agent-provider";
+export { currentUsagePeriodStart, currentUsagePeriodEnd } from "./constants";
+export { signInternalRun, verifyInternalRun, INTERNAL_SIGNATURE_TTL_MS } from "./community/internal-auth";
+export type { InternalRunClaims, InternalRunVerdict } from "./community/internal-auth";
 export type {
   AgentProviderBinding,
   AgentProviderEnv,

@@ -1,5 +1,8 @@
 import {
   callProvider,
+  currentUsagePeriodEnd,
+  currentUsagePeriodStart,
+  getPlanLimits,
   ProviderCallError,
   queries,
   resolveAgentProvider,
@@ -32,7 +35,11 @@ const CONTEXT_MESSAGE_LIMIT = 20
 
 export type CloudAgentRunResult =
   | { ok: true; messageId: string; inputTokens: number; outputTokens: number; billable: boolean }
-  | { ok: false; kind: "no_credential" | "permanent" | "transient" | "empty_reply"; error: string }
+  | {
+      ok: false
+      kind: "no_credential" | "permanent" | "transient" | "empty_reply" | "over_allowance"
+      error: string
+    }
 
 export interface CloudAgentRunInput {
   db: Database
@@ -78,6 +85,40 @@ export async function runCloudAgentTurn(input: CloudAgentRunInput): Promise<Clou
   }
 
   // `listMessages` returns newest-first; a conversation reads oldest-first.
+  // Spend gate. Only calls WE pay for are capped — a workspace on its own key
+  // costs us nothing, and counting those against an allowance would be charging
+  // someone for spending their own money. Checked BEFORE the provider call, so
+  // an over-allowance workspace cannot run up cost and be refused afterwards.
+  if (resolution.billable) {
+    const over = await isOverIncludedAllowance(db, bot.workspaceId)
+    if (over) {
+      // Say so in the channel rather than going quiet. Silence is the failure
+      // mode this whole change exists to remove — an agent that stops answering
+      // for an invisible reason is indistinguishable from a broken one.
+      //
+      // `skipWake` is load-bearing, not tidiness: a bot's message can wake
+      // another bot, so two over-allowance agents in one channel would answer
+      // each other's notices forever.
+      await createCommunityMessage({
+        db,
+        authorId: botUserId,
+        target: { kind: "channel", channelId, serverId },
+        body: {
+          content:
+            "I'm out of included AI usage for this month. Add your own provider key in settings, or upgrade the plan, and I'll pick straight back up.",
+        },
+        skipWake: true,
+      }).catch(() => {
+        // Best-effort. Failing to explain must not turn into failing to stop.
+      })
+      return {
+        ok: false,
+        kind: "over_allowance",
+        error: "this workspace has used its included AI usage for the month",
+      }
+    }
+  }
+
   const history = (
     await queries.communityMessage.listMessages(db, {
       channelId,
@@ -143,6 +184,37 @@ export async function runCloudAgentTurn(input: CloudAgentRunInput): Promise<Clou
     outputTokens: result.outputTokens,
     billable: resolution.billable,
   }
+}
+
+/**
+ * Has this workspace spent its monthly included allowance on OneCaptain-paid
+ * calls?
+ *
+ * Sums the period's BILLABLE usage only — `summarizeUsage` returns both totals
+ * precisely so a limit can read the billable one without a second query. A
+ * workspace with no id cannot be metered or billed, so it has no allowance to
+ * spend and is refused rather than given a free uncapped ride.
+ */
+async function isOverIncludedAllowance(
+  db: Database,
+  workspaceId: string | null,
+): Promise<boolean> {
+  if (!workspaceId) return true
+
+  const plan = await queries.workspace.getWorkspacePlan(db, workspaceId)
+  const allowance = getPlanLimits(plan).includedTokensPerMonth
+  if (allowance === Number.POSITIVE_INFINITY) return false
+
+  const usage = await queries.providerCredential.summarizeUsage(
+    db,
+    workspaceId,
+    currentUsagePeriodStart(),
+    currentUsagePeriodEnd(),
+  )
+  // Tokens in AND out — both are billed by every provider, so counting only one
+  // would let an agent that writes long answers run at roughly double the
+  // intended allowance.
+  return usage.inputTokens + usage.outputTokens >= allowance
 }
 
 /**

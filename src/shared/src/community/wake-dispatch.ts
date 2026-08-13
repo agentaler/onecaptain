@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { signInternalRun } from "./internal-auth";
 import type { HostCommand, UnreadNotice } from "../community-cli-contract";
 import { makeRuntimeConfig, type ProviderConfig } from "../runtime-config";
 import { resolveModelConfig } from "./bot-model";
@@ -44,8 +45,6 @@ interface WakeDispatchEnv {
    * rather than throwing.
    */
   WEB_WORKER?: FetcherLike;
-  /** Shared secret proving a request to the internal run route came from here. */
-  INTERNAL_RUN_SECRET?: string;
   /**
    * Secret for decrypting a bot's stored cloud-provider API key
    * (`community_bot_binding.provider_api_key_enc`). Optional so unit tests
@@ -431,14 +430,22 @@ async function runCloudWake(
   env: WakeDispatchEnv,
   ready: Extract<BuildUnreadWakeResult, { state: "ready"; mode: "cloud" }>
 ): Promise<DispatchOneWakeResult> {
-  if (!env.WEB_WORKER || !env.INTERNAL_RUN_SECRET) {
+  // `ENCRYPTION_KEY` is the same secret that decrypts stored provider keys, so
+  // a deploy that can run a cloud agent at all can sign for one. Nothing extra
+  // is configured for this.
+  if (!env.WEB_WORKER || !env.ENCRYPTION_KEY) {
     return { outcome: "cloud_unavailable", botUserId: ready.botUserId };
   }
+  const signature = await signInternalRun(env.ENCRYPTION_KEY, {
+    botUserId: ready.botUserId,
+    channelId: ready.channelId,
+    issuedAtMs: Date.now(),
+  });
   const res = await env.WEB_WORKER.fetch("http://internal/api/internal/agent-run", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-onecaptain-internal": env.INTERNAL_RUN_SECRET,
+      "x-onecaptain-internal": signature,
     },
     body: JSON.stringify({ botUserId: ready.botUserId, channelId: ready.channelId }),
   });
