@@ -25,6 +25,12 @@ const ALLOWLIST = [
   // primitive — shared by the send-fold (step 4) and the existing-data
   // migration (step 5) to open a message with its own auto-created thread.
   "src/lib/community/create-channels.ts",
+  // A cloud-hosted agent's reply. It goes through the funnel for the same
+  // reason a daemon-backed agent's does: mentions, WS fan-out, read-state and
+  // audit must behave identically whether the agent ran on someone's laptop or
+  // on a provider API key here. Posting it any other way would make cloud
+  // agents' messages subtly second-class.
+  "src/lib/community/cloud-agent-run.ts",
 ].sort()
 
 function walk(dir: string, acc: string[] = []): string[] {

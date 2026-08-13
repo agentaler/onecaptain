@@ -1142,6 +1142,12 @@ export const CommunityBotPatchRequestSchema = z
   );
 export type CommunityBotPatchRequest = z.infer<typeof CommunityBotPatchRequestSchema>;
 
+/** Run one turn of a cloud-hosted agent in a channel, on demand. */
+export const CommunityAgentRunRequestSchema = z.object({
+  channelId: z.string().trim().min(1),
+});
+export type CommunityAgentRunRequest = z.infer<typeof CommunityAgentRunRequestSchema>;
+
 /** Owner-only workspace member role change — `owner` is deliberately not grantable here. */
 export const UpdateMemberRoleRequestSchema = z.object({
   role: z.enum(["admin", "member"]),

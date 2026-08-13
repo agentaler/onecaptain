@@ -274,6 +274,7 @@ export {
   COMMUNITY_RUNTIME_VERSION_MAX,
   COMMUNITY_RUNTIME_LIST_MAX,
   CommunityBotCreateRequestSchema,
+  CommunityAgentRunRequestSchema,
   CommunityBotPatchRequestSchema,
   CommunityBotAddToServerRequestSchema,
   CommunityAgentCursorSchema,
@@ -484,6 +485,15 @@ export {
   resolveProviderConfig,
 } from "./community/bot-provider";
 export type { BotProviderKind } from "./community/bot-provider";
+export { resolveAgentProvider } from "./community/agent-provider";
+export type {
+  AgentProviderBinding,
+  AgentProviderEnv,
+  AgentProviderResolution,
+  AgentProviderSource,
+} from "./community/agent-provider";
+export { callProvider, classifyProviderStatus, ProviderCallError } from "./community/provider-client";
+export type { ProviderRequest, ProviderResult, ProviderFailureKind } from "./community/provider-client";
 
 export { sendWakeToMachine, buildUnreadWakeCommand, dispatchOneUnreadWake } from "./community/wake-dispatch";
 export type { DispatchOneWakeResult } from "./community/wake-dispatch";
