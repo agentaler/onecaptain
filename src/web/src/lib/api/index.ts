@@ -1,5 +1,12 @@
 export { apiFetch, wsQuery } from "./client";
 export { getMe } from "./me";
+export {
+  listLlmProviders,
+  saveLlmProvider,
+  removeLlmProvider,
+  verifyLlmProvider,
+} from "./llm-providers";
+export type { LlmProviderEntry, LlmProviderVerifyResult } from "./llm-providers";
 export { fetchModelOptions, getMinCliVersion, fetchLatestCliVersion } from "./config";
 export {
   listAgents,

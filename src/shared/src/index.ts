@@ -276,6 +276,8 @@ export {
   CommunityBotCreateRequestSchema,
   CommunityAgentRunRequestSchema,
   InternalAgentRunRequestSchema,
+  LlmProviderUpsertSchema,
+  LlmProviderVerifySchema,
   CommunityBotPatchRequestSchema,
   CommunityBotAddToServerRequestSchema,
   CommunityAgentCursorSchema,

@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { GeneralTab } from "./general-tab";
 import { InstructionTab } from "./instruction-tab";
+import { LlmTab } from "./llm-tab";
 import { MembersTab } from "./members-tab";
 import { BillingTab } from "./billing-tab";
 import { NotificationTab } from "./notification-tab";
@@ -16,6 +17,7 @@ const TABS = [
   { id: "general", label: "General" },
   { id: "pet", label: "Pet" },
   { id: "instruction", label: "Global Instruction" },
+  { id: "llm", label: "LLM Provider" },
   { id: "notifications", label: "Notifications" },
   { id: "members", label: "Members" },
   { id: "billing", label: "Billing" },
@@ -84,6 +86,7 @@ export default function SettingsPage() {
             ) : (
               <div className="mx-auto max-w-md">
                 {activeTab === "general" && <GeneralTab />}
+                {activeTab === "llm" && <LlmTab />}
                 {activeTab === "pet" && <PetTab />}
                 {activeTab === "billing" && <BillingTab />}
                 {activeTab === "notifications" && <NotificationTab />}

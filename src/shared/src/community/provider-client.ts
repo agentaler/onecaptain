@@ -71,26 +71,72 @@ export function classifyProviderStatus(status: number): ProviderFailureKind {
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
+/**
+ * Join a user-supplied API URL to the path we need.
+ *
+ * The field is documented as a BASE url, but people paste whatever their
+ * provider's docs showed them — which is nearly always the full endpoint. Naive
+ * concatenation then produced a doubled path. Confirmed against a live provider:
+ *
+ *   base  `https://api.fireworks.ai/inference`                        -> 200
+ *   full  `https://api.fireworks.ai/inference/v1/chat/completions`    -> 404
+ *         (…/v1/chat/completions/v1/chat/completions)
+ *
+ * A 404 classifies as `permanent`, so the agent just never replied and the user
+ * was told nothing — the worst possible shape for a configuration mistake. So
+ * accept both: strip any endpoint suffix the user included, then append ours.
+ */
+function joinApiUrl(base: string, path: string): string {
+  let trimmed = base.trim().replace(/\/+$/, "");
+  // Longest first — `/v1/chat/completions` must win over `/chat/completions`.
+  for (const suffix of ["/v1/chat/completions", "/chat/completions", "/v1/messages", "/messages"]) {
+    if (trimmed.toLowerCase().endsWith(suffix)) {
+      trimmed = trimmed.slice(0, -suffix.length).replace(/\/+$/, "");
+      break;
+    }
+  }
+  return `${trimmed}${path}`;
+}
+
 function endpointFor(config: ProviderConfig): { url: string; shape: "anthropic" | "openai" } {
   if (config.kind === "cloud") {
     if (config.providerId === "anthropic") {
-      return { url: `${config.apiUrl ?? "https://api.anthropic.com"}/v1/messages`, shape: "anthropic" };
+      return {
+        url: joinApiUrl(config.apiUrl ?? "https://api.anthropic.com", "/v1/messages"),
+        shape: "anthropic",
+      };
     }
     if (config.providerId === "openrouter") {
       return {
-        url: `${config.apiUrl ?? "https://openrouter.ai/api"}/v1/chat/completions`,
+        url: joinApiUrl(config.apiUrl ?? "https://openrouter.ai/api", "/v1/chat/completions"),
         shape: "openai",
       };
     }
-    return { url: `${config.apiUrl ?? "https://api.openai.com"}/v1/chat/completions`, shape: "openai" };
+    return {
+      url: joinApiUrl(config.apiUrl ?? "https://api.openai.com", "/v1/chat/completions"),
+      shape: "openai",
+    };
   }
   if (config.kind === "custom") {
     // A custom endpoint is OpenAI-shaped by convention — that is what DeepSeek,
-    // Together, Groq, vLLM and the rest expose. An Anthropic-compatible custom
-    // endpoint should be stored as `anthropic` with an `apiUrl` override.
-    return { url: `${config.apiUrl.replace(/\/$/, "")}/v1/chat/completions`, shape: "openai" };
+    // Fireworks, Together, Groq, vLLM and the rest expose. An Anthropic-compatible
+    // custom endpoint should be stored as `anthropic` with an `apiUrl` override.
+    return { url: joinApiUrl(config.apiUrl, "/v1/chat/completions"), shape: "openai" };
   }
   throw new ProviderCallError("permanent", `provider kind ${config.kind} cannot be called directly`, null);
+}
+
+/**
+ * OpenAI renamed the output cap to `max_completion_tokens` and its newer
+ * reasoning models REJECT `max_tokens` outright. Every other OpenAI-shaped
+ * provider (OpenRouter, Fireworks, DeepSeek, Groq, vLLM…) still takes
+ * `max_tokens`, and some do not recognise the new name — so this is keyed on
+ * who we are actually talking to, not on the wire shape.
+ */
+function outputTokenField(config: ProviderConfig): "max_tokens" | "max_completion_tokens" {
+  return config.kind === "cloud" && config.providerId === "openai"
+    ? "max_completion_tokens"
+    : "max_tokens";
 }
 
 function authHeaders(config: ProviderConfig, shape: "anthropic" | "openai"): Record<string, string> {
@@ -141,7 +187,7 @@ export async function callProvider(
         }
       : {
           model: request.model,
-          max_tokens: request.maxTokens,
+          [outputTokenField(config)]: request.maxTokens,
           messages: [{ role: "system", content: request.system }, ...request.messages],
         };
 

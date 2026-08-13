@@ -97,6 +97,61 @@ describe("callProvider", () => {
     );
   });
 
+  it("accepts a pasted full endpoint URL, not just a base", async () => {
+    // Users paste what their provider's docs showed them. Naive concatenation
+    // produced `…/v1/chat/completions/v1/chat/completions`, verified live as a
+    // 404 — which classifies as permanent, so the agent silently never replied.
+    const fetchImpl = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "ok" } }] }));
+    for (const pasted of [
+      "https://api.fireworks.ai/inference",
+      "https://api.fireworks.ai/inference/",
+      "https://api.fireworks.ai/inference/v1/chat/completions",
+      "https://api.fireworks.ai/inference/chat/completions",
+    ]) {
+      fetchImpl.mockClear();
+      await callProvider(
+        { kind: "custom", apiUrl: pasted, apiKey: "k" },
+        request,
+        fetchImpl as unknown as typeof fetch,
+      );
+      expect((fetchImpl.mock.calls[0] as [string, RequestInit])[0]).toBe(
+        "https://api.fireworks.ai/inference/v1/chat/completions",
+      );
+    }
+  });
+
+  it("normalises a pasted Anthropic endpoint too", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ content: [{ type: "text", text: "ok" }] }));
+    await callProvider(
+      { kind: "cloud", providerId: "anthropic", apiKey: "k", apiUrl: "https://api.anthropic.com/v1/messages" },
+      request,
+      fetchImpl as unknown as typeof fetch,
+    );
+    expect((fetchImpl.mock.calls[0] as [string, RequestInit])[0]).toBe(
+      "https://api.anthropic.com/v1/messages",
+    );
+  });
+
+  it("sends max_completion_tokens to OpenAI and max_tokens to everyone else", async () => {
+    // OpenAI's newer reasoning models reject `max_tokens`; other OpenAI-shaped
+    // providers do not recognise the new name. Keyed on who we are talking to.
+    const openaiFetch = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "ok" } }] }));
+    await callProvider(openai, request, openaiFetch as unknown as typeof fetch);
+    const openaiBody = JSON.parse((openaiFetch.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(openaiBody.max_completion_tokens).toBe(512);
+    expect(openaiBody.max_tokens).toBeUndefined();
+
+    const routerFetch = vi.fn(async () => jsonResponse({ choices: [{ message: { content: "ok" } }] }));
+    await callProvider(
+      { kind: "cloud", providerId: "openrouter", apiKey: "k" },
+      request,
+      routerFetch as unknown as typeof fetch,
+    );
+    const routerBody = JSON.parse((routerFetch.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(routerBody.max_tokens).toBe(512);
+    expect(routerBody.max_completion_tokens).toBeUndefined();
+  });
+
   it("reports zero rather than a guess when the provider omits usage", async () => {
     // A missing meter reading is not a free call. Zeros are visibly wrong;
     // an invented number would quietly become someone's invoice.
