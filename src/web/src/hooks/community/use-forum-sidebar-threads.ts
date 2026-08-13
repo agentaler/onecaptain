@@ -531,6 +531,32 @@ export function isForumSidebarParent(
     )) ?? false
 }
 
+/**
+ * True only when the child is POSITIVELY known to sit under a forum — i.e.
+ * inside the scope this sidebar projects (`parentType=forum`).
+ *
+ * The distinction matters because the sidebar response cannot express it. A
+ * `retainId` the server omits from `retainedChannel` means one of two very
+ * different things: the child is gone (deleted / left / archived), or its
+ * parent simply isn't a forum, so the query never had it in scope — a thread
+ * under a TEXT channel, or any child on a server with no forums at all
+ * (`listParticipatingForumThreads` returns early on an empty parent set).
+ * Only the first justifies evicting the child's caches, so treat "we can't
+ * tell yet" (no `channelMeta` loaded) as NOT in scope: eviction is
+ * destructive, so it needs positive evidence, not the absence of evidence.
+ */
+function isForumSidebarChild(
+  queryClient: QueryClient,
+  serverId: string,
+  childId: string,
+) {
+  const meta = queryClient.getQueryData<ChildChannelMeta>(
+    communityKeys.channelMeta(serverId, childId),
+  )
+  if (!meta) return false
+  return isForumSidebarParent(queryClient, serverId, meta.parentChannelId)
+}
+
 function patchRetained(
   queryClient: QueryClient,
   serverId: string,
@@ -850,10 +876,19 @@ function seedForumSidebarResources(
   verifiedEpoch: number,
   retainId: string | null,
 ) {
+  // Evicting the retained child's caches removes queries that are MOUNTED for
+  // the channel the viewer is currently looking at — its `channelMeta` and its
+  // own `forumSidebarRetained` row. React Query answers a `removeQueries` on an
+  // active query by refetching it, and this runs inside that very query's
+  // `queryFn`, so an eviction here re-enters the fetch that performed it. Guard
+  // it on positive in-scope evidence or a non-forum child loops forever (one
+  // sidebar + one `/channels/:id` request per cycle) and its route never
+  // hydrates past the composer skeleton.
   if (
     retainId &&
     !normalized.retained &&
-    !hasForumSidebarThread(normalized.base, retainId)
+    !hasForumSidebarThread(normalized.base, retainId) &&
+    isForumSidebarChild(queryClient, serverId, retainId)
   ) {
     removeForumSidebarUnreadChild(queryClient, serverId, retainId)
     removeForumSidebarThreadExact(queryClient, serverId, retainId)
