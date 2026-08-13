@@ -904,3 +904,54 @@ export const subscription = pgTable(
     index("idx_subscription_polar_id").on(t.polarSubscriptionId),
   ]
 );
+
+// Workspace-level cloud LLM credential — the key a workspace brings once,
+// instead of pasting it into every bot. `community_bot_binding` keeps its own
+// per-bot override; this is the fallback a cloud-run agent resolves against
+// when the bot names no provider of its own. Stored only encrypted; reads
+// expose `last4` so the UI can show which key is set without handing it back.
+export const workspaceProviderCredential = pgTable(
+  "workspace_provider_credential",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "wpc_" + nanoid()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    apiUrl: text("api_url"),
+    apiKeyEnc: text("api_key_enc").notNull(),
+    last4: text("last4").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    unique("workspace_provider_credential_kind_unique").on(t.workspaceId, t.kind),
+  ]
+);
+
+// Append-only usage ledger — one row per provider call. `costMicros` is USD
+// micros as an integer (money never touches a float) and holds the provider's
+// list price; platform markup is applied at invoice time so changing it never
+// rewrites history. `billable` keeps BYO-key calls out of invoices while still
+// metering them.
+export const agentUsageEvent = pgTable(
+  "agent_usage_event",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "aue_" + nanoid()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    agentUserId: text("agent_user_id").references(() => user.id, { onDelete: "set null" }),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costMicros: integer("cost_micros").notNull().default(0),
+    billable: boolean("billable").notNull().default(true),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    index("idx_agent_usage_workspace_created").on(t.workspaceId, t.createdAt),
+  ]
+);
