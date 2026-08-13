@@ -31,6 +31,7 @@ import { ProviderLogo } from "@/components/provider-logo"
 import { formatAwakeDuration } from "@/components/community/format-time"
 import { BotActivityHeatmap } from "./bot-activity-heatmap"
 import { useMachines } from "@/hooks/community/use-machines"
+import { useLlmProviders } from "@/hooks/community/use-llm-providers"
 import { useBots, useDeleteBot, useResetBotSession, useResetMachineAgents, type BotSummary } from "@/hooks/community/use-bots"
 import { useCreateOrGetDm } from "@/hooks/community/mutations"
 import { useOnlineUserIds } from "@/stores/community/ws"
@@ -42,7 +43,6 @@ import { AgentHelpGallery } from "@/components/community/onboarding-tiles/agent-
 import {
   advanceCommunityOnboarding,
   readCommunityOnboardingState,
-  recoverCommunityOnboardingMachine,
   updateCommunityOnboardingResources,
   useCommunityOnboarding,
 } from "@/lib/community-onboarding"
@@ -84,6 +84,7 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   const searchParams = useSearchParams()
   const { bots, isLoading } = useBots()
   const { machines, isLoading: machinesLoading } = useMachines()
+  const { providers } = useLlmProviders()
   // Presence read: single API for humans + bots, server-pushed identically
   // (see plans/community-account-debt-fixes.md Fix 3 — the owner is always
   // part of its own bots' presence audience, even for a bot not yet in any
@@ -117,9 +118,7 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   const guidedActive = onboardingState?.status === "active" && onboardingState.stage === "bot"
   const guidedPendingBotId =
     guidedActive ? onboardingState.botId : undefined
-  const guidedNeedsMachine =
-    guidedActive &&
-    !machines.some((machine) => isPresenceOnline(machine.status))
+  const guidedNeedsProvider = guidedActive && providers.length === 0
 
   const chatWithBot = async (bot: BotSummary) => {
     try {
@@ -152,10 +151,11 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
 
   const openGuidedCreate = () => {
     const state = readCommunityOnboardingState()
-    const hasUsableMachine = machines.some((machine) => isPresenceOnline(machine.status))
-    if (state?.status === "active" && state.stage === "bot" && !hasUsableMachine) {
-      recoverCommunityOnboardingMachine()
-      router.push("/c/me/machines")
+    // The guided flow's prerequisite is a usable LLM key. It used to be an
+    // ONLINE machine, which is why onboarding stalled for anyone who had not
+    // installed the daemon.
+    if (state?.status === "active" && state.stage === "bot" && providers.length === 0) {
+      router.push("/c/me/llm")
       return
     }
     if (state?.status === "active" && state.stage === "bot" && state.botId) {
@@ -165,8 +165,8 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
     setCreateOpen(true)
   }
 
-  const guidedCreateLabel = guidedNeedsMachine
-    ? "Connect a machine"
+  const guidedCreateLabel = guidedNeedsProvider
+    ? "Add an LLM key"
     : guidedPendingBotId
       ? "Open bot chat"
       : "Create a bot"
@@ -260,7 +260,9 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   }
 
   if (bots.length === 0) {
-    const needsMachine = machines.length === 0
+    // An agent runs on the workspace's LLM key, not on a machine. The block is
+    // "no key" now — a machine is neither required nor sufficient.
+    const needsProvider = providers.length === 0
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {backBar}
@@ -272,11 +274,11 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-medium text-foreground">
-              {needsMachine ? "Connect a machine first" : "No bots yet"}
+              {needsProvider ? "Add an LLM key first" : "No bots yet"}
             </h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              {needsMachine
-                ? "Bots need a connected machine to run. Connect one first, then come back to create your bot."
+              {needsProvider
+                ? "Bots run on your LLM provider key. Add one, then come back and create your bot."
                 : "Create a bot and chat with it from anywhere — spin up servers and share it with family and friends."}
             </p>
           </div>
@@ -285,9 +287,9 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
               header instead. */}
           <div data-onboarding-target="create-bot" className="w-fit">
             <Button
-              onClick={needsMachine ? () => router.push("/c/me/machines") : openGuidedCreate}
+              onClick={needsProvider ? () => router.push("/c/me/llm") : openGuidedCreate}
             >
-              {needsMachine ? "Connect a machine" : guidedCreateLabel}
+              {needsProvider ? "Add an LLM key" : guidedCreateLabel}
             </Button>
           </div>
         </div>

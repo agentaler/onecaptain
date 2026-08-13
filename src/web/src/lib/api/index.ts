@@ -5,6 +5,10 @@ export {
   saveLlmProvider,
   removeLlmProvider,
   verifyLlmProvider,
+  listCommunityLlmProviders,
+  saveCommunityLlmProvider,
+  removeCommunityLlmProvider,
+  verifyCommunityLlmProvider,
 } from "./llm-providers";
 export type { LlmProviderEntry, LlmProviderVerifyResult } from "./llm-providers";
 export { fetchModelOptions, getMinCliVersion, fetchLatestCliVersion } from "./config";

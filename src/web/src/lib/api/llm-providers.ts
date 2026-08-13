@@ -45,3 +45,33 @@ export const verifyLlmProvider = (workspaceId: string, kind: string, model: stri
     `/api/llm-providers/${encodeURIComponent(kind)}/verify${wsQuery(workspaceId)}`,
     { method: "POST", body: JSON.stringify({ model }) },
   );
+
+/**
+ * Community-surface variants. `/c` carries no workspace, so these resolve the
+ * caller's primary workspace server-side — see `primary-workspace.ts`.
+ */
+export const listCommunityLlmProviders = () =>
+  apiFetch<{ providers: LlmProviderEntry[] }>("/api/community/llm-providers").then(
+    (r) => r.providers,
+  );
+
+export const saveCommunityLlmProvider = (
+  kind: string,
+  data: { apiKey: string; apiUrl?: string | null },
+) =>
+  apiFetch<{ kind: string; last4: string }>(
+    `/api/community/llm-providers/${encodeURIComponent(kind)}`,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+
+export const removeCommunityLlmProvider = (kind: string) =>
+  apiFetch<{ kind: string; removed: boolean }>(
+    `/api/community/llm-providers/${encodeURIComponent(kind)}`,
+    { method: "DELETE" },
+  );
+
+export const verifyCommunityLlmProvider = (kind: string, model: string) =>
+  apiFetch<LlmProviderVerifyResult>(
+    `/api/community/llm-providers/${encodeURIComponent(kind)}/verify`,
+    { method: "POST", body: JSON.stringify({ model }) },
+  );
