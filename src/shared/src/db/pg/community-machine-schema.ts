@@ -123,8 +123,12 @@ export const communityBotBinding = pgTable(
     userId: text("user_id")
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
+    // NULL when the agent runs in the cloud against a provider API key instead
+    // of on a user's machine — that is the whole point of the cloud runtime, so
+    // "no machine" is a valid live binding, not a broken one. RESTRICT stays:
+    // deleting a machine that still has bots bound to it must error.
+    // Hand-maintained in lockstep with migration 0090.
     machineId: text("machine_id")
-      .notNull()
       .references(() => communityMachine.id, { onDelete: "restrict" }),
     runtime: text("runtime").notNull(),
     // Full launchable model id (e.g. "claude-opus-4-6"), or NULL for the

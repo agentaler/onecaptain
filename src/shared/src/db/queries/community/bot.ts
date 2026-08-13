@@ -78,6 +78,9 @@ export class OwnerHasBotsError extends Error {
 /**
  * List live bots owned by `ownerId`. Filters `isBot=true AND deletedAt IS NULL`.
  * Joined against `communityBotBinding` for machine/runtime overlay.
+ *
+ * `machineId` is null for a cloud-run agent (no machine, runs against a
+ * provider API key) — a live bot, not a broken one.
  */
 export async function listBotsForOwner(
   db: Database,
@@ -85,7 +88,7 @@ export async function listBotsForOwner(
 ): Promise<
   Array<
     BotRow & {
-      machineId: string;
+      machineId: string | null;
       runtime: string;
       modelName: string | null;
       providerKind: string | null;
@@ -236,7 +239,7 @@ export async function countLiveBotsForOwner(
 export async function getBotBinding(
   db: Database,
   botId: string
-): Promise<{ machineId: string; runtime: string; modelName: string | null } | null> {
+): Promise<{ machineId: string | null; runtime: string; modelName: string | null } | null> {
   const rows = await db
     .select({
       machineId: communityBotBinding.machineId,
@@ -260,7 +263,7 @@ export async function getBotBinding(
 export async function getBotBindingWithOwner(
   db: Database,
   botId: string
-): Promise<{ machineId: string; runtime: string; ownerUserId: string; name: string; discriminator: string } | null> {
+): Promise<{ machineId: string | null; runtime: string; ownerUserId: string; name: string; discriminator: string } | null> {
   const rows = await db
     .select({
       machineId: communityBotBinding.machineId,
@@ -291,7 +294,8 @@ export async function getBotBindingWithOwner(
  * Wake-dispatch candidate filter — one D1 hit. Given a message's `recipients`
  * (all fanout recipients, human + bot) and the `channelId` it landed in,
  * returns only the bots among them that are (a) live (`!deletedAt`), (b) bound
- * to a machine, and (c) actually behind `newSeq` per their own `lastReadSeq`
+ * (to a machine OR, for a cloud-run agent, to a provider — the join is on the
+ * binding row, which both have), and (c) actually behind `newSeq` per their own `lastReadSeq`
  * for that channel (`NULL` read-state row counts as "never read", i.e.
  * behind). A bot that's already caught up (e.g. it just authored `newSeq`
  * itself, or acked out-of-band) is filtered out here so the producer never
@@ -304,7 +308,7 @@ export async function findWakeCandidates(
     channelId: string;
     newSeq: number;
   }
-): Promise<Array<{ botUserId: string; name: string | null; machineId: string; runtime: string }>> {
+): Promise<Array<{ botUserId: string; name: string | null; machineId: string | null; runtime: string }>> {
   if (opts.recipients.length === 0) return [];
   const scopeCond = eq(communityReadState.channelId, opts.channelId);
 
