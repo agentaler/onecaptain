@@ -275,6 +275,7 @@ export {
   COMMUNITY_RUNTIME_LIST_MAX,
   CommunityBotCreateRequestSchema,
   CommunityAgentRunRequestSchema,
+  InternalAgentRunRequestSchema,
   CommunityBotPatchRequestSchema,
   CommunityBotAddToServerRequestSchema,
   CommunityAgentCursorSchema,

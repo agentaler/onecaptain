@@ -24,6 +24,8 @@ declare namespace Cloudflare {
     BETTER_AUTH_SECRET: string
     BETTER_AUTH_URL: string
     ENCRYPTION_KEY: string
+    /** Shared secret proving a request came from the wake worker, not a browser. */
+    INTERNAL_RUN_SECRET?: string
     CACHE_KV: KVNamespace
     AUTH_OTP_RATE_LIMIT_MAX?: string
     AUTH_OTP_RATE_LIMIT_WINDOW_SEC?: string

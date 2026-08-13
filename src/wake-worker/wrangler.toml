@@ -27,6 +27,14 @@ inspector_port = 9232
 binding = "WS_DO_WORKER"
 service = "onecaptain-ws-do"
 
+# Cloud-run agents only. Their reply must go through `createCommunityMessage`,
+# which reaches `getCloudflareContext()` and so only runs inside the Next/
+# OpenNext runtime — this worker asks the web worker to run the turn rather
+# than duplicating the message funnel. Machine-bound agents never touch this.
+[[services]]
+binding = "WEB_WORKER"
+service = "onecaptain-web"
+
 # Same `onecaptain-app` database `src/web/wrangler.toml` binds as `DB`
 # (minimal-wake-queue-unread-notice plan §3) — the consumer re-derives the
 # `agent:wake` command from current D1 state at consume time instead of

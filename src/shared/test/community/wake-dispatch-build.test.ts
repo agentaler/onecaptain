@@ -177,6 +177,38 @@ describe("buildUnreadWakeCommand", () => {
     expect(result.command.config.model).toEqual({ kind: "default" });
   });
 
+  it("ready: a machine-bound agent still takes the machine path, unchanged", async () => {
+    // The regression that matters most in this fork. Everything about an
+    // existing daemon-backed agent must be byte-for-byte what it was before
+    // cloud mode existed.
+    seedHappyPath();
+
+    const result = await buildUnreadWakeCommand(fakeDb, { messageId: "msg_1", botUserId: "bot_1" });
+
+    if (result.state !== "ready") throw new Error("expected ready");
+    expect(result.mode).toBe("machine");
+    if (result.mode !== "machine") throw new Error("expected machine mode");
+    expect(result.machineId).toBe("machine_1");
+    expect(result.command.type).toBe("agent:wake");
+  });
+
+  it("ready: an agent with no machine resolves to cloud mode instead of being skipped", async () => {
+    // Before the fork this was `bot_unbound` — a machine-less agent could never
+    // wake at all. It is now a live agent that runs server-side.
+    seedHappyPath({ bot: { machineId: null } });
+
+    const result = await buildUnreadWakeCommand(fakeDb, { messageId: "msg_1", botUserId: "bot_1" });
+
+    if (result.state !== "ready") throw new Error("expected ready");
+    expect(result.mode).toBe("cloud");
+    if (result.mode !== "cloud") throw new Error("expected cloud mode");
+    expect(result.botUserId).toBe("bot_1");
+    // The channel comes from the message scope; the server is deliberately not
+    // carried — the web route resolves it from the channel it must read anyway.
+    expect(result.channelId).toBe("ch_1");
+    expect(result.command.type).toBe("agent:wake");
+  });
+
   it("skip: message_missing when the message no longer exists", async () => {
     mockGetWakeMessageScopeById.mockResolvedValue(null);
 

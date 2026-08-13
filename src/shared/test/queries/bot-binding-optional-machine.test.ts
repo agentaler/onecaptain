@@ -5,6 +5,7 @@ import { createNodeClient, createNodeDb, applyMigrations } from "../../src/db/no
 import type { Database } from "../../src/db";
 import { user } from "../../src/db/schema";
 import { communityBotBinding, communityMachine } from "../../src/db/community-machine-schema";
+import { getBotWakeContext } from "../../src/db/queries/community/bot";
 import { member, workspace } from "../../src/db/schema";
 
 /**
@@ -151,6 +152,48 @@ describe("community_bot_binding after 0090", () => {
       sql`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'community_bot_binding'`
     );
     expect(rows.map((r) => r.name)).toContain("idx_community_bot_binding_workspace");
+  });
+
+  it("treats a machine-less binding as wakeable, and only a MISSING binding as unbound", async () => {
+    // The guard used to read `!machineId || !runtime`, which made every
+    // cloud agent permanently unwakeable. "Unbound" now means what the word
+    // says: there is no binding row at all.
+    const [cloudBot] = await db
+      .insert(user)
+      .values({
+        id: "user_bot_cloud",
+        name: "Cloud",
+        email: "cloud@example.com",
+        emailVerified: false,
+        isBot: true,
+        ownerUserId: ownerId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    await db
+      .insert(communityBotBinding)
+      .values({ userId: cloudBot.id, machineId: null, runtime: "cloud" });
+
+    const ready = await getBotWakeContext(db, cloudBot.id);
+    expect(ready.state).toBe("ready");
+    if (ready.state !== "ready") throw new Error("expected ready");
+    expect(ready.machineId).toBeNull();
+
+    const [unbound] = await db
+      .insert(user)
+      .values({
+        id: "user_bot_unbound",
+        name: "Unbound",
+        email: "unbound@example.com",
+        emailVerified: false,
+        isBot: true,
+        ownerUserId: ownerId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .returning();
+    expect((await getBotWakeContext(db, unbound.id)).state).toBe("bot_unbound");
   });
 
   it("keeps the machine index the wake-dispatch lookups rely on", async () => {

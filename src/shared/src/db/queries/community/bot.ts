@@ -361,7 +361,8 @@ export type BotWakeContext =
       botUserId: string;
       name: string;
       discriminator: string;
-      machineId: string;
+      /** NULL for a cloud-run agent — see the guard below. */
+      machineId: string | null;
       workspaceId: string | null;
       runtime: string;
       modelName: string | null;
@@ -395,7 +396,13 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
   const r = rows[0];
   if (!r || !r.isBot) return { state: "bot_missing" };
   if (r.deletedAt) return { state: "bot_deleted" };
-  if (!r.machineId || !r.runtime) return { state: "bot_unbound" };
+  // "Unbound" means there is no binding ROW — the left join produced nothing,
+  // so `runtime` (NOT NULL on the binding) is null. It deliberately no longer
+  // means "no machine": a cloud-run agent has a binding with `machine_id` NULL
+  // and is perfectly wakeable. Whether it can actually run is a credential
+  // question, answered later by `resolveAgentProvider`, which can see the
+  // workspace key this row cannot.
+  if (!r.runtime) return { state: "bot_unbound" };
   return {
     state: "ready",
     botUserId: r.id,

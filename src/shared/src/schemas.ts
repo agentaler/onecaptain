@@ -1148,6 +1148,17 @@ export const CommunityAgentRunRequestSchema = z.object({
 });
 export type CommunityAgentRunRequest = z.infer<typeof CommunityAgentRunRequestSchema>;
 
+/**
+ * Service-to-service: run one cloud agent turn. Not a user-facing shape — the
+ * caller is the wake worker, which already established WHICH agent and channel
+ * from current D1 state.
+ */
+export const InternalAgentRunRequestSchema = z.object({
+  botUserId: z.string().trim().min(1),
+  channelId: z.string().trim().min(1),
+});
+export type InternalAgentRunRequest = z.infer<typeof InternalAgentRunRequestSchema>;
+
 /** Owner-only workspace member role change — `owner` is deliberately not grantable here. */
 export const UpdateMemberRoleRequestSchema = z.object({
   role: z.enum(["admin", "member"]),
