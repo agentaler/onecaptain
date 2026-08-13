@@ -25,6 +25,7 @@ import {
   mockGetUserInternal,
   mockGetValidSession,
   mockGetValidSessionWithIdentity,
+  mockWithD1Retry,
   mockHashCredential,
   mockInsertBotActivityEventAndPrune,
   mockInsertBotAuditModelChanged,
@@ -159,6 +160,52 @@ describe("WebSocketDurableObject", () => {
 
       expect(ws.close).toHaveBeenCalledWith(1008, "Unauthorized")
       expect(ws.send).not.toHaveBeenCalled()
+    })
+
+    it("closes with 1011, not silence, when the session lookup keeps failing", async () => {
+      // Regression: a transient D1 failure used to throw straight out of the
+      // message handler. The socket had already upgraded, so it was left
+      // authenticated=false and never closed — the DO never registered it,
+      // every broadcast to that user reached zero sockets, and realtime was
+      // silently dead until the client's own reconnect timer fired. Closing
+      // 1011 is what lets the client reconnect immediately.
+      const { durable } = createDO()
+      mockGetValidSessionWithIdentity.mockRejectedValue(
+        new Error("D1_ERROR: database is locked: SQLITE_BUSY"),
+      )
+
+      const ws = createMockWebSocket()
+      ws.serializeAttachment({ type: "user", userId: "", authenticated: false })
+
+      await durable.webSocketMessage(ws as any, JSON.stringify({ type: "auth", token: "valid-token" }))
+
+      expect(ws.close).toHaveBeenCalledWith(1011, "Auth temporarily unavailable")
+      expect(ws.send).not.toHaveBeenCalled()
+      expect(ws.deserializeAttachment()).toEqual({ type: "user", userId: "", authenticated: false })
+    })
+
+    it("retries a transient session lookup and authenticates when it recovers", async () => {
+      const { durable } = createDO()
+      // Two real attempts through the real retry helper: first blips, second
+      // succeeds. Proves the blip is absorbed rather than closing the socket.
+      let attempts = 0
+      mockWithD1Retry.mockImplementation(async <T,>(fn: () => Promise<T>): Promise<T> => {
+        try { return await fn() } catch { return await fn() }
+      })
+      mockGetValidSessionWithIdentity.mockImplementation(async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error("Network connection lost")
+        return { userId: "user-42", name: "Ana", discriminator: "0012" }
+      })
+
+      const ws = createMockWebSocket()
+      ws.serializeAttachment({ type: "user", userId: "", authenticated: false })
+
+      await durable.webSocketMessage(ws as any, JSON.stringify({ type: "auth", token: "valid-token" }))
+
+      expect(attempts).toBe(2)
+      expect(ws.send).toHaveBeenCalledWith(JSON.stringify({ type: "auth.ok" }))
+      expect(ws.close).not.toHaveBeenCalled()
     })
 
     it("closes with 1008 when auth message has no token", async () => {
