@@ -10,7 +10,8 @@ export type BotSummary = {
   name: string
   description: string
   image: string | null
-  machineId: string
+  /** null for a cloud-run agent — it has no machine. */
+  machineId: string | null
   runtime: string
   modelName: string | null
   // Context lifecycle (my-bots #516): when the agent last refreshed its context
@@ -42,7 +43,8 @@ export function useBots(): UseQueryResult<BotsResponse> & { bots: BotSummary[] }
 export type CreateBotInput = {
   name: string
   description?: string
-  machineId: string
+  /** null for a cloud-run agent — it has no machine. */
+  machineId: string | null
   runtime: string
   image?: string
   model?: string | null

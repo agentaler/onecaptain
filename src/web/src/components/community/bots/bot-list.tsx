@@ -48,6 +48,12 @@ import {
 } from "@/lib/community-onboarding"
 
 /**
+ * Group key for agents that run in the cloud and therefore have no machine.
+ * A machine id can never collide with it — real ids are nanoids.
+ */
+const CLOUD_GROUP = "__cloud__"
+
+/**
  * BotList — the /c/me/bots surface.
  *
  * Visual language matches the sibling MachineList: a back-bar header, a
@@ -166,6 +172,7 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
       : "Create a bot"
 
   const machineName = (id: string): string => {
+    if (id === CLOUD_GROUP) return "Cloud"
     const m = machines.find((x) => x.id === id)
     if (!m) return "Unknown machine"
     return resolveMachineName(m)
@@ -177,13 +184,22 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   const groups = useMemo(() => {
     const byMachine = new Map<string, BotSummary[]>()
     for (const bot of bots) {
-      const list = byMachine.get(bot.machineId)
+      // A cloud-run agent has no machine. It groups under its own heading
+      // rather than falling into "Unknown machine", which would read as a
+      // broken binding when it is the normal, healthy case.
+      const key = bot.machineId ?? CLOUD_GROUP
+      const list = byMachine.get(key)
       if (list) list.push(bot)
-      else byMachine.set(bot.machineId, [bot])
+      else byMachine.set(key, [bot])
     }
     const orderedIds = [
+      // Cloud agents first — they are the default, and they need no machine
+      // to be online.
+      ...(byMachine.has(CLOUD_GROUP) ? [CLOUD_GROUP] : []),
       ...machines.map((m) => m.id).filter((id) => byMachine.has(id)),
-      ...[...byMachine.keys()].filter((id) => !machines.some((m) => m.id === id)),
+      ...[...byMachine.keys()].filter(
+        (id) => id !== CLOUD_GROUP && !machines.some((m) => m.id === id),
+      ),
     ]
     return orderedIds.map((machineId) => ({
       machineId,
