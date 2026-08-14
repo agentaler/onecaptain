@@ -10,8 +10,9 @@ export type BotSummary = {
   name: string
   description: string
   image: string | null
-  /** null for a cloud-run agent — it has no machine. */
+  /** null for a cloud agent — it runs on a key, not a host. */
   machineId: string | null
+  /** "cloud" for a cloud agent, otherwise the local runtime id. */
   runtime: string
   modelName: string | null
   // Context lifecycle (my-bots #516): when the agent last refreshed its context
@@ -43,9 +44,13 @@ export function useBots(): UseQueryResult<BotsResponse> & { bots: BotSummary[] }
 export type CreateBotInput = {
   name: string
   description?: string
-  /** null for a cloud-run agent — it has no machine. */
-  machineId: string | null
-  runtime: string
+  /**
+   * Omit for a cloud agent, which is the default kind — it runs on the
+   * workspace's LLM key and has no machine. Send one only to pin an agent to a
+   * specific local machine, in which case `runtime` is required too.
+   */
+  machineId?: string
+  runtime?: string
   image?: string
   model?: string | null
 }

@@ -1,5 +1,7 @@
 "use client"
 
+import type { CommunityMachineSummary } from "@onecaptain/shared"
+
 import { ProviderLogo } from "@/components/provider-logo"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -8,6 +10,26 @@ import { ModelField } from "./model-field"
 export type BotRuntimeOption = {
   id: string
   unhealthy: boolean
+}
+
+/**
+ * Normalize a machine's runtimes into `{ id, unhealthy }`, healthy-first.
+ *
+ * A legacy CommunityMachineSummary cached client-side may still be missing
+ * availableRuntimes, or a runtime entry may still be a bare string
+ * (pre-health-status shape). Normalize both instead of hiding unhealthy
+ * runtimes outright, so the radio card can show *why* an option is disabled.
+ * Available runtimes sort first — the ones you can actually pick should never
+ * be buried below ones you can't.
+ */
+export function normalizeRuntimes(machine: CommunityMachineSummary | undefined): BotRuntimeOption[] {
+  const rt = machine?.availableRuntimes ?? []
+  const normalized = rt.map((r) =>
+    typeof r === "string"
+      ? { id: r, unhealthy: false }
+      : { id: (r as { id: string }).id, unhealthy: (r as { status?: string }).status === "unhealthy" },
+  )
+  return normalized.sort((a, b) => Number(a.unhealthy) - Number(b.unhealthy))
 }
 
 export function BotRuntimeFields({

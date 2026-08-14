@@ -35,7 +35,7 @@ import { BotRuntimeFields } from "./bot-runtime-fields"
 import { CloudProviderField, type CloudProviderPatch } from "./cloud-provider-field"
 import { validateBotModel } from "./bot-form-validation"
 import { uniqueNamesGenerator, names } from "unique-names-generator"
-import { normalizeRuntimes } from "./create-bot-sheet"
+import { normalizeRuntimes } from "./bot-runtime-fields"
 
 function draftFromBot(bot: BotSummary): AvatarDraft {
   if (isPhotoAvatarUrl(bot.image)) return { kind: "photo", file: null, previewUrl: bot.image! }

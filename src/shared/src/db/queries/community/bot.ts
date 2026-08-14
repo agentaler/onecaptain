@@ -60,7 +60,8 @@ export type BotRow = {
 
 export type BotBinding = {
   userId: string;
-  machineId: string;
+  /** Null for a cloud agent — the binding column is nullable by design. */
+  machineId: string | null;
   runtime: string;
   modelName: string | null;
   createdAt: string;
@@ -540,7 +541,8 @@ export type CreateBotInput = {
   ownerId: string;
   name: string;
   description?: string;
-  machineId: string;
+  /** Null for a cloud agent — the binding column is nullable by design. */
+  machineId: string | null;
   runtime: string;
   image?: string | null;
   modelName?: string | null;

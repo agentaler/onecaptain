@@ -336,7 +336,6 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={onBotCreated}
-          guided={guidedActive}
           avatarSeed={guidedActive ? onboardingState.guideAvatarSeed : undefined}
         />
       </div>
@@ -602,7 +601,6 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={onBotCreated}
-        guided={guidedActive}
         avatarSeed={guidedActive ? onboardingState.guideAvatarSeed : undefined}
       />
       <AgentHelpGallery open={helpOpen} onOpenChange={setHelpOpen} />

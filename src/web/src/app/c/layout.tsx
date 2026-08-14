@@ -48,7 +48,7 @@ export default function CommunityLayout({
 
   return (
     <>
-      <SignupTracker redirectTo="/c/me/machines" />
+      <SignupTracker redirectTo="/c/me/bots" />
       <CommunityShell currentUser={currentUser}>{children}</CommunityShell>
     </>
   )

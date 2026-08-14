@@ -1086,8 +1086,12 @@ export const CommunityBotCreateRequestSchema = z.object({
     .max(COMMUNITY_BOT_NAME_MAX)
     .refine(isMentionSafeName, { message: MENTION_SAFE_NAME_MSG }),
   description: z.string().max(COMMUNITY_BOT_DESCRIPTION_MAX).optional(),
-  machineId: z.string().min(1),
-  runtime: z.string().min(1),
+  // Optional: absent means a CLOUD agent, which is the default kind now — it
+  // runs on the workspace's LLM key and has no machine to bind to. Present
+  // means the caller wants a specific local machine, and the API still checks
+  // ownership and runtime health for that case.
+  machineId: z.string().min(1).optional(),
+  runtime: z.string().min(1).optional(),
   image: BotImageUrlSchema.optional(),
   // Full launchable model id, or null for the runtime's default. `undefined`
   // ⇒ untouched (default), explicit `null` ⇒ default.
