@@ -53,6 +53,9 @@ interface WakeDispatchEnv {
    * own auth (with a warn), never to a failed wake.
    */
   ENCRYPTION_KEY?: string;
+  /** Keyring, for deployments that have rotated past the single legacy key. */
+  ENCRYPTION_KEYS?: string;
+  ENCRYPTION_KEY_ACTIVE?: string;
 }
 
 /**
@@ -78,11 +81,15 @@ async function resolveWakeProviderConfig(
     return undefined;
   }
   try {
-    const { decrypt } = await import("../utils/crypto");
+    // Through the keyring, so a key stored under a rotated-out id still opens.
+    const [{ decryptWithKeyring }, { parseKeyring }] = await Promise.all([
+      import("../utils/crypto"),
+      import("../utils/keyring"),
+    ]);
     return resolveProviderConfig({
       providerKind: botCtx.providerKind,
       providerApiUrl: botCtx.providerApiUrl,
-      apiKey: decrypt(botCtx.providerApiKeyEnc, env.ENCRYPTION_KEY),
+      apiKey: decryptWithKeyring(botCtx.providerApiKeyEnc, parseKeyring(env)),
     });
   } catch (err) {
     // eslint-disable-next-line no-console

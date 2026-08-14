@@ -571,6 +571,19 @@ export { createDb } from "./db/index";
 export type { Database } from "./db/index";
 export { withD1Retry, readOrStale, isRetryableD1Error } from "./db/resilience";
 export type { RetryOpts } from "./db/resilience";
+// Keyring only — NOT ./utils/crypto, which imports node:crypto and would break
+// any browser bundle that reaches this barrel. Server-side decrypt sites import
+// the crypto module lazily and directly for that reason.
+export {
+  parseKeyring,
+  describeKeyring,
+  keyForId,
+  KeyringError,
+  LEGACY_KEY_ID,
+  type Keyring,
+  type KeyringEnv,
+} from "./utils/keyring";
+
 export * as schema from "./db/schema";
 export * as queries from "./db/queries-index";
 export { batchAll } from "./db/batch";

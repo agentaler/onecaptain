@@ -43,6 +43,9 @@ export type AgentProviderResolution =
 export interface AgentProviderEnv {
   /** Secret for decrypting stored keys. Without it, no stored key is usable. */
   ENCRYPTION_KEY?: string;
+  /** Keyring, for deployments that have rotated past the single legacy key. */
+  ENCRYPTION_KEYS?: string;
+  ENCRYPTION_KEY_ACTIVE?: string;
   /** OneCaptain's own key, used when the workspace brings none. */
   PLATFORM_PROVIDER_KIND?: string;
   PLATFORM_PROVIDER_API_KEY?: string;
@@ -59,14 +62,21 @@ export interface AgentProviderBinding {
 /**
  * Decrypt lazily so this module stays importable from a browser bundle through
  * the shared barrel — only server-side callers ever reach the import, and only
- * they hold `ENCRYPTION_KEY`. A decrypt failure yields null (and falls through
+ * they hold the keys. A decrypt failure yields null (and falls through
  * to the next source) rather than throwing: a corrupt stored key must not take
  * an agent down when a workspace or platform key could still serve it.
+ *
+ * Goes through the keyring so a value written under a rotated-out key still
+ * opens. A deployment that sets only ENCRYPTION_KEY gets a one-key ring and the
+ * original behavior.
  */
-async function decryptOrNull(ciphertext: string, secret: string): Promise<string | null> {
+async function decryptOrNull(ciphertext: string, env: AgentProviderEnv): Promise<string | null> {
   try {
-    const { decrypt } = await import("../utils/crypto");
-    return decrypt(ciphertext, secret);
+    const [{ decryptWithKeyring }, { parseKeyring }] = await Promise.all([
+      import("../utils/crypto"),
+      import("../utils/keyring"),
+    ]);
+    return decryptWithKeyring(ciphertext, parseKeyring(env));
   } catch {
     return null;
   }
@@ -79,7 +89,7 @@ export async function resolveAgentProvider(
 ): Promise<AgentProviderResolution> {
   // 1. The agent's own key.
   if (binding.providerKind && binding.providerApiKeyEnc && env.ENCRYPTION_KEY) {
-    const apiKey = await decryptOrNull(binding.providerApiKeyEnc, env.ENCRYPTION_KEY);
+    const apiKey = await decryptOrNull(binding.providerApiKeyEnc, env);
     const config = resolveProviderConfig({
       providerKind: binding.providerKind,
       providerApiUrl: binding.providerApiUrl,
@@ -98,7 +108,7 @@ export async function resolveAgentProvider(
     for (const kind of kinds) {
       const stored = await getCredentialSecret(db, binding.workspaceId, kind);
       if (!stored) continue;
-      const apiKey = await decryptOrNull(stored.apiKeyEnc, env.ENCRYPTION_KEY);
+      const apiKey = await decryptOrNull(stored.apiKeyEnc, env);
       const config = resolveProviderConfig({
         providerKind: stored.kind,
         providerApiUrl: stored.apiUrl,

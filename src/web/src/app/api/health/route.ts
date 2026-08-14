@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { describeKeyring } from "@onecaptain/shared";
 
 /**
  * Liveness, plus which required configuration is actually present.
@@ -39,12 +40,21 @@ export async function GET() {
     return typeof value !== "string" || value.length === 0;
   });
 
+  // A half-finished key rotation is otherwise invisible until a decrypt fails
+  // in a request: the keys are all "present", but ENCRYPTION_KEY_ACTIVE may name
+  // an id the ring does not hold, so every new write would be unreadable. Report
+  // key IDS and the active id — those are names the operator chose, not secrets.
+  const ring = describeKeyring(env as Parameters<typeof describeKeyring>[0]);
+
   return NextResponse.json({
     // `status` stays "ok" — the process IS serving. A config gap is a
     // deployment problem to surface, not a reason to fail a liveness probe and
     // have an orchestrator restart a healthy container in a loop.
     status: "ok",
-    config: missing.length === 0 ? "complete" : "incomplete",
+    config: missing.length === 0 && ring.ok ? "complete" : "incomplete",
     ...(missing.length > 0 ? { missing } : {}),
+    keyring: ring.ok
+      ? { status: "ok", activeId: ring.activeId, keyIds: ring.keyIds }
+      : { status: "error", error: ring.error },
   });
 }
