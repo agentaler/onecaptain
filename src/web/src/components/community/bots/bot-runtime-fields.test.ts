@@ -1,91 +1,55 @@
-import { describe, expect, it, vi } from "vitest"
-import React from "react"
-import TestRenderer, { act } from "react-test-renderer"
+import { describe, it, expect } from "vitest"
+import { normalizeRuntimes } from "./bot-runtime-fields"
+import type { CommunityMachineSummary } from "@onecaptain/shared"
 
-vi.mock("@/components/provider-logo", () => ({
-  ProviderLogo: () => React.createElement("span", { "data-mock": "provider-logo" }),
-}))
+// Moved here with the function. Creating a bot no longer picks a machine or a
+// runtime, but EDITING a machine-bound agent still lists its runtimes, so this
+// normalization is live code and keeps its coverage.
 
-vi.mock("@/components/ui/label", () => ({
-  Label: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement("label", null, children),
-}))
-
-vi.mock("@/lib/utils", () => ({
-  cn: (...values: unknown[]) => values.filter(Boolean).join(" "),
-}))
-
-vi.mock("./model-field", () => ({
-  ModelField: ({ runtime, value }: { runtime: string; value: string | null }) =>
-    React.createElement("div", { "data-runtime": runtime, "data-model": value }),
-}))
-
-import { BotRuntimeFields } from "./bot-runtime-fields"
-
-const OPTIONS = [
-  { id: "claude", unhealthy: true },
-  { id: "codex", unhealthy: false },
-  { id: "gemini", unhealthy: true },
-]
-
-function renderFields(overrides: Partial<React.ComponentProps<typeof BotRuntimeFields>> = {}) {
-  const onRuntimeChange = vi.fn()
-  const onModelChange = vi.fn()
-  let renderer!: TestRenderer.ReactTestRenderer
-  act(() => {
-    renderer = TestRenderer.create(
-      React.createElement(BotRuntimeFields, {
-        options: OPTIONS,
-        runtime: "claude",
-        model: "claude-sonnet-4-6",
-        onRuntimeChange,
-        onModelChange,
-        ...overrides,
-      }),
-    )
-  })
-  return { renderer, onRuntimeChange, onModelChange }
+function machine(over: Partial<CommunityMachineSummary>): CommunityMachineSummary {
+  return {
+    id: "m1",
+    hostname: "host",
+    displayName: "",
+    platform: "darwin",
+    arch: "arm64",
+    osRelease: "",
+    daemonVersion: "0",
+    lastSeenAt: null,
+    status: "online",
+    availableRuntimes: [],
+    createdAt: "",
+    updatedAt: "",
+    ...over,
+  }
 }
 
-function radio(renderer: TestRenderer.ReactTestRenderer, value: string) {
-  return renderer.root.find(
-    (node) => node.type === "input" && node.props.value === value,
-  )
-}
-
-describe("BotRuntimeFields", () => {
-  it("keeps the selected unhealthy runtime enabled and disables other unhealthy options", () => {
-    const { renderer } = renderFields()
-    expect(radio(renderer, "claude").props.disabled).toBe(false)
-    expect(radio(renderer, "codex").props.disabled).toBe(false)
-    expect(radio(renderer, "gemini").props.disabled).toBe(true)
+describe("normalizeRuntimes", () => {
+  it("returns [] when availableRuntimes is missing", () => {
+    expect(normalizeRuntimes(undefined)).toEqual([])
+    // legacy summary missing the field entirely
+    const legacy = { ...machine({}) } as CommunityMachineSummary
+    delete (legacy as { availableRuntimes?: unknown }).availableRuntimes
+    expect(normalizeRuntimes(legacy)).toEqual([])
   })
 
-  it("changes runtime and clears the previous provider model together", () => {
-    const { renderer, onRuntimeChange, onModelChange } = renderFields()
-    act(() => radio(renderer, "codex").props.onChange())
-    expect(onRuntimeChange).toHaveBeenCalledWith("codex")
-    expect(onModelChange).toHaveBeenCalledWith(null)
-  })
-
-  it("does not clear the model when the selected runtime is chosen again", () => {
-    const { renderer, onRuntimeChange, onModelChange } = renderFields()
-    act(() => radio(renderer, "claude").props.onChange())
-    expect(onRuntimeChange).not.toHaveBeenCalled()
-    expect(onModelChange).not.toHaveBeenCalled()
-  })
-
-  it("exposes optional motion targets without changing the form contract", () => {
-    const { renderer } = renderFields({
-      motionTargetPrefix: "runtime",
-      modelMotionTarget: "model",
+  it("normalizes bare-string legacy entries to healthy", () => {
+    const m = machine({
+      availableRuntimes: ["claude"] as unknown as CommunityMachineSummary["availableRuntimes"],
     })
-    expect(
-      renderer.root.find((node) => node.props["data-motion-target"] === "runtime-codex"),
-    ).toBeTruthy()
-    expect(
-      renderer.root.find((node) => node.props["data-motion-target"] === "model"),
-    ).toBeTruthy()
-    expect(radio(renderer, "codex").props.name).toBe("edit-bot-runtime")
+    expect(normalizeRuntimes(m)).toEqual([{ id: "claude", unhealthy: false }])
+  })
+
+  it("marks status:'unhealthy' entries unhealthy and sorts healthy-first", () => {
+    const m = machine({
+      availableRuntimes: [
+        { id: "sick", status: "unhealthy" },
+        { id: "ok", status: "healthy" },
+      ] as unknown as CommunityMachineSummary["availableRuntimes"],
+    })
+    expect(normalizeRuntimes(m)).toEqual([
+      { id: "ok", unhealthy: false },
+      { id: "sick", unhealthy: true },
+    ])
   })
 })

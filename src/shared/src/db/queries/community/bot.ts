@@ -60,7 +60,8 @@ export type BotRow = {
 
 export type BotBinding = {
   userId: string;
-  machineId: string;
+  /** Null for a cloud agent — the binding column is nullable by design. */
+  machineId: string | null;
   runtime: string;
   modelName: string | null;
   createdAt: string;
@@ -78,6 +79,9 @@ export class OwnerHasBotsError extends Error {
 /**
  * List live bots owned by `ownerId`. Filters `isBot=true AND deletedAt IS NULL`.
  * Joined against `communityBotBinding` for machine/runtime overlay.
+ *
+ * `machineId` is null for a cloud-run agent (no machine, runs against a
+ * provider API key) — a live bot, not a broken one.
  */
 export async function listBotsForOwner(
   db: Database,
@@ -85,7 +89,7 @@ export async function listBotsForOwner(
 ): Promise<
   Array<
     BotRow & {
-      machineId: string;
+      machineId: string | null;
       runtime: string;
       modelName: string | null;
       providerKind: string | null;
@@ -236,7 +240,7 @@ export async function countLiveBotsForOwner(
 export async function getBotBinding(
   db: Database,
   botId: string
-): Promise<{ machineId: string; runtime: string; modelName: string | null } | null> {
+): Promise<{ machineId: string | null; runtime: string; modelName: string | null } | null> {
   const rows = await db
     .select({
       machineId: communityBotBinding.machineId,
@@ -260,7 +264,7 @@ export async function getBotBinding(
 export async function getBotBindingWithOwner(
   db: Database,
   botId: string
-): Promise<{ machineId: string; runtime: string; ownerUserId: string; name: string; discriminator: string } | null> {
+): Promise<{ machineId: string | null; runtime: string; ownerUserId: string; name: string; discriminator: string } | null> {
   const rows = await db
     .select({
       machineId: communityBotBinding.machineId,
@@ -291,7 +295,8 @@ export async function getBotBindingWithOwner(
  * Wake-dispatch candidate filter — one D1 hit. Given a message's `recipients`
  * (all fanout recipients, human + bot) and the `channelId` it landed in,
  * returns only the bots among them that are (a) live (`!deletedAt`), (b) bound
- * to a machine, and (c) actually behind `newSeq` per their own `lastReadSeq`
+ * (to a machine OR, for a cloud-run agent, to a provider — the join is on the
+ * binding row, which both have), and (c) actually behind `newSeq` per their own `lastReadSeq`
  * for that channel (`NULL` read-state row counts as "never read", i.e.
  * behind). A bot that's already caught up (e.g. it just authored `newSeq`
  * itself, or acked out-of-band) is filtered out here so the producer never
@@ -304,7 +309,7 @@ export async function findWakeCandidates(
     channelId: string;
     newSeq: number;
   }
-): Promise<Array<{ botUserId: string; name: string | null; machineId: string; runtime: string }>> {
+): Promise<Array<{ botUserId: string; name: string | null; machineId: string | null; runtime: string }>> {
   if (opts.recipients.length === 0) return [];
   const scopeCond = eq(communityReadState.channelId, opts.channelId);
 
@@ -357,7 +362,9 @@ export type BotWakeContext =
       botUserId: string;
       name: string;
       discriminator: string;
-      machineId: string;
+      /** NULL for a cloud-run agent — see the guard below. */
+      machineId: string | null;
+      workspaceId: string | null;
       runtime: string;
       modelName: string | null;
       providerKind: string | null;
@@ -376,6 +383,7 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
       deletedAt: user.deletedAt,
       ownerUserId: user.ownerUserId,
       machineId: communityBotBinding.machineId,
+      workspaceId: communityBotBinding.workspaceId,
       runtime: communityBotBinding.runtime,
       modelName: communityBotBinding.modelName,
       providerKind: communityBotBinding.providerKind,
@@ -389,13 +397,20 @@ export async function getBotWakeContext(db: Database, botUserId: string): Promis
   const r = rows[0];
   if (!r || !r.isBot) return { state: "bot_missing" };
   if (r.deletedAt) return { state: "bot_deleted" };
-  if (!r.machineId || !r.runtime) return { state: "bot_unbound" };
+  // "Unbound" means there is no binding ROW — the left join produced nothing,
+  // so `runtime` (NOT NULL on the binding) is null. It deliberately no longer
+  // means "no machine": a cloud-run agent has a binding with `machine_id` NULL
+  // and is perfectly wakeable. Whether it can actually run is a credential
+  // question, answered later by `resolveAgentProvider`, which can see the
+  // workspace key this row cannot.
+  if (!r.runtime) return { state: "bot_unbound" };
   return {
     state: "ready",
     botUserId: r.id,
     name: r.name,
     discriminator: r.discriminator,
     machineId: r.machineId,
+    workspaceId: r.workspaceId ?? null,
     runtime: r.runtime,
     modelName: r.modelName ?? null,
     providerKind: r.providerKind ?? null,
@@ -526,10 +541,18 @@ export type CreateBotInput = {
   ownerId: string;
   name: string;
   description?: string;
-  machineId: string;
+  /** Null for a cloud agent — the binding column is nullable by design. */
+  machineId: string | null;
   runtime: string;
   image?: string | null;
   modelName?: string | null;
+  /**
+   * The tenant that pays for and quotas this agent. Optional only so existing
+   * machine-only callers keep compiling; a bot created without one cannot run
+   * in the cloud, because there is no workspace whose credential it could use
+   * or whose usage it could be billed to.
+   */
+  workspaceId?: string | null;
 };
 
 /**
@@ -572,6 +595,7 @@ export async function createBot(
       const stmt2 = db.insert(communityBotBinding).values({
         userId: botId,
         machineId: data.machineId,
+        workspaceId: data.workspaceId ?? null,
         runtime: data.runtime,
         modelName: data.modelName ?? null,
         createdAt: nowIso,

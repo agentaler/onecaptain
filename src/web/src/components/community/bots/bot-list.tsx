@@ -26,11 +26,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { AgentAvatar } from "@/components/avatar"
+import { AgentAvatar, GeneratedAvatar } from "@/components/avatar"
 import { ProviderLogo } from "@/components/provider-logo"
 import { formatAwakeDuration } from "@/components/community/format-time"
 import { BotActivityHeatmap } from "./bot-activity-heatmap"
 import { useMachines } from "@/hooks/community/use-machines"
+import { useLlmProviders } from "@/hooks/community/use-llm-providers"
 import { useBots, useDeleteBot, useResetBotSession, useResetMachineAgents, type BotSummary } from "@/hooks/community/use-bots"
 import { useCreateOrGetDm } from "@/hooks/community/mutations"
 import { useOnlineUserIds } from "@/stores/community/ws"
@@ -42,10 +43,16 @@ import { AgentHelpGallery } from "@/components/community/onboarding-tiles/agent-
 import {
   advanceCommunityOnboarding,
   readCommunityOnboardingState,
-  recoverCommunityOnboardingMachine,
+  startCommunityOnboarding,
   updateCommunityOnboardingResources,
   useCommunityOnboarding,
 } from "@/lib/community-onboarding"
+
+/**
+ * Group key for agents that run in the cloud and therefore have no machine.
+ * A machine id can never collide with it — real ids are nanoids.
+ */
+const CLOUD_GROUP = "__cloud__"
 
 /**
  * BotList — the /c/me/bots surface.
@@ -78,6 +85,7 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   const searchParams = useSearchParams()
   const { bots, isLoading } = useBots()
   const { machines, isLoading: machinesLoading } = useMachines()
+  const { providers, platformFallback } = useLlmProviders()
   // Presence read: single API for humans + bots, server-pushed identically
   // (see plans/community-account-debt-fixes.md Fix 3 — the owner is always
   // part of its own bots' presence audience, even for a bot not yet in any
@@ -103,17 +111,28 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
     () => new Set(),
   )
   const [helpOpen, setHelpOpen] = useState(false)
+  // Seeded after mount, not during render: `crypto.randomUUID()` in the render
+  // body would differ between server and client and hydrate mismatched.
+  const [guideAvatarSeed, setGuideAvatarSeed] = useState("onecaptain-guide")
   const del = useDeleteBot()
   const resetSession = useResetBotSession()
   const resetMachineAgents = useResetMachineAgents()
   const createOrGetDm = useCreateOrGetDm()
   const onboardingState = useCommunityOnboarding()
+
+  useEffect(() => {
+    setGuideAvatarSeed(`onecaptain-guide-${crypto.randomUUID()}`)
+  }, [])
   const guidedActive = onboardingState?.status === "active" && onboardingState.stage === "bot"
   const guidedPendingBotId =
     guidedActive ? onboardingState.botId : undefined
-  const guidedNeedsMachine =
-    guidedActive &&
-    !machines.some((machine) => isPresenceOnline(machine.status))
+  // An agent runs on a key, not a machine — and the key does not have to be the
+  // workspace's own. `resolveAgentProvider` falls back to OneCaptain's platform
+  // key, so a workspace with no credential of its own can still create and run
+  // agents on the free tier. Blocking on `providers.length === 0` alone would
+  // deny exactly the users the free tier is for.
+  const needsProvider = providers.length === 0 && !platformFallback
+  const guidedNeedsProvider = guidedActive && needsProvider
 
   const chatWithBot = async (bot: BotSummary) => {
     try {
@@ -146,10 +165,11 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
 
   const openGuidedCreate = () => {
     const state = readCommunityOnboardingState()
-    const hasUsableMachine = machines.some((machine) => isPresenceOnline(machine.status))
-    if (state?.status === "active" && state.stage === "bot" && !hasUsableMachine) {
-      recoverCommunityOnboardingMachine()
-      router.push("/c/me/machines")
+    // The guided flow's prerequisite is a usable LLM key. It used to be an
+    // ONLINE machine, which is why onboarding stalled for anyone who had not
+    // installed the daemon.
+    if (state?.status === "active" && state.stage === "bot" && needsProvider) {
+      router.push("/c/me/llm")
       return
     }
     if (state?.status === "active" && state.stage === "bot" && state.botId) {
@@ -159,13 +179,14 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
     setCreateOpen(true)
   }
 
-  const guidedCreateLabel = guidedNeedsMachine
-    ? "Connect a machine"
+  const guidedCreateLabel = guidedNeedsProvider
+    ? "Add an LLM key"
     : guidedPendingBotId
       ? "Open bot chat"
       : "Create a bot"
 
   const machineName = (id: string): string => {
+    if (id === CLOUD_GROUP) return "Cloud"
     const m = machines.find((x) => x.id === id)
     if (!m) return "Unknown machine"
     return resolveMachineName(m)
@@ -177,13 +198,22 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   const groups = useMemo(() => {
     const byMachine = new Map<string, BotSummary[]>()
     for (const bot of bots) {
-      const list = byMachine.get(bot.machineId)
+      // A cloud-run agent has no machine. It groups under its own heading
+      // rather than falling into "Unknown machine", which would read as a
+      // broken binding when it is the normal, healthy case.
+      const key = bot.machineId ?? CLOUD_GROUP
+      const list = byMachine.get(key)
       if (list) list.push(bot)
-      else byMachine.set(bot.machineId, [bot])
+      else byMachine.set(key, [bot])
     }
     const orderedIds = [
+      // Cloud agents first — they are the default, and they need no machine
+      // to be online.
+      ...(byMachine.has(CLOUD_GROUP) ? [CLOUD_GROUP] : []),
       ...machines.map((m) => m.id).filter((id) => byMachine.has(id)),
-      ...[...byMachine.keys()].filter((id) => !machines.some((m) => m.id === id)),
+      ...[...byMachine.keys()].filter(
+        (id) => id !== CLOUD_GROUP && !machines.some((m) => m.id === id),
+      ),
     ]
     return orderedIds.map((machineId) => ({
       machineId,
@@ -244,7 +274,6 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
   }
 
   if (bots.length === 0) {
-    const needsMachine = machines.length === 0
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {backBar}
@@ -256,30 +285,57 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-medium text-foreground">
-              {needsMachine ? "Connect a machine first" : "No bots yet"}
+              {needsProvider ? "Add an LLM key first" : "No bots yet"}
             </h2>
             <p className="max-w-md text-sm text-muted-foreground">
-              {needsMachine
-                ? "Bots need a connected machine to run. Connect one first, then come back to create your bot."
+              {needsProvider
+                ? "Bots run on your LLM provider key. Add one, then come back and create your bot."
                 : "Create a bot and chat with it from anywhere — spin up servers and share it with family and friends."}
             </p>
           </div>
           {/* No help ? in the empty state (Gus): the gallery is about mechanics
               a user only needs AFTER they own a bot — it lives in the populated
               header instead. */}
-          <div data-onboarding-target="create-bot" className="w-fit">
-            <Button
-              onClick={needsMachine ? () => router.push("/c/me/machines") : openGuidedCreate}
-            >
-              {needsMachine ? "Connect a machine" : guidedCreateLabel}
-            </Button>
+          <div className="flex items-center gap-2">
+            <div data-onboarding-target="create-bot" className="w-fit">
+              <Button
+                onClick={needsProvider ? () => router.push("/c/me/llm") : openGuidedCreate}
+              >
+                {needsProvider ? "Add an LLM key" : guidedCreateLabel}
+              </Button>
+            </div>
+            {/* The guide starts here because its first step IS here. It used to
+                live on the machines page, where step 1 was "connect a machine" —
+                a prerequisite that no longer exists and that stranded anyone
+                without the daemon. Hidden while a key is genuinely missing: the
+                guide would open on a screen the user cannot act on. */}
+            {!needsProvider && (
+              <span className="community-guide-me">
+                {onboardingState === null ? (
+                  <span className="community-guide-me-orbit" aria-hidden="true">
+                    <span className="community-guide-me-avatar">
+                      <GeneratedAvatar
+                        seed={guideAvatarSeed}
+                        size={24}
+                        className="rounded-full ring-2 ring-background shadow-sm"
+                      />
+                    </span>
+                  </span>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  onClick={() => startCommunityOnboarding({ guideAvatarSeed })}
+                >
+                  Guide me
+                </Button>
+              </span>
+            )}
           </div>
         </div>
         <CreateBotSheet
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={onBotCreated}
-          guided={guidedActive}
           avatarSeed={guidedActive ? onboardingState.guideAvatarSeed : undefined}
         />
       </div>
@@ -545,7 +601,6 @@ export function BotList({ onBack }: { onBack?: () => void } = {}) {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={onBotCreated}
-        guided={guidedActive}
         avatarSeed={guidedActive ? onboardingState.guideAvatarSeed : undefined}
       />
       <AgentHelpGallery open={helpOpen} onOpenChange={setHelpOpen} />

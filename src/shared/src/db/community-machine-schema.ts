@@ -1,7 +1,7 @@
 import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { user } from "./schema";
+import { user, workspace } from "./schema";
 import type { CommunityMachineRuntime } from "../community-ws-events";
 
 // community_machine_token — pairing tokens. The id IS the user-visible
@@ -119,9 +119,21 @@ export const communityBotBinding = sqliteTable(
     userId: text("user_id")
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
+    // NULL when the agent runs in the cloud against a provider API key instead
+    // of on a user's machine — that is the whole point of the cloud runtime, so
+    // "no machine" is a valid live binding, not a broken one. RESTRICT stays:
+    // deleting a machine that still has bots bound to it must error.
+    // Hand-maintained in lockstep with migration 0090.
     machineId: text("machine_id")
-      .notNull()
       .references(() => communityMachine.id, { onDelete: "restrict" }),
+    // The tenant that pays for and quotas this agent. A bot is otherwise only
+    // owner-scoped (`user.owner_user_id`), which gives the cloud runtime no way
+    // to resolve the workspace credential or attribute an `agent_usage_event`.
+    // Nullable because it is backfilled: a binding without one is simply not
+    // runnable in the cloud (the machine path never reads it).
+    // Hand-maintained in lockstep with migration 0091.
+    workspaceId: text("workspace_id")
+      .references(() => workspace.id, { onDelete: "cascade" }),
     runtime: text("runtime").notNull(),
     // Full launchable model id (e.g. "claude-opus-4-6"), or NULL for the
     // runtime's default. Kind is derived from the catalog at read time, never
@@ -141,7 +153,10 @@ export const communityBotBinding = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
   },
-  (t) => [index("idx_community_bot_binding_machine").on(t.machineId)]
+  (t) => [
+    index("idx_community_bot_binding_machine").on(t.machineId),
+    index("idx_community_bot_binding_workspace").on(t.workspaceId),
+  ]
 );
 
 // community_agent_runner_key — per-agent runner key. Same hashing shape

@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { toastApiError } from "@/lib/api/client"
-import { isPresenceOnline, type CommunityMachineSummary } from "@onecaptain/shared"
-import { machineName } from "@/lib/community/machine-name"
 import {
   Sheet,
   SheetBody,
@@ -14,21 +12,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { type AvatarDraft } from "@/components/avatar"
 import { serializeBeamSeed } from "@/lib/avatar/seed-url"
-import { ProviderLogo } from "@/components/provider-logo"
-import { useMachines } from "@/hooks/community/use-machines"
 import { useCreateBot, useUploadBotAvatar } from "@/hooks/community/use-bots"
 import { BotFormFields } from "./bot-form-fields"
-import { BotRuntimeFields } from "./bot-runtime-fields"
 import {
   type BotCreateFieldErrors,
   hasBotCreateFieldErrors,
   validateBotCreateFields,
 } from "./bot-form-validation"
 import { uniqueNamesGenerator, names } from "unique-names-generator"
-import { cn } from "@/lib/utils"
 import type { BotSummary } from "@/hooks/community/use-bots"
 
 // Stable initial seed avoids hydration mismatch (real seed is rerolled on mount).
@@ -38,73 +31,26 @@ function randomBotName(): string {
   return uniqueNamesGenerator({ dictionaries: [names], length: 1, style: "capital" })
 }
 
-type NormalizedRuntime = { id: string; unhealthy: boolean }
-
-/**
- * Normalize a machine's runtimes into `{ id, unhealthy }`, healthy-first.
- *
- * A legacy CommunityMachineSummary cached client-side may still be missing
- * availableRuntimes, or a runtime entry may still be a bare string
- * (pre-health-status shape). Normalize both instead of hiding unhealthy
- * runtimes outright, so the radio card can show *why* an option is disabled.
- * Available runtimes sort first — the ones you can actually pick should never
- * be buried below ones you can't.
- */
-export function normalizeRuntimes(machine: CommunityMachineSummary | undefined): NormalizedRuntime[] {
-  const rt = machine?.availableRuntimes ?? []
-  const normalized = rt.map((r) =>
-    typeof r === "string"
-      ? { id: r, unhealthy: false }
-      : { id: (r as { id: string }).id, unhealthy: (r as { status?: string }).status === "unhealthy" },
-  )
-  return normalized.sort((a, b) => Number(a.unhealthy) - Number(b.unhealthy))
-}
-
-/** First healthy (selectable) runtime id, or "" if none. */
-export function firstHealthyRuntimeId(options: NormalizedRuntime[]): string {
-  return options.find((o) => !o.unhealthy)?.id ?? ""
-}
-
-/** First online (selectable) machine id, or "" if none. */
-export function firstOnlineMachineId(machines: CommunityMachineSummary[]): string {
-  return machines.find((m) => isPresenceOnline(m.status))?.id ?? ""
-}
-
 export function CreateBotSheet({
   open,
   onOpenChange,
   onCreated,
-  guided = false,
   avatarSeed,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated?: (bot: BotSummary) => void | Promise<void>
-  guided?: boolean
   avatarSeed?: string
 }) {
-  const { machines } = useMachines()
   const create = useCreateBot()
   const uploadBotAvatar = useUploadBotAvatar()
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [machineId, setMachineId] = useState<string>("")
-  const [runtime, setRuntime] = useState<string>("")
-  const [model, setModel] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<BotCreateFieldErrors>({})
-  const [technicalExpanded, setTechnicalExpanded] = useState(false)
   const [avatarDraft, setAvatarDraft] = useState<AvatarDraft>({
     kind: "procedural",
     image: INITIAL_AVATAR,
   })
-
-  const selectedMachine = machines.find((m) => m.id === machineId)
-  const runtimeOptions = useMemo(() => normalizeRuntimes(selectedMachine), [selectedMachine])
-  const singleTechnicalDefault =
-    guided &&
-    Boolean(selectedMachine && runtime) &&
-    machines.filter((machine) => isPresenceOnline(machine.status)).length === 1 &&
-    runtimeOptions.filter((option) => !option.unhealthy).length === 1
 
   // Randomize name + avatar on client mount (not during SSR — Math.random would
   // hydration-mismatch). Fires once per sheet open.
@@ -122,29 +68,8 @@ export function CreateBotSheet({
       image: serializeBeamSeed(avatarSeed ?? crypto.randomUUID()),
     })
     setDescription("")
-    setMachineId("")
-    setRuntime("")
-    setModel(null)
     setFieldErrors({})
-    setTechnicalExpanded(false)
   }, [open, avatarSeed])
-
-  // Auto-select sensible defaults once machine data arrives. useMachines()
-  // loads async, so `machines` is often [] on the open transition and
-  // populates a tick later — this reacts to that. Each write is guarded on the
-  // target being "" so a presence refetch never overwrites a made choice.
-  useEffect(() => {
-    if (!open) return
-    if (machineId === "") {
-      const next = firstOnlineMachineId(machines)
-      if (next) setMachineId(next)
-      return
-    }
-    if (runtime === "") {
-      const next = firstHealthyRuntimeId(runtimeOptions)
-      if (next) setRuntime(next)
-    }
-  }, [open, machines, runtimeOptions, machineId, runtime])
 
   function shuffleName() {
     setName(randomBotName())
@@ -158,23 +83,8 @@ export function CreateBotSheet({
     }
   }
 
-  function selectMachine(id: string) {
-    setMachineId(id)
-    const nextMachine = machines.find((m) => m.id === id)
-    setRuntime(firstHealthyRuntimeId(normalizeRuntimes(nextMachine)))
-    // A model id is runtime-specific; a machine switch can change the runtime,
-    // so drop any selected model back to Default.
-    setModel(null)
-    setFieldErrors((prev) => ({ ...prev, machineId: undefined }))
-  }
-
-  function selectRuntime(id: string) {
-    setRuntime(id)
-    setFieldErrors((prev) => ({ ...prev, runtime: undefined }))
-  }
-
   async function submit() {
-    const nextErrors = validateBotCreateFields({ name, machineId, runtime })
+    const nextErrors = validateBotCreateFields({ name })
     setFieldErrors(nextErrors)
     if (hasBotCreateFieldErrors(nextErrors)) return
 
@@ -182,10 +92,7 @@ export function CreateBotSheet({
       const data = await create.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
-        machineId,
-        runtime,
         image: avatarDraft.kind === "procedural" ? avatarDraft.image : undefined,
-        model,
       })
       // Bots don't have an id until creation resolves — the photo upload is
       // deferred until now so a cropped-then-cancelled dialog never uploads
@@ -231,87 +138,6 @@ export function CreateBotSheet({
             nameError={fieldErrors.name}
           />
 
-          {singleTechnicalDefault && !technicalExpanded ? (
-            <div className="flex items-center gap-3 rounded-lg bg-muted/60 px-3 py-2.5">
-              <ProviderLogo provider={runtime} className="size-5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">Ready on {selectedMachine ? machineName(selectedMachine) : "your machine"}</p>
-                <p className="text-xs text-muted-foreground">{runtime} · Default model</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setTechnicalExpanded(true)}>Change</Button>
-            </div>
-          ) : (
-          <>
-          <div className="flex flex-col gap-2">
-            <Label className="text-xs text-muted-foreground">Machine</Label>
-            {machines.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No paired machines — pair one first.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Machine">
-                {machines.map((m) => {
-                  const online = isPresenceOnline(m.status)
-                  const selected = machineId === m.id
-                  return (
-                    <label
-                      key={m.id}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors",
-                        selected ? "border-primary bg-primary/5" : "border-border/50 hover:border-foreground/20",
-                        !online && "opacity-40 pointer-events-none",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="bot-machine"
-                        value={m.id}
-                        checked={selected}
-                        disabled={!online}
-                        onChange={() => selectMachine(m.id)}
-                        className="accent-primary size-3.5"
-                      />
-                      <span className="text-sm">{machineName(m)}</span>
-                      <span
-                        className={cn(
-                          "ml-auto inline-flex items-center gap-1 text-xs",
-                          online ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "inline-block size-1.5 rounded-full",
-                            online ? "bg-status-online" : "bg-muted-foreground",
-                          )}
-                        />
-                        {online ? "Online" : "Offline"}
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-            {fieldErrors.machineId && (
-              <p className="text-xs text-destructive">{fieldErrors.machineId}</p>
-            )}
-          </div>
-
-          {selectedMachine && (
-            <div className="flex flex-col gap-2">
-              <BotRuntimeFields
-                options={runtimeOptions}
-                runtime={runtime}
-                model={model}
-                onRuntimeChange={selectRuntime}
-                onModelChange={setModel}
-                radioName="bot-runtime"
-                runtimeError={fieldErrors.runtime}
-                disableUnhealthyOptions
-              />
-            </div>
-          )}
-          </>
-          )}
         </SheetBody>
 
         <SheetFooter>

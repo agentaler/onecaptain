@@ -1,4 +1,4 @@
-import { createDb, queries, readOrStale } from "@onecaptain/shared"
+import { createDb, queries, readOrStale, withD1Retry } from "@onecaptain/shared"
 import type {
   CommunityMachineConnectionState,
   ConnectionState,
@@ -139,13 +139,20 @@ export async function handleWebSocketMessage(
       ws.close(1008, "Unauthorized")
       return
     }
-    const identity = await validateToken(context, msg.token)
-    if (!identity) {
+    const authOutcome = await validateToken(context, msg.token)
+    if (authOutcome.kind === "invalid") {
       context.log.warn("websocket auth failed")
       ws.close(1008, "Unauthorized")
       return
     }
-    const { userId, name, discriminator } = identity
+    if (authOutcome.kind === "transient") {
+      // 1011 (not 1008) so this reads as "try again", matching the daemon
+      // path. The client reconnects on any close; the distinction is for
+      // whoever reads the logs.
+      ws.close(1011, "Auth temporarily unavailable")
+      return
+    }
+    const { userId, name, discriminator } = authOutcome.identity
     const wasOnline = countAuthenticatedUserConnections(context, userId) > 0
     ws.serializeAttachment({ type: "user", userId, authenticated: true, name, discriminator } as ConnectionState)
     context.log.info("websocket authenticated", { userId })
@@ -244,12 +251,48 @@ async function getDaemonIdForUser(context: WsDurableContext, userId: string): Pr
   return token?.hostname || null
 }
 
+/**
+ * Resolve the session behind a user WS handshake, separating "this token is
+ * not valid" from "we could not find out right now" — the SAME three-way shape
+ * `validateMachineToken` already uses, and for the same reason.
+ *
+ * Before this, the lookup was a bare query: a transient D1 failure
+ * (`SQLITE_BUSY: database is locked`, `Network connection lost`) threw out of
+ * the message handler, so the socket had already upgraded (101) but never
+ * authenticated and was never closed. It just sat there — the DO never
+ * registered it, every broadcast to that user delivered to zero sockets, and
+ * the client only recovered when its own reconnect timer eventually fired
+ * ~20s later. From the user's side that is "realtime silently stopped
+ * working"; it is what made the multi-user realtime spec flaky.
+ *
+ * So: retry the transient (`withD1Retry` exists for exactly these
+ * signatures), and if it still fails, report `transient` so the caller can
+ * close 1011 and let the client reconnect at once. A genuinely bad token is
+ * still `invalid` → 1008, unchanged.
+ */
 async function validateToken(
   context: WsDurableContext,
   token: string,
-): Promise<{ userId: string; name: string; discriminator: string } | null> {
+): Promise<
+  | { kind: "valid"; identity: { userId: string; name: string; discriminator: string } }
+  | { kind: "invalid" }
+  | { kind: "transient" }
+> {
   const db = createDb(context.env.DB)
-  return queries.session.getValidSessionWithIdentity(db, token)
+  try {
+    const identity = await withD1Retry(
+      () => queries.session.getValidSessionWithIdentity(db, token),
+      { route: "ws-do/user-auth:validate-token" },
+    )
+    return identity ? { kind: "valid", identity } : { kind: "invalid" }
+  } catch (err) {
+    // Retryable or not, the socket must not be left dangling — that is the
+    // failure mode being fixed. `withD1Retry` has already exhausted its
+    // attempts for the transient shapes, so anything arriving here closes the
+    // connection and is logged with the underlying error for triage.
+    context.log.warn("websocket auth lookup failed", { err: String(err) })
+    return { kind: "transient" }
+  }
 }
 
 async function validateMachineToken(

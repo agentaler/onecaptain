@@ -155,7 +155,11 @@ describe("landing content contract", () => {
     expect(signInClient).toContain('label: "Bring your own agents"')
     expect(signInClient).toContain('description: "Use your own computer and existing agent subscriptions."')
     expect(signInClient).not.toContain("Bring your own workspaces")
-    expect(communityLayout).toContain('<SignupTracker redirectTo="/c/me/machines" />')
+    // A new signup lands on their bots, not on "connect a machine". An agent
+    // runs on an LLM key, so the machines page was a dead end for anyone who
+    // had not installed the daemon.
+    expect(communityLayout).toContain('<SignupTracker redirectTo="/c/me/bots" />')
+    expect(communityLayout).not.toContain("/c/me/machines")
     expect(ogRoute).toContain('searchParams.get("title") || "Rooms for people and agents."')
     expect(ogRoute).toContain("HOME / FAMILY-PLANS")
     expect(ogRoute).toContain("Maya joined the room.")

@@ -113,11 +113,36 @@ export type WorkspacePlan = (typeof WORKSPACE_PLANS)[number];
  * accept). `Infinity` means uncapped. Reading an unknown/legacy plan value
  * must go through `getPlanLimits`, which falls back to the free tier.
  */
-export const PLAN_LIMITS: Record<WorkspacePlan, { maxAgents: number; maxMembers: number }> = {
-  free: { maxAgents: 5, maxMembers: 5 },
-  pro: { maxAgents: 25, maxMembers: 25 },
-  enterprise: { maxAgents: Number.POSITIVE_INFINITY, maxMembers: Number.POSITIVE_INFINITY },
+export const PLAN_LIMITS: Record<
+  WorkspacePlan,
+  { maxAgents: number; maxMembers: number; includedTokensPerMonth: number }
+> = {
+  // `includedTokensPerMonth` caps only LLM calls OneCaptain pays for. A
+  // workspace running on its own provider key is never capped — that call costs
+  // us nothing, which is the whole reason `billable` is separated from the total
+  // in `agent_usage_event`. Counting a BYO-key call against an allowance would
+  // charge a user for spending their own money.
+  //
+  // Free is deliberately non-zero: a new workspace must be able to create an
+  // agent and see it reply without going and getting a key first.
+  free: { maxAgents: 5, maxMembers: 5, includedTokensPerMonth: 100_000 },
+  pro: { maxAgents: 25, maxMembers: 25, includedTokensPerMonth: 5_000_000 },
+  enterprise: {
+    maxAgents: Number.POSITIVE_INFINITY,
+    maxMembers: Number.POSITIVE_INFINITY,
+    includedTokensPerMonth: Number.POSITIVE_INFINITY,
+  },
 };
+
+/** First instant of the current UTC month — the period an allowance is measured over. */
+export function currentUsagePeriodStart(now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+/** First instant of the NEXT UTC month. Exclusive end, matching `summarizeUsage`. */
+export function currentUsagePeriodEnd(now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+}
 
 export function getPlanLimits(plan: string | null | undefined) {
   return PLAN_LIMITS[(plan ?? "free") as WorkspacePlan] ?? PLAN_LIMITS.free;

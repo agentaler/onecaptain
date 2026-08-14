@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { signInternalRun } from "./internal-auth";
 import type { HostCommand, UnreadNotice } from "../community-cli-contract";
 import { makeRuntimeConfig, type ProviderConfig } from "../runtime-config";
 import { resolveModelConfig } from "./bot-model";
@@ -30,6 +31,21 @@ interface FetcherLike {
 interface WakeDispatchEnv {
   WS_DO_WORKER: FetcherLike;
   /**
+   * Service binding to `onecaptain-web`, used ONLY for a cloud-run agent.
+   *
+   * A cloud agent's reply has to go through `createCommunityMessage`, and that
+   * funnel reaches `getCloudflareContext()` from `@opennextjs/cloudflare` (five
+   * call sites in `fanout.ts`), so it cannot execute outside the Next/OpenNext
+   * runtime. Lifting it into `src/shared` would mean building the platform seam
+   * the Postgres cutover needs first — a separate project. So this worker asks
+   * the web worker to run the turn instead of duplicating the funnel.
+   *
+   * Optional so deploys without the binding (and every existing unit test)
+   * keep working: a cloud wake without it resolves to `cloud_unavailable`
+   * rather than throwing.
+   */
+  WEB_WORKER?: FetcherLike;
+  /**
    * Secret for decrypting a bot's stored cloud-provider API key
    * (`community_bot_binding.provider_api_key_enc`). Optional so unit tests
    * and legacy deploys without the secret keep working — a wake for a bot
@@ -37,6 +53,9 @@ interface WakeDispatchEnv {
    * own auth (with a warn), never to a failed wake.
    */
   ENCRYPTION_KEY?: string;
+  /** Keyring, for deployments that have rotated past the single legacy key. */
+  ENCRYPTION_KEYS?: string;
+  ENCRYPTION_KEY_ACTIVE?: string;
 }
 
 /**
@@ -62,11 +81,15 @@ async function resolveWakeProviderConfig(
     return undefined;
   }
   try {
-    const { decrypt } = await import("../utils/crypto");
+    // Through the keyring, so a key stored under a rotated-out id still opens.
+    const [{ decryptWithKeyring }, { parseKeyring }] = await Promise.all([
+      import("../utils/crypto"),
+      import("../utils/keyring"),
+    ]);
     return resolveProviderConfig({
       providerKind: botCtx.providerKind,
       providerApiUrl: botCtx.providerApiUrl,
-      apiKey: decrypt(botCtx.providerApiKeyEnc, env.ENCRYPTION_KEY),
+      apiKey: decryptWithKeyring(botCtx.providerApiKeyEnc, parseKeyring(env)),
     });
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -155,7 +178,26 @@ export type SkipReason =
 export type BuildUnreadWakeResult =
   | {
       state: "ready";
+      /**
+       * How this agent runs. `machine` is the original path — dispatch the
+       * `agent:wake` to the daemon over ws-do — and is byte-for-byte unchanged.
+       * `cloud` means the binding has no machine, so the turn runs server-side
+       * against a provider API key.
+       */
+      mode: "machine";
       machineId: string;
+      command: HostCommand;
+    }
+  | {
+      state: "ready";
+      mode: "cloud";
+      botUserId: string;
+      /**
+       * The channel to reply in. The server is deliberately NOT carried: the
+       * web route resolves it from the channel, which it must read anyway, so
+       * this side does not pay an extra round trip for a field it never uses.
+       */
+      channelId: string;
       command: HostCommand;
     }
   | { state: "skip"; reason: SkipReason };
@@ -250,7 +292,16 @@ export async function buildUnreadWakeCommand(
     });
   }
 
-  return { state: "ready", machineId: botCtx.machineId, command };
+  if (botCtx.machineId) {
+    return { state: "ready", mode: "machine", machineId: botCtx.machineId, command };
+  }
+  return {
+    state: "ready",
+    mode: "cloud",
+    botUserId: botCtx.botUserId,
+    channelId: scope.channelId,
+    command,
+  };
 }
 
 async function writeWakeTriggerAudit(
@@ -336,7 +387,17 @@ async function writeWakeTriggerAudit(
 export type DispatchOneWakeResult =
   | { outcome: "skip"; reason: SkipReason }
   | { outcome: "sent" }
-  | { outcome: "delivered_nowhere"; machineId: string };
+  | { outcome: "delivered_nowhere"; machineId: string }
+  /** A cloud agent replied. */
+  | { outcome: "cloud_ran"; botUserId: string }
+  /**
+   * A cloud agent could not reply for a reason retrying will not fix — no
+   * credential, a rejected key, a malformed request. The caller ACKs: a bad key
+   * that retried forever would be invisible and expensive.
+   */
+  | { outcome: "cloud_failed"; botUserId: string; reason: string }
+  /** No web binding configured — this deploy cannot run cloud agents at all. */
+  | { outcome: "cloud_unavailable"; botUserId: string };
 
 /**
  * The ONE place that decides what happens for a single `{ messageId,
@@ -357,6 +418,49 @@ export async function dispatchOneUnreadWake(
 ): Promise<DispatchOneWakeResult> {
   const result = await buildUnreadWakeCommand(db, input, env);
   if (result.state === "skip") return { outcome: "skip", reason: result.reason };
+  if (result.mode === "cloud") return runCloudWake(env, result);
   const { sent } = await sendWakeToMachine(env, result.machineId, result.command);
   return sent ? { outcome: "sent" } : { outcome: "delivered_nowhere", machineId: result.machineId };
+}
+
+/**
+ * Ask the web worker to run one cloud turn.
+ *
+ * Only a TRANSIENT failure throws — the queue consumer turns a throw into
+ * `retry()`, and that is exactly right for a provider rate limit or a 5xx. A
+ * permanent failure returns `cloud_failed` so the caller ACKs instead: no
+ * credential, a rejected key, or a request the provider will refuse identically
+ * forever. The web route encodes that split as 503-vs-4xx, which is the only
+ * thing this function has to interpret.
+ */
+async function runCloudWake(
+  env: WakeDispatchEnv,
+  ready: Extract<BuildUnreadWakeResult, { state: "ready"; mode: "cloud" }>
+): Promise<DispatchOneWakeResult> {
+  // `ENCRYPTION_KEY` is the same secret that decrypts stored provider keys, so
+  // a deploy that can run a cloud agent at all can sign for one. Nothing extra
+  // is configured for this.
+  if (!env.WEB_WORKER || !env.ENCRYPTION_KEY) {
+    return { outcome: "cloud_unavailable", botUserId: ready.botUserId };
+  }
+  const signature = await signInternalRun(env.ENCRYPTION_KEY, {
+    botUserId: ready.botUserId,
+    channelId: ready.channelId,
+    issuedAtMs: Date.now(),
+  });
+  const res = await env.WEB_WORKER.fetch("http://internal/api/internal/agent-run", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-onecaptain-internal": signature,
+    },
+    body: JSON.stringify({ botUserId: ready.botUserId, channelId: ready.channelId }),
+  });
+  if (res.ok) return { outcome: "cloud_ran", botUserId: ready.botUserId };
+  if (res.status >= 500) {
+    // Transient — throw so the consumer retries with backoff.
+    throw new Error(`cloud agent run returned ${res.status}`);
+  }
+  const detail = await res.text().catch(() => "");
+  return { outcome: "cloud_failed", botUserId: ready.botUserId, reason: detail.slice(0, 300) };
 }

@@ -1086,8 +1086,12 @@ export const CommunityBotCreateRequestSchema = z.object({
     .max(COMMUNITY_BOT_NAME_MAX)
     .refine(isMentionSafeName, { message: MENTION_SAFE_NAME_MSG }),
   description: z.string().max(COMMUNITY_BOT_DESCRIPTION_MAX).optional(),
-  machineId: z.string().min(1),
-  runtime: z.string().min(1),
+  // Optional: absent means a CLOUD agent, which is the default kind now — it
+  // runs on the workspace's LLM key and has no machine to bind to. Present
+  // means the caller wants a specific local machine, and the API still checks
+  // ownership and runtime health for that case.
+  machineId: z.string().min(1).optional(),
+  runtime: z.string().min(1).optional(),
   image: BotImageUrlSchema.optional(),
   // Full launchable model id, or null for the runtime's default. `undefined`
   // ⇒ untouched (default), explicit `null` ⇒ default.
@@ -1141,6 +1145,42 @@ export const CommunityBotPatchRequestSchema = z
     }
   );
 export type CommunityBotPatchRequest = z.infer<typeof CommunityBotPatchRequestSchema>;
+
+/** Run one turn of a cloud-hosted agent in a channel, on demand. */
+export const CommunityAgentRunRequestSchema = z.object({
+  channelId: z.string().trim().min(1),
+});
+export type CommunityAgentRunRequest = z.infer<typeof CommunityAgentRunRequestSchema>;
+
+/**
+ * Service-to-service: run one cloud agent turn. Not a user-facing shape — the
+ * caller is the wake worker, which already established WHICH agent and channel
+ * from current D1 state.
+ */
+export const InternalAgentRunRequestSchema = z.object({
+  botUserId: z.string().trim().min(1),
+  channelId: z.string().trim().min(1),
+});
+export type InternalAgentRunRequest = z.infer<typeof InternalAgentRunRequestSchema>;
+
+/**
+ * Save a workspace LLM provider key.
+ *
+ * `apiUrl` is a BASE url, but users paste the full endpoint their provider's
+ * docs showed them — `provider-client.ts` normalises both, so this only has to
+ * reject something that is not a URL at all.
+ */
+export const LlmProviderUpsertSchema = z.object({
+  apiKey: z.string().trim().min(8, "that does not look like an API key"),
+  apiUrl: z.string().trim().url().optional().nullable(),
+});
+export type LlmProviderUpsert = z.infer<typeof LlmProviderUpsertSchema>;
+
+/** Verify a saved provider key by making one real, tiny completion call. */
+export const LlmProviderVerifySchema = z.object({
+  model: z.string().trim().min(1),
+});
+export type LlmProviderVerify = z.infer<typeof LlmProviderVerifySchema>;
 
 /** Owner-only workspace member role change — `owner` is deliberately not grantable here. */
 export const UpdateMemberRoleRequestSchema = z.object({

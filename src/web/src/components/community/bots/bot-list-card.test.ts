@@ -16,6 +16,15 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/hooks/community/use-machines", () => ({
   useMachines: () => ({ machines: [{ id: "mac1", displayName: "Mac", hostname: "mac", status: "online" }] }),
 }))
+// The list reads configured LLM providers to decide whether an agent can be
+// created at all. One configured provider keeps these card-rendering cases on
+// the populated path, which is what they are about.
+vi.mock("@/hooks/community/use-llm-providers", () => ({
+  useLlmProviders: () => ({
+    providers: [{ id: "p1", kind: "anthropic", apiUrl: null, last4: "ab12", createdAt: "", updatedAt: "" }],
+    isLoading: false,
+  }),
+}))
 vi.mock("@/hooks/community/use-bots", () => ({
   useBots: () => useBotsMock(),
   useDeleteBot: () => ({ mutateAsync: vi.fn(), isPending: false }),

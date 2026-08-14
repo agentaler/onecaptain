@@ -899,3 +899,73 @@ export const subscription = sqliteTable(
     index("idx_subscription_polar_id").on(t.polarSubscriptionId),
   ]
 );
+
+// Workspace-level cloud LLM credential — the key a workspace brings once,
+// instead of pasting it into every bot. `community_bot_binding` keeps its own
+// per-bot override; this is the fallback a cloud-run agent resolves against
+// when the bot names no provider of its own.
+//
+// `kind` is a BOT_PROVIDER_KINDS value ("anthropic" | "openai" | "openrouter"
+// | "custom"). The key is stored ONLY encrypted (AES-256-GCM via
+// @onecaptain/shared/crypto with ENCRYPTION_KEY) and is never returned by any
+// API after write — reads expose `last4` so the UI can show which key is set
+// without ever handing it back.
+export const workspaceProviderCredential = sqliteTable(
+  "workspace_provider_credential",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "wpc_" + nanoid()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    apiUrl: text("api_url"),
+    apiKeyEnc: text("api_key_enc").notNull(),
+    last4: text("last4").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    // One credential per provider per workspace: setting the same kind again
+    // replaces the key rather than accumulating rows nobody can tell apart.
+    unique("workspace_provider_credential_kind_unique").on(t.workspaceId, t.kind),
+  ]
+);
+
+// Append-only usage ledger — one row per provider call made on a workspace's
+// behalf. This is what consumption billing is computed from, so it records
+// what was actually spent rather than what was requested: token counts come
+// from the provider's own usage response.
+//
+// `costMicros` is USD micros (1e-6 USD) as an integer — money never touches a
+// float. It is the provider's list price for the call; any platform markup is
+// applied at invoice time from this base, so changing the markup never
+// rewrites history.
+//
+// `billable` separates "we paid for this" from "the workspace's own key paid
+// for it": a BYO-key call is still metered (the user wants to see usage) but
+// must never be invoiced.
+export const agentUsageEvent = sqliteTable(
+  "agent_usage_event",
+  {
+    id: text("id").primaryKey().$defaultFn(() => "aue_" + nanoid()),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    // The bot's user row. Nullable so a workspace-level call (not attributable
+    // to one agent) still lands in the ledger rather than being dropped.
+    agentUserId: text("agent_user_id").references(() => user.id, { onDelete: "set null" }),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    costMicros: integer("cost_micros").notNull().default(0),
+    billable: integer("billable", { mode: "boolean" }).notNull().default(true),
+    createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [
+    // The billing rollup is always "this workspace, this period", so the index
+    // that serves it carries the time column too.
+    index("idx_agent_usage_workspace_created").on(t.workspaceId, t.createdAt),
+  ]
+);

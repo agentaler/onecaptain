@@ -995,6 +995,73 @@ describe("forum sidebar Stage B resources", () => {
     renderer!.unmount()
   })
 
+  it("keeps a text-channel thread's resources when the forum-scoped response omits it", async () => {
+    // A thread under a TEXT channel is structurally outside this query
+    // (`parentType=forum`), so the server always answers `retainedChannel:
+    // null` for it — that is "out of scope", not "gone". Evicting on it removed
+    // the mounted `channelMeta` + retained queries from inside the queryFn that
+    // performed the eviction, and React Query refetches an active query it is
+    // told to remove: one sidebar + one `/channels/:id` request per cycle,
+    // forever, with the route stuck on its composer skeleton.
+    apiFetchMock.mockResolvedValue({
+      ...envelope([]),
+      canonicalChannels: [],
+      retainedChannel: null,
+    })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const detail = serverDetail(false)
+    queryClient.setQueryData(communityKeys.server("server-1"), {
+      ...detail,
+      categories: [{
+        ...detail.categories[0]!,
+        channels: [
+          ...detail.categories[0]!.channels,
+          { id: "text-1", name: "threads", type: "text", active: false, unread: false, muted: false },
+        ],
+      }],
+    })
+    queryClient.setQueryData(
+      communityKeys.channelMeta("server-1", "text-thread"),
+      {
+        id: "text-thread",
+        serverId: "server-1",
+        name: "Thread",
+        type: "thread",
+        parentChannelId: "text-1",
+        parentMessageId: "text-opener",
+        creatorId: "user-1",
+        archived: false,
+        activityAt: "2026-08-08T00:00:00.000Z",
+        verifiedEpoch: 0,
+      },
+    )
+    queryClient.setQueryData(
+      communityKeys.forumOpenerHint("server-1", "text-opener"),
+      { id: "text-opener", content: "Thread title" },
+    )
+    let renderer: TestRenderer.ReactTestRenderer
+    await act(async () => {
+      renderer = TestRenderer.create(
+        React.createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          React.createElement(Capture, { retainId: "text-thread", onRender: () => undefined }),
+        ),
+      )
+    })
+    await waitFor(() => queryClient.getQueryState(
+      communityKeys.forumSidebarRetained("server-1", "text-thread"),
+    )?.status === "success")
+
+    expect(queryClient.getQueryState(
+      communityKeys.channelMeta("server-1", "text-thread"),
+    )).toBeDefined()
+    expect(queryClient.getQueryState(
+      communityKeys.forumOpenerHint("server-1", "text-opener"),
+    )).toBeDefined()
+    renderer!.unmount()
+  })
+
   it("force-restarts an in-flight request on grant instead of reusing its negative response", async () => {
     let resolveFirst: ((value: SidebarThreadEnvelope) => void) | undefined
     let resolveSecond: ((value: SidebarThreadEnvelope) => void) | undefined

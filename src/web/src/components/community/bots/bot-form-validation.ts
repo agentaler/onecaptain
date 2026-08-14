@@ -1,37 +1,33 @@
 export interface BotCreateRequiredFields {
   name: string
-  machineId: string
-  runtime: string
 }
 
 export interface BotCreateFieldErrors {
   name?: string
-  machineId?: string
-  runtime?: string
 }
 
+/**
+ * A name is the only thing an agent genuinely needs.
+ *
+ * This used to also demand a machine and a runtime, which made creating an
+ * agent impossible without the daemon installed — with a perfectly good LLM key
+ * configured. An agent runs on a provider key now, so neither is a
+ * prerequisite.
+ */
 export function validateBotCreateFields({
   name,
-  machineId,
-  runtime,
 }: BotCreateRequiredFields): BotCreateFieldErrors {
   const errors: BotCreateFieldErrors = {}
 
   if (!name.trim()) {
     errors.name = "Name is required"
   }
-  if (!machineId) {
-    errors.machineId = "Pick a machine"
-  }
-  if (!runtime) {
-    errors.runtime = "Pick a runtime"
-  }
 
   return errors
 }
 
 export function hasBotCreateFieldErrors(errors: BotCreateFieldErrors): boolean {
-  return Boolean(errors.name || errors.machineId || errors.runtime)
+  return Boolean(errors.name)
 }
 
 /**

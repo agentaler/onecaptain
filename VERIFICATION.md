@@ -52,19 +52,21 @@ workspace creation/scoping, invite accept lifecycle, member removal,
 multi-workspace task routing, protected-route 401s.
 
 Browser E2E (`pnpm test:e2e-ui`, Playwright) runs in CI on PRs touching
-web/shared. Spec 09 fails on every run and specs 02/03/13/15/17 fail
+web/shared. Spec 09 failed on every run and specs 02/03/13/15/17 failed
 intermittently, all with the same visible signature: a message that is
 known to exist never appears in the feed, and the composer never mounts.
-Each newly-observed spec was checked against the branch locally before
+Both causes below are now fixed. Each newly-observed spec was checked against the branch locally before
 being classified: 02 and 13 both pass locally, and spec 13's popup test
 (`13-mentions.spec.ts:72`) exercises the `searchMembers` path touched by
 the `likeInsensitive` seam, so the seam is exonerated by a positive test
 rather than by assumption.
 
-**The "refetch loop" label on this was wrong.** Reading the Playwright
-trace of a failing spec 09 run shows only ~21–25 API requests for the
-whole journey — there is no loop. Two separate causes hide behind the one
-signature:
+Two separate causes hid behind that one signature. The record here was
+wrong once in between: it retracted the original "refetch loop" label and
+replaced it with "`GET /api/community/servers/:id/unreads` returns 500".
+That retraction was the error — there is no 500, and the loop is real. The
+first reading was right about the shape and only lacked the evidence,
+which the reproduction below supplies.
 
 1. *Cold-route fan-out.* Opening a channel fires ~7 API routes at once.
    Under `next dev` each pays a ~3s first compile and the dev server
@@ -75,14 +77,43 @@ signature:
    on a cold server takes 2.6–4.3s each. The setup warm-up now pre-builds
    them, and after that change every request in the trace completes.
 
-2. *A real 500.* With the fan-out warmed, the same run shows
-   `GET /api/community/servers/:id/unreads` returning **500**, after which
-   the channel view never issues its `/messages` request at all — hence an
-   empty feed and no composer. This is a product bug, not a harness one,
-   and it is the remaining cause of the red. It is NOT yet fixed: the
-   route wraps its queries in `readOrStale` with a fallback, so the throw
-   is coming from outside that guard (`getDb`, `requireServerMember`, or
-   `withAuth`) and still needs to be pinned down.
+2. *A self-retriggering refetch loop in the forum sidebar.* Once the
+   fan-out was warmed, spec 09 reproduced standalone against a local stack
+   with the dev server's own stderr captured (the harness starts services
+   with `stdio: "ignore"`, which is why this was invisible for so long).
+   The log shows **no 5xx anywhere** — the earlier "`/unreads` returns
+   500" claim was wrong — and instead an unbounded alternation, ~2/second
+   until the 60s timeout, of exactly two 200s:
+
+   ```
+   GET /api/community/servers/:id/channels?type=thread&parentType=forum&…&retainId=<child>
+   GET /api/community/channels/<child>
+   ```
+
+   Cause: `seedForumSidebarResources` treated "the response omitted
+   `retainId`" as "this child is gone" and evicted its `channelMeta` and
+   `forumSidebarRetained` queries. But that sidebar query is scoped to
+   `parentType=forum` — `listParticipatingForumThreads` even returns early
+   when the server has no forum channels at all — so a thread under a
+   **text** channel (spec 09's journey) is omitted because it was never in
+   scope, not because it was deleted. The eviction ran inside the very
+   `queryFn` whose query it removed, and React Query answers a
+   `removeQueries` on an *active* query by refetching it, so each pass
+   re-entered the pass that caused it. `routeHydrated` never settled and
+   `channel-route.tsx` rendered `ComposerSkeleton` forever — which is the
+   `community-composer-input` timeout the spec reports.
+
+   Fix: evict only on positive evidence that the child is in scope
+   (`isForumSidebarChild` — its `channelMeta` is loaded *and* names a
+   forum parent). Eviction is destructive, so absence of evidence is not
+   evidence of absence; when the parent type isn't known yet, leave the
+   caches alone. The forum-parented eviction path (leave/delete/archive)
+   is unchanged and still covered, and a child that is genuinely gone is
+   still caught by the `channelMeta` 404 → `isDefinitiveChildMetaFailure`
+   path in `use-channel-route-model`.
+
+   Verified: same journey, same stack, before → after, the two request
+   counts fell from 48 and ~40 to **2** and **1**, and spec 09 passes.
 
 ## Live smoke (Railway deployment)
 

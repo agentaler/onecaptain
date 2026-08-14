@@ -12,7 +12,6 @@ import {
 } from "./community-onboarding-guide";
 
 const botStage = { status: "active", stage: "bot" } as const;
-const machine = (id: string, status: "online" | "offline") => ({ id, status });
 
 describe("community onboarding guide routing", () => {
   afterEach(() => {
@@ -20,51 +19,38 @@ describe("community onboarding guide routing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("routes a zero-machine bot step to Pair", () => {
-    const copy = guideCopy(botStage, { machines: [], bots: [] });
-
-    expect(copy).toMatchObject({
-      target: { name: "connect-machine" },
-      route: "/c/me/machines",
-    });
-  });
-
-  it("routes an offline-only bot step to the exact Reconnect control", () => {
-    const copy = guideCopy(botStage, {
-      machines: [machine("machine-b", "offline"), machine("machine-a", "offline")],
-      bots: [],
-    });
-
-    expect(copy).toMatchObject({
-      target: { name: "reconnect-machine", resourceId: "machine-a" },
-      route: "/c/me/machines",
-    });
-  });
-
-  it("keeps the normal bot step when an online machine is available", () => {
-    const copy = guideCopy(botStage, {
-      machines: [machine("offline", "offline"), machine("online", "online")],
-      bots: [],
-    });
-
-    expect(copy).toMatchObject({
+  it("points step 1 at creating a bot, with nothing to connect first", () => {
+    // The guide used to send step 1 (and a machine-less step 2) to
+    // /c/me/machines, so anyone without the daemon could not finish it. An
+    // agent runs on an LLM key now, and a workspace without its own falls back
+    // to OneCaptain's, so there is no prerequisite left to route to.
+    expect(guideCopy(botStage)).toEqual({
       target: { name: "create-bot" },
+      eyebrow: "Step 1 of 3",
+      title: "Create a bot with a voice of its own",
       route: "/c/me/bots",
     });
   });
 
-  it("prefers the pending bot's bound offline machine over another online machine", () => {
-    const copy = guideCopy(
-      { ...botStage, botId: "bot-7" },
-      {
-        machines: [machine("online", "online"), machine("bound", "offline")],
-        bots: [{ id: "bot-7", machineId: "bound" }],
-      },
-    );
+  it("switches step 1 to the chat hand-off once a bot exists", () => {
+    expect(guideCopy({ ...botStage, botId: "bot-7" })).toMatchObject({
+      target: { name: "create-bot" },
+      title: "Meet your bot in chat",
+    });
+  });
 
-    expect(copy).toMatchObject({
-      target: { name: "reconnect-machine", resourceId: "bound" },
-      route: "/c/me/machines",
+  it("numbers three steps, so the guide can actually reach its end", () => {
+    expect(guideCopy(botStage)?.eyebrow).toBe("Step 1 of 3");
+    expect(guideCopy({ status: "active", stage: "dm", dmId: "dm-4" })?.eyebrow).toBe(
+      "Step 2 of 3",
+    );
+    expect(guideCopy({ status: "active", stage: "server" })?.eyebrow).toBe("Step 3 of 3");
+  });
+
+  it("routes the dm step at the conversation it created", () => {
+    expect(guideCopy({ status: "active", stage: "dm", dmId: "dm-4" })).toMatchObject({
+      target: { name: "dm-composer" },
+      route: "/c/me/dm-4",
     });
   });
 
@@ -86,7 +72,7 @@ describe("community onboarding guide routing", () => {
       }
     });
 
-    const pending = waitForTarget({ name: "connect-machine" }, 50);
+    const pending = waitForTarget({ name: "create-bot" }, 50);
     await vi.advanceTimersByTimeAsync(50);
 
     await expect(pending).resolves.toBeNull();
@@ -116,7 +102,7 @@ describe("community onboarding guide routing", () => {
     expect(guidePopoverSide({ name: "dm-composer" })).toBe("top");
     expect(guidePopoverSide({ name: "channel-composer" })).toBe("top");
     expect(guidePopoverSide({ name: "add-server" })).toBe("right");
-    expect(guidePopoverSide({ name: "reconnect-machine", resourceId: "machine-1" })).toBe("bottom");
+    expect(guidePopoverSide({ name: "create-bot" })).toBe("bottom");
   });
 
   it("hands Driver the inner interactive control instead of its large wrapper", () => {
